@@ -164,11 +164,57 @@ produced = []
 runtime["decrypt_to"] = lambda src, final, key=None: produced.append((src, key)) or True
 runtime["_duration_ok"] = lambda ep, path: (True, 0, 0)
 pending, ok_list, failed = {7, 8}, [], []
-ns["_flush_ready"](pending, 2, ok_list, failed, {})
+progressed = ns["_flush_ready"](pending, 2, ok_list, failed, {})
 assert ns["DEFERRED"] == {7: "ab" * 16}, ns["DEFERRED"]
+# 推迟换源的集【必须算进返回值】:调用方用它判断"这一轮有没有进展"(dry = 0 if got else dry + 1)。
+# 漏掉就会被当成空转,连着几轮后白白触发选集网格重定位。
+assert 7 in progressed and 8 in progressed, progressed
 assert ok_list == [8] and failed == [], (ok_list, failed)
 assert pending == set(), pending
 assert len(produced) == 1 and produced[0][1] is None
+
+# CDN 取源失败必须走 logev(stdout JSON),不能只写 stderr。
+# Electron 对抓取进程的 stderr 只放行匹配英文 error/failed/... 的行,中文诊断会被整条丢掉,
+# 于是主地址卡住重试的那几分钟界面上一片死寂,和真的卡死分不出来。
+assert ns["CDN_TIMEOUT"] <= 30, ns["CDN_TIMEOUT"]        # 这是每次 read 的超时,不是整段下载上限
+events = []
+runtime["logev"] = lambda level, message: events.append((level, message))
+runtime["_http_get"] = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("timed out"))
+assert ns["_fetch_rung"](7, {"definition": "1080p", "url": "https://x/main",
+                             "backup": "https://x/backup", "size": 1}, "/tmp/none.mp4") is False
+text = " | ".join(m for _, m in events)
+assert "主地址下载失败" in text and "改用备用地址重试" in text, text
+assert "备地址下载失败" in text, text
+assert all(lvl == "warn" for lvl, _ in events), events
+# 复现实测事故:70 集的剧,盘上留着别的剧的 5 个文件,一路数到 75/70。
+foreign = {"old%d.mdl" % i for i in range(5)}
+state = {}
+runtime["offline_set"] = lambda: foreign | {"new%d.mdl" % i for i in range(state["n"])}
+runtime["offline_bytes"] = lambda: state["kb"]
+runtime["logev"] = lambda level, message: None
+runtime["dbg"] = lambda m: None
+
+def run(stop_at):
+    """下到 stop_at 个新文件就不再增加;字节数【永远】在涨,模拟有一集卡着涓涓细流地写。"""
+    state.update(n=0, kb=0, t=0.0)
+    def fake_sleep(sec):
+        state["t"] += sec
+        if state["n"] < stop_at: state["n"] = min(stop_at, state["n"] + 3)
+        state["kb"] += 1
+    runtime["time"].sleep = fake_sleep
+    runtime["time"].time = lambda: state["t"]
+    return ns["_wait_download"](70, 1800, foreign)
+
+# 本剧只下到 65 集就卡住:必须判 partial。若把别的剧那 5 个也算进来,
+# 65+5=70 会满足 n>=N 而误判"已下齐",后面整轮拿着缺集的素材往下走。
+assert run(65) == "partial", "本剧没下齐却判成功了(把别的剧的残留算进计数)"
+assert state["n"] == 65, state["n"]
+
+# 本剧下齐 70 集,但字节数总也稳不下来:必须在 GIVEUP 上限内收工,不能空转到 30 分钟 timeout。
+assert run(70) is True, "文件齐了却没收工"
+assert state["t"] < 600, "空转了 %.0fs,应在 GIVEUP 上限内收工" % state["t"]
+print("download counting ok (卡住判 partial;齐了 %.0fs 内收工)" % state["t"])
+
 print("bytevc2 rung fallback ok")
 `;
 

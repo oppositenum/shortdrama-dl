@@ -592,13 +592,21 @@ def _open_dl_panel():
         time.sleep(1.5)
     return ""
 
-def _wait_download(N, timeout):
-    """按【绝对在盘数】等到 N 集下齐。返回 True / 'partial' / 'cancel'。"""
+def _wait_download(N, timeout, baseline=None):
+    """等到本剧 N 集下齐。返回 True / 'partial' / 'cancel'。
+
+    只数【开工后新出现的】文件,不数目录里原有的。原来数的是绝对总数,前提是"清库会把别的剧的
+    残留一起清掉"——可 delete_downloads() 全靠点 UI,失败了还不报错,前提随时会塌。
+    实测踩过:盘上留着别的剧的 5 个文件,70 集的剧一路数到 75/70。两个后果都很坏——
+    本剧其实还差几集时就可能满足 n >= N 提前收工;而且 75>=70 一旦成立,
+    后面就只剩"等字节数稳定"这一个出口了(见下面的 GIVEUP)。"""
     STABLE = 12; GIVEUP = 180
+    if baseline is None: baseline = offline_set()
+    if baseline: dbg(f"[dl] 开工前盘上已有 {len(baseline)} 个 .mdl(别的剧的残留),计数时排除")
     t0 = time.time(); last = 0; last_b = -1; stable_since = None; noprog_since = None
     while time.time() - t0 < timeout:
         if CANCEL["v"]: return "cancel"
-        n = len(offline_set()); b = offline_bytes()               # 绝对在盘数(清库后=本剧)
+        n = len(offline_set() - baseline); b = offline_bytes()
         if b > 0 and b == last_b:
             if stable_since is None: stable_since = time.time()
         else: stable_since = None; last_b = b
@@ -609,6 +617,13 @@ def _wait_download(N, timeout):
         noprog = (time.time() - noprog_since) if noprog_since else 0
         logev("info", f"下载中 {n}/{N} ({b//1024}MB)")
         if n >= N and (b <= 0 or stable_for >= STABLE): return True
+        # 文件数已够,但字节数总也稳不下来:多半是有一集卡在那儿涓涓细流地写,
+        # 每次轮询都把稳定计时器重置。没有这一条,循环会一直空转到 timeout(30 分钟)——
+        # 实测就这么干等过。所以文件齐了就给个上限:超过 GIVEUP 没有新文件也照样收工,
+        # 最后那个可能没下全,交给出片时的时长校验去拦(它本来就是防这一类的)。
+        if n >= N and noprog >= GIVEUP:
+            logev("warn", f"{N} 集文件已齐,但仍有文件在缓慢写入且 {GIVEUP}s 没有新增,按已齐处理")
+            return True
         if n < N and noprog >= GIVEUP and stable_for >= STABLE: return "partial"
         time.sleep(4)
     return "partial"
@@ -637,12 +652,19 @@ def download_all(N, timeout=1800):
     elif len(offline_set()):
         logev("info", f"App 库里没有本剧的下载记录,目录里那 {len(offline_set())} 个文件是别的剧的,整部重下")
     # 盘上不齐:可能存在幽灵记录(App 记为已下载但文件已丢),那些集点下载不会重下。
-    # 先清 App 下载记录再整部干净重下;清库同时也把其它剧残留清空,绝对计数即本剧。
+    # 先清 App 下载记录再整部干净重下。注意【不能假设清库会把别的剧的残留一起清掉】:
+    # delete_downloads() 走的是 App 自己的删除,只认它数据库里有记录的文件;
+    # 数据库不认识的孤儿文件永远删不掉,会一轮轮累积。所以下面一律用"清库后新增"计数。
     for attempt in (1, 2):
-        logev("info", f"磁盘缺文件({len(offline_set())}/{N}),清 App 下载记录后整部重下(第{attempt}/2 次)…")
+        logev("info", f"本剧离线文件不齐(目录内共 {len(offline_set())} 个,含别的剧的残留),"
+                      f"清 App 下载记录后整部重下(第{attempt}/2 次)…")
         try: delete_downloads()
         except Exception as e: dbg(f"清下载记录异常: {e}")
         time.sleep(2)
+        # 【必须在这里取基准】:清库之后、开下之前。清完还剩下的就是清不掉的别的剧的残留,
+        # 后面的计数一律排除它们。放到 _wait_download 里取就晚了——那时点"开始下载"已经过去两秒,
+        # 本剧可能已经落盘一两个文件,被当成残留排除掉,反而永远数不到 N。
+        baseline = offline_set()
         if not search_open(NAME):
             logev("error", "清库后重新进入该剧失败"); return len(offline_set()) >= 1
         panel = _open_dl_panel()
@@ -656,15 +678,16 @@ def download_all(N, timeout=1800):
         tap(*st); time.sleep(2)
         cont = ui_find(ui_dump(), text='继续')
         if cont: tap(*cont); time.sleep(2)
-        res = _wait_download(N, timeout)
+        res = _wait_download(N, timeout, baseline)
         if res == "cancel": return "cancel"
         keyback(); time.sleep(1.5)          # 关下载面板,收口回剧详情页(与复用路径同一落点)
         if res is True: return True
+        got = len(offline_set() - baseline)      # 与 _wait_download 的判据保持一致,别再报绝对总数
         if attempt == 1:
-            logev("warn", f"仅下到 {len(offline_set())}/{N},清库整部重下一次"); continue
-        logev("warn", f"下载卡在 {len(offline_set())}/{N},以现有继续")
-        return len(offline_set()) >= 1
-    return len(offline_set()) >= 1
+            logev("warn", f"仅下到 {got}/{N},清库整部重下一次"); continue
+        logev("warn", f"下载卡在 {got}/{N},以现有继续")
+        return got >= 1
+    return True
 
 # ============ 集号 ↔ .mdl 文件 的确定性映射(取自 App 自己的数据库)============
 # 界面识别(顶栏'第X集'/高亮格子)会读不到、会滞后,而 App 的下载库里本来就写着
@@ -884,7 +907,13 @@ def _pick_rung(ep):
             return r
     return None
 
-def _http_get(url, dest, expect=0, timeout=120):
+# 单次 socket 操作的超时。这个源正常 1 秒内就有响应,给到 25 秒已经很宽裕。
+# 【别再调大】:它是【每次 read 的超时】,不是整段下载的上限。原来写 120 秒时,
+# 主地址一旦卡住就要干等满 120 秒,再换备用地址又是一轮——实测出现过单集卡 3 分半,
+# 而那段时间界面上一行日志都没有,看起来就像整个程序死了。
+CDN_TIMEOUT = 25
+
+def _http_get(url, dest, expect=0, timeout=CDN_TIMEOUT, tag=""):
     import urllib.request
     req = urllib.request.Request(url, headers={
         "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36",
@@ -892,32 +921,52 @@ def _http_get(url, dest, expect=0, timeout=120):
     })
     tmp = dest + ".part"
     total = 0
-    with urllib.request.urlopen(req, timeout=timeout) as src, open(tmp, "wb") as fh:
-        while True:
-            if CANCEL["v"]: raise RuntimeError("canceled")
-            chunk = src.read(1 << 20)
-            if not chunk: break
-            total += len(chunk)
-            if total > 2 * 1024 * 1024 * 1024: raise RuntimeError("响应超过 2GB 上限")
-            fh.write(chunk)
-    if expect and total != expect:
-        os.remove(tmp)
-        raise RuntimeError(f"大小不符(拿到 {total},应为 {expect})")
+    t0 = last_beat = time.time()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as src, open(tmp, "wb") as fh:
+            while True:
+                if CANCEL["v"]: raise RuntimeError("canceled")
+                chunk = src.read(1 << 20)
+                if not chunk: break
+                total += len(chunk)
+                if total > 2 * 1024 * 1024 * 1024: raise RuntimeError("响应超过 2GB 上限")
+                fh.write(chunk)
+                # 慢下载的心跳。没有它,一次 60 秒的下载在界面上就是 60 秒的死寂,
+                # 和真的卡死分不出来——用户唯一能做的判断就是"是不是挂了"。
+                now = time.time()
+                if now - t0 > 8 and now - last_beat > 5:
+                    last_beat = now
+                    pct = f" {total * 100 // expect}%" if expect else ""
+                    logev("info", f"{tag}下载中{pct} ({total // 1024}KB / {now - t0:.0f}s)")
+        if expect and total != expect:
+            raise RuntimeError(f"大小不符(拿到 {total},应为 {expect})")
+    except Exception:
+        try:
+            if os.path.exists(tmp): os.remove(tmp)   # 半截文件绝不能留给下一步
+        except OSError: pass
+        raise
     os.replace(tmp, dest)
     return total
 
 def _fetch_rung(ep, rung, dest):
-    """下这一档的源文件,主备地址各试一次。"""
+    """下这一档的源文件,主备地址各试一次。
+
+    失败信息走 logev(stdout JSON) 而【不是 dbg(stderr)】:Electron 那边对抓取进程的 stderr
+    只放行匹配英文 error/failed/... 的行,中文诊断会被整条丢掉。结果就是主地址卡住重试的那几分钟
+    界面上完全没有输出,用户只能看到进度莫名其妙停住——问题本身反而不是最难受的,看不见才是。"""
     last = None
     for label, url in (("主", rung["url"]), ("备", rung.get("backup"))):
         if not url: continue
+        t0 = time.time()
         try:
-            n = _http_get(url, dest, expect=rung.get("size") or 0)
-            dbg(f"[cdn] 第{ep}集 {rung['definition']} {label}地址下好 {n}B")
+            n = _http_get(url, dest, expect=rung.get("size") or 0, tag=f"第{ep}集 ")
+            el = time.time() - t0
+            dbg(f"[cdn] 第{ep}集 {rung['definition']} {label}地址下好 {n}B 用时 {el:.1f}s")
             return True
         except Exception as e:
             last = e
-            dbg(f"[cdn] 第{ep}集 {rung['definition']} {label}地址失败: {e}")
+            logev("warn", f"第{ep}集 {label}地址下载失败(等待 {time.time() - t0:.0f}s): {e}"
+                          + ("，改用备用地址重试" if label == "主" and rung.get("backup") else ""))
     logev("warn", f"第{ep}集 1080p 源下载失败: {last}")
     return False
 
@@ -1240,12 +1289,53 @@ def _nudge_play():
 # 全靠它跑完整部剧)。反过来,逐集定位要踩的全是最不稳的地方:选集网格四种形态、点已看完的集会跳集、
 # 失败复位又会把播放位置打回续播点甚至带到别的剧——而且恢复动作本身还会制造新的坏状态。
 # 所以主路径改成:粗定位一次 → 停留收割 → 上滑一集 → 停留收割 …… 谁被解密了由索引说了算。
-SWIPE_MS = "500"                                        # 慢速大幅度上滑:实测稳定 +1 集,快了会惯性冲过头
+# 【位移要够大】,这是单次成功率的决定因素。Android 翻页通常有两个判据:fling 速度达标,
+# 或者拖拽距离超过约半页。这个播放器上 fling 判据在模拟器里很不可靠——录屏看得很清楚,
+# 页面滑了一小段又弹回原位。所以别指望速度,直接把位移拉到超过半屏,让距离判据兜底。
+#   实测(1080x2400):
+#     0.62 → 0.25 (37% 屏高)  约 35%
+#     0.77 → 0.19 (58% 屏高)  约 28%
+#     0.875 → 0.042 (83% 屏高) 约 83%   ← 当前值
+# 时长同样测过:100ms 只有 8%(太快反而识别不了),200/500ms 都在 30% 上下,300ms 配大位移最好。
+SWIPE_MS = "300"
+SWIPE_FROM, SWIPE_TO = 0.875, 0.042      # 1080x2400 上 = y 2100 → 100
+# 起点靠下【本来】是有风险的:底部"选集"条(这台机器上 y≈2265)是个 bottom sheet 拖拽把手,
+# 从它附近起手会变成"上拉选集面板",掉进详情页 sheet 态——那时上滑只是滚选集网格,永远切不了集。
+# 0.875H(y=2100)落在剧名/简介行上、还在那条把手【上方】,实测连续多轮没有掉进去过。
+# 【往下调 SWIPE_FROM 要格外小心】,越接近 0.94H 越容易被那条把手截走。
+SWIPE_TRIES = 3           # 单次约 83% → 3 次覆盖 1-0.17^3 = 99.5%,再多没意义
+SWIPE_VERIFY = 1.6        # 每次重滑后用多长的解密事件窗口确认"到底换没换集"
 
-def _swipe_next():
-    """全屏播放器里上滑 = 下一集。必须确认在全屏播放器再滑:详情页 sheet 态上滑是滚页面,会把布局搞乱。"""
-    sh("input", "swipe", str(_W // 2), str(int(_H * 0.77)), str(_W // 2), str(int(_H * 0.19)), SWIPE_MS)
-    time.sleep(1.2)
+def _raw_swipe(y1, y2):
+    """按【屏幕高度比例】发滑动,不写死像素——换分辨率的设备要照样能用。
+    _W/_H 是启动时用 wm size 读的实际分辨率。夹一下边界,免得比例调过头算出屏幕外的坐标。"""
+    x = _W // 2
+    py1 = max(1, min(_H - 2, int(_H * y1)))
+    py2 = max(1, min(_H - 2, int(_H * y2)))
+    sh("input", "swipe", str(x), str(py1), str(x), str(py2), SWIPE_MS)
+
+def _swipe_next(expect_from=None, tries=SWIPE_TRIES):
+    """全屏播放器里上滑 = 下一集;给了 expect_from 就【确认真的换集了】,没换立刻重滑。
+
+    为什么必须验证:实测盲滑的成功率只有 25~40%(录屏看得很清楚——页面确实滑动了一小段,
+    然后又弹回原位,fling 没达标)。而旧写法滑完就走,失败了要等主循环下一轮花掉一整个
+    3~6 秒的测量窗口才发现还在原地,那一整轮全是白干。就地重滑一次只要约 2 秒。
+
+    验证【只用解密事件】,绝不读 UI:全屏播放器里视频一直在播,窗口永远不 idle,
+    uiautomator dump 必定失败——而一次失败的 dump 要 11.5 秒,ui_dump() 默认重试 3 次
+    就是 35 秒。放进重滑循环里会比它要解决的问题还贵。"""
+    for i in range(tries):
+        _raw_swipe(SWIPE_FROM, SWIPE_TO)
+        if expect_from is None:                 # 调用方不知道自己在哪一集,没法比对,滑完就算
+            time.sleep(1.2); return True
+        ep, state = _now_playing(SWIPE_VERIFY)
+        if state == "ok" and ep != expect_from:
+            if i: dbg(f"[swipe] 滑了 {i + 1} 次才从第{expect_from}集换到第{ep}集")
+            return True
+        if state == "foreign":                  # 跑到别的剧上去了,交给上层重进,别在这儿空滑
+            dbg("[swipe] 量到的 key 不属于本剧,交给上层处理"); return False
+        dbg(f"[swipe] 第{i + 1}/{tries} 次滑动没换集(仍在第{expect_from}集/{state})")
+    return False
 
 _AD_CONTINUE_MARKERS = (
     "上滑继续观看短剧",
@@ -1281,7 +1371,7 @@ def _skip_ad_if_present(xml=None, max_swipes=2):
 
 def _swipe_prev():
     """下滑 = 上一集。用于目标集被跳过(播放头已经越过它)时退回去补。"""
-    sh("input", "swipe", str(_W // 2), str(int(_H * 0.19)), str(_W // 2), str(int(_H * 0.77)), SWIPE_MS)
+    _raw_swipe(SWIPE_TO, SWIPE_FROM)
     time.sleep(1.2)
 
 def _now_playing(sec, want=None):
@@ -1401,6 +1491,11 @@ def _flush_ready(pending, width, ok_list, failed, badcnt):
             pending.discard(ep)
             logev("info", f"第{ep}集离线副本是 {bad[0] if bad else '720p'},"
                           f"已拿到 key,改用服务端 1080p 源出片(抓取结束后统一下载)")
+            # 【必须算作本轮有进展】。这一集的 key 已经到手,App 那边真的做完了,只是出片挪到收尾。
+            # 漏掉这一句,调用方的 `dry = 0 if got else dry + 1` 就会把它当成"这一轮什么也没捞到",
+            # 连着 8 轮后白白触发一次选集网格重定位——而 ByteVC2 的集可能占到全剧一半,
+            # 于是越是靠换源救回来的剧,越会被这个假信号反复打断。
+            done.append(ep)
             continue
         emit({"event": "episode_start", "ep": ep})
         emit({"event": "progress", "ep": ep, "percent": 80.0})
@@ -1515,7 +1610,9 @@ def run_harvest(todo, width, ok_list, failed):
             else: relocate_fail = 0
             if relocate_fail >= GIVEUP: break
             continue
-        _swipe_next()                                       # 常态:往下一集走,继续收割
+        # 常态:往下一集走,继续收割。把当前集号传进去,滑完就地确认真的换集了,
+        # 没换立刻重滑——盲滑只有约三成能成,失败一次旧写法要赔掉下一整轮的测量窗口。
+        _swipe_next(expect_from=ep_now)
 
     # 收尾:放一放的那些集,这会儿可能已经被顺带解密了,再捡一遍
     if pending and not CANCEL["v"]:
