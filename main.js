@@ -404,6 +404,9 @@ async function extractSeriesInfo(seriesUrl) {
               vidList: list,
               episodeCnt: sd.episode_cnt || 0,
               cover: sd.series_cover || '',
+              // 只用于生成「简介.txt」。缺了也不影响下载流程，所以给默认值，
+              // 绝不让详情页少个字段就把整剧判失败。
+              intro: sd.series_intro || '',
             };
           }
           return null;
@@ -858,6 +861,25 @@ async function downloadCover(coverUrl, seriesDir) {
     log(`封面已保存：封面${ext}`);
   } catch (err) {
     log(`封面下载失败（不影响剧集）：${err.message}`, 'warn');
+  }
+}
+
+/**
+ * 把剧名和剧情简介写成剧目文件夹里的「简介.txt」，只要这两样。
+ *
+ * 每次都重写：连载中的剧简介会改，保留旧的没意义。
+ * 这是个纯附带产物，任何一步出问题都只记警告——绝不能因为写不出一个文本文件
+ * 就影响视频下载（封面下载也是同样的处理原则）。
+ */
+function writeSeriesIntro(info, seriesDir) {
+  try {
+    const name = info.seriesName || '（未知剧名）';
+    const intro = info.intro || '';
+    const text = intro ? `${name}\n\n${intro}\n` : `${name}\n`;
+    fs.writeFileSync(path.join(seriesDir, '简介.txt'), text, 'utf8');
+    log('简介已保存：简介.txt');
+  } catch (err) {
+    log(`简介保存失败（不影响剧集）：${err.message}`, 'warn');
   }
 }
 
@@ -1540,8 +1562,9 @@ async function downloadSeriesCore(url, saveDir, opts = {}) {
     throw new Error(`创建目录失败：${e.message}`);
   }
 
-  // 网页整剧流程唯一下载的内容是封面，不打开任何分集播放器。
+  // 网页整剧流程只落两样东西：封面和简介，不打开任何分集播放器。
   await downloadCover(info.cover, seriesDir);
+  writeSeriesIntro(info, seriesDir);
 
   const beforeCount = countExistingEpisodes(seriesDir, totalCnt);
   let appOk = 0;
