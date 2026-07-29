@@ -1,0 +1,371 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Prepare release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      - name: Create or update the release pull request
+        id: release
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  build-macos:
+    name: Build signed macOS universal DMG
+    if: needs.release-please.outputs.release_created == 'true'
+    needs: release-please
+    runs-on: macos-15
+    environment: release
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+      RELEASE_VERSION: ${{ needs.release-please.outputs.version }}
+    steps:
+      - name: Check out released source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.release-please.outputs.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify release version
+        run: node scripts/verify-release-version.js "$RELEASE_TAG" "$RELEASE_VERSION"
+
+      - name: Test and audit
+        run: |
+          npm test
+          npm audit --omit=dev
+
+      - name: Build signed and notarized universal DMG
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$CSC_LINK" || -z "$CSC_KEY_PASSWORD" ]]; then
+            echo "MAC_CSC_LINK and MAC_CSC_KEY_PASSWORD are required." >&2
+            exit 1
+          fi
+
+          apple_id_any=0
+          apple_id_complete=0
+          api_key_any=0
+          api_key_complete=0
+          key_path=""
+          cleanup() {
+            if [[ -n "$key_path" && -f "$key_path" ]]; then
+              rm -f "$key_path"
+            fi
+          }
+          trap cleanup EXIT
+
+          if [[ -n "$APPLE_ID" || -n "$APPLE_APP_SPECIFIC_PASSWORD" || -n "$APPLE_TEAM_ID" ]]; then
+            apple_id_any=1
+          fi
+          if [[ -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
+            apple_id_complete=1
+          fi
+          if [[ -n "$APPLE_API_KEY_BASE64" || -n "$APPLE_API_KEY_ID" || -n "$APPLE_API_ISSUER" ]]; then
+            api_key_any=1
+          fi
+          if [[ -n "$APPLE_API_KEY_BASE64" && -n "$APPLE_API_KEY_ID" && -n "$APPLE_API_ISSUER" ]]; then
+            api_key_complete=1
+          fi
+
+          if [[ "$apple_id_any" -eq 1 && "$apple_id_complete" -eq 0 ]]; then
+            echo "APPLE_ID notarization credentials are incomplete." >&2
+            exit 1
+          fi
+          if [[ "$api_key_any" -eq 1 && "$api_key_complete" -eq 0 ]]; then
+            echo "App Store Connect API key credentials are incomplete." >&2
+            exit 1
+          fi
+          if [[ "$apple_id_complete" -eq "$api_key_complete" ]]; then
+            echo "Configure exactly one complete Apple notarization credential method." >&2
+            exit 1
+          fi
+
+          if [[ "$api_key_complete" -eq 1 ]]; then
+            key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+            printf '%s' "$APPLE_API_KEY_BASE64" | openssl base64 -d -A -out "$key_path"
+            chmod 600 "$key_path"
+            export APPLE_API_KEY="$key_path"
+          fi
+
+          npm run dist:mac:signed
+
+      - name: Verify signed universal artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          app_path="release/mac-universal/红果短剧下载器.app"
+          dmg_path="release/红果短剧下载器-${RELEASE_VERSION}-universal.dmg"
+          [[ -d "$app_path" ]] || { echo "Missing app bundle: $app_path" >&2; exit 1; }
+          [[ -f "$dmg_path" ]] || { echo "Missing DMG: $dmg_path" >&2; exit 1; }
+
+          verify_app() {
+            local candidate="$1"
+            local macho_count=0
+            local binary
+            local archs
+
+            codesign --verify --deep --strict --verbose=2 "$candidate"
+            spctl --assess --type execute --verbose=4 "$candidate"
+            xcrun stapler validate "$candidate"
+
+            while IFS= read -r -d '' binary; do
+              if file "$binary" | grep -q 'Mach-O'; then
+                macho_count=$((macho_count + 1))
+                archs="$(lipo -archs "$binary")"
+                if [[ " $archs " != *" x86_64 "* || " $archs " != *" arm64 "* ]]; then
+                  echo "Not universal: $binary ($archs)" >&2
+                  return 1
+                fi
+              fi
+            done < <(
+              find "$candidate/Contents" -type f \
+                \( -perm -111 -o -name '*.node' -o -name '*.dylib' \) -print0
+            )
+
+            if [[ "$macho_count" -eq 0 ]]; then
+              echo "No Mach-O files found in $candidate" >&2
+              return 1
+            fi
+            echo "Verified $macho_count universal Mach-O files."
+          }
+
+          verify_app "$app_path"
+          hdiutil verify "$dmg_path"
+
+          mount_dir="$(mktemp -d "$RUNNER_TEMP/shortdrama-dmg.XXXXXX")"
+          cleanup() {
+            hdiutil detach "$mount_dir" -quiet || true
+            rmdir "$mount_dir" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          hdiutil attach "$dmg_path" -nobrowse -readonly -mountpoint "$mount_dir" >/dev/null
+          verify_app "$mount_dir/红果短剧下载器.app"
+          hdiutil detach "$mount_dir" -quiet
+          trap - EXIT
+          rmdir "$mount_dir"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-macos-${{ needs.release-please.outputs.version }}
+          path: release/红果短剧下载器-${{ needs.release-please.outputs.version }}-universal.dmg
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  build-windows:
+    name: Build Windows x64 NSIS installer
+    if: needs.release-please.outputs.release_created == 'true'
+    needs: release-please
+    runs-on: windows-2022
+    environment: release
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+      RELEASE_VERSION: ${{ needs.release-please.outputs.version }}
+    steps:
+      - name: Check out released source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.release-please.outputs.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify release version
+        run: node scripts/verify-release-version.js "$env:RELEASE_TAG" "$env:RELEASE_VERSION"
+
+      - name: Test and audit
+        run: |
+          npm test
+          npm audit --omit=dev
+
+      - name: Build NSIS installer
+        id: build
+        shell: pwsh
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+        run: |
+          if ([bool]$env:CSC_LINK -ne [bool]$env:CSC_KEY_PASSWORD) {
+            throw 'Configure both WINDOWS_CSC_LINK and WINDOWS_CSC_KEY_PASSWORD, or neither.'
+          }
+          "signed=$([bool]$env:CSC_LINK)".ToLowerInvariant() | Add-Content -Path $env:GITHUB_OUTPUT
+          npm run dist:win
+
+      - name: Verify Windows installer
+        shell: pwsh
+        env:
+          WINDOWS_SIGNED: ${{ steps.build.outputs.signed }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = "release/红果短剧下载器-$env:RELEASE_VERSION-setup.exe"
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw "Missing NSIS installer: $installer"
+          }
+          if ((Get-Item -LiteralPath $installer).Length -le 0) {
+            throw "Empty NSIS installer: $installer"
+          }
+
+          if ($env:WINDOWS_SIGNED -eq 'true') {
+            $signature = Get-AuthenticodeSignature -LiteralPath $installer
+            if ($signature.Status -ne 'Valid') {
+              throw "Windows signature validation failed: $($signature.Status) $($signature.StatusMessage)"
+            }
+            "Windows Authenticode signature: Valid" | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+          } else {
+            "Windows installer is unsigned because WINDOWS_CSC_LINK was not configured. SmartScreen warnings are expected." |
+              Add-Content -Path $env:GITHUB_STEP_SUMMARY
+          }
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-windows-${{ needs.release-please.outputs.version }}
+          path: release/红果短剧下载器-${{ needs.release-please.outputs.version }}-setup.exe
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  publish:
+    name: Publish verified GitHub Release
+    if: needs.release-please.outputs.release_created == 'true'
+    needs:
+      - release-please
+      - build-macos
+      - build-windows
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+      RELEASE_VERSION: ${{ needs.release-please.outputs.version }}
+      RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
+    steps:
+      - name: Check out released source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.release-please.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Verify release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/verify-release-version.js "$RELEASE_TAG" "$RELEASE_VERSION"
+          tag_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+          if [[ "$tag_sha" != "$RELEASE_SHA" ]]; then
+            echo "Tag $RELEASE_TAG points to $tag_sha, expected $RELEASE_SHA." >&2
+            exit 1
+          fi
+          is_draft="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq .draft)"
+          if [[ "$is_draft" != "true" ]]; then
+            echo "Release $RELEASE_TAG is not a draft; refusing to replace a published release." >&2
+            exit 1
+          fi
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-*-${{ needs.release-please.outputs.version }}
+          path: release-assets
+          merge-multiple: true
+
+      - name: Validate artifacts and create checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg="release-assets/红果短剧下载器-${RELEASE_VERSION}-universal.dmg"
+          exe="release-assets/红果短剧下载器-${RELEASE_VERSION}-setup.exe"
+          [[ -s "$dmg" ]] || { echo "Missing or empty DMG: $dmg" >&2; exit 1; }
+          [[ -s "$exe" ]] || { echo "Missing or empty installer: $exe" >&2; exit 1; }
+
+          mapfile -t files < <(find release-assets -maxdepth 1 -type f -print | sort)
+          if [[ "${#files[@]}" -ne 2 ]]; then
+            printf 'Expected exactly two release artifacts, found:\n%s\n' "${files[*]}" >&2
+            exit 1
+          fi
+
+          (
+            cd release-assets
+            sha256sum "$(basename "$dmg")" "$(basename "$exe")" > SHA256SUMS.txt
+            sha256sum --check SHA256SUMS.txt
+          )
+
+      - name: Upload assets and publish draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
+
+          expected_assets=3
+          actual_assets="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.assets | length')"
+          if [[ "$actual_assets" -ne "$expected_assets" ]]; then
+            echo "Release asset count is $actual_assets, expected $expected_assets." >&2
+            exit 1
+          fi
+
+          gh release edit "$RELEASE_TAG" --draft=false --latest

@@ -1,0 +1,63 @@
+# 依赖
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 构建 / 打包产物
+release/
+dist/
+out/
+
+# Playwright 浏览器（体积大，由 npm run fetch-browser 生成）
+ms-playwright/
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 环境变量
+.env
+.env.*
+!.env.example
+
+# Python 抓取运行时生成物 / 外部二进制
+python/.appdb/
+python/.cdn/
+python/allmdl/
+python/captured*.jsonl
+python/frida-server
+python/frida-server-*
+python/ADBKeyboard.apk
+python/*.mdl
+python/*.mp4
+python/*.dec.mp4
+python/*.nodeconf
+python/*_cap.bin
+python/*.raw
+python/*.db
+python/*.db-shm
+python/*.db-wal
+python/*.log
+python/*.png
+python/*.xml
+python/*keys*.txt
+
+# 用户选择项目目录作为输出位置时的兜底排除
+downloads/
+output/
+*.part
+.tmp_*.mp4
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

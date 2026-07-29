@@ -1,0 +1,12 @@
+# Electron 集成用 Python 依赖(python -m pip install -r requirements.txt)
+#
+# ⚠️ frida 必须锁版本,原因有二:
+#   1) frida 的 Python 端与设备端 frida-server 版本必须严格一致。
+#      本项目要求的 frida-server 版本是 v17.15.5,故此处锁 17.15.5。
+#      frida-server 不随仓库分发,需按设备 ABI 自行准备。
+#      换 frida-server 时,这里也要同步改。
+#   2) frida >= 17.16 用了 Python 3.11+ 的 typing.NotRequired,在本机的
+#      Python 3.9.6 上直接 ImportError。
+frida==17.15.5        # 注入抓 AES key;版本须与设备端 frida-server 一致
+frida-tools==14.5.1   # 配套 CLI 工具
+cryptography>=41      # AES-128-CTR 解密

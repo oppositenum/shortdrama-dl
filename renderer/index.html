@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>红果短剧下载器</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- 顶部标题 -->
+      <header class="header">
+        <div class="brand">
+          <span class="logo">🎬</span>
+          <div>
+            <h1>红果短剧下载器</h1>
+            <p class="subtitle">粘贴播放页链接，一键抓取并下载为 MP4</p>
+          </div>
+        </div>
+      </header>
+
+      <!-- 输入区 -->
+      <section class="card">
+        <label class="field-label" for="url">播放页 / 详情页链接</label>
+        <div class="input-row">
+          <input
+            id="url"
+            type="text"
+            placeholder="播放页 /player/... 网页下单集；详情/分类页保存封面后由 App 从第1集抓全集"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+
+        <label class="field-label" for="dir">保存目录</label>
+        <div class="input-row">
+          <input id="dir" type="text" placeholder="默认下载文件夹" readonly />
+          <button id="chooseDir" class="btn btn-ghost">选择文件夹</button>
+        </div>
+
+        <label class="checkbox-row">
+          <input id="appGrab" type="checkbox" checked />
+          <span>用 App 抓取全集（网页只保存封面，视频从第 1 集开始全部由 App 抓取，需已 root 安卓设备）</span>
+        </label>
+        <div class="input-row" id="grabDirRow">
+          <input
+            id="grabDir"
+            type="text"
+            placeholder="App 抓取组件目录，留空使用项目内置 python 目录（也可用 HONGGUO_GRAB_DIR 覆盖）"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button id="chooseGrabDir" class="btn btn-ghost">选择目录</button>
+        </div>
+
+        <div class="actions">
+          <button id="start" class="btn btn-primary">
+            <span class="btn-text">开始下载</span>
+          </button>
+          <button id="cancel" class="btn btn-danger" disabled>取消</button>
+          <button id="openDir" class="btn btn-ghost" disabled>打开文件夹</button>
+        </div>
+      </section>
+
+      <!-- 进度区 -->
+      <section class="card">
+        <div class="status-row">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="status" class="status-text">就绪</span>
+          <span id="episode" class="episode-badge"></span>
+          <span id="progressText" class="progress-text">0%</span>
+        </div>
+        <div class="progress-track">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <div class="meta-row">
+          <span id="timemark">--:--:--</span>
+          <span id="speed"></span>
+        </div>
+      </section>
+
+      <!-- 日志区 -->
+      <section class="card log-card">
+        <div class="log-head">
+          <span>运行日志</span>
+          <button id="clearLog" class="btn btn-mini">清空</button>
+        </div>
+        <div id="log" class="log"></div>
+      </section>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

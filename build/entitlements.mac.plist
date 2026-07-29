@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Electron 运行需要 JIT / 可执行内存 -->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+	<!-- 允许通过环境变量注入（Electron 内部会用到） -->
+	<key>com.apple.security.cs.allow-dyld-environment-variables</key>
+	<true/>
+	<!-- 允许加载随应用打包的第三方二进制（ffmpeg / Playwright 的 Chromium） -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>

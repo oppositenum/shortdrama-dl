@@ -1,0 +1,44 @@
+{
+  "name": "shortdrama-dl",
+  "version": "1.0.0",
+  "description": "红果短剧下载器 - 抓取并下载红果短剧视频到本地（支持 Windows / macOS）",
+  "main": "main.js",
+  "author": "oppositenum",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oppositenum/shortdrama-dl.git"
+  },
+  "homepage": "https://github.com/oppositenum/shortdrama-dl#readme",
+  "bugs": {
+    "url": "https://github.com/oppositenum/shortdrama-dl/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "cross-env ELECTRON_RUN_AS_NODE= PLAYWRIGHT_BROWSERS_PATH=./ms-playwright electron .",
+    "dev": "cross-env ELECTRON_RUN_AS_NODE= PLAYWRIGHT_BROWSERS_PATH=./ms-playwright electron . --enable-logging",
+    "test": "node --test tests/*.test.js",
+    "fetch-browser": "cross-env PLAYWRIGHT_BROWSERS_PATH=./ms-playwright playwright install chromium",
+    "pack": "electron-builder --dir --config electron-builder.js",
+    "pack:mac:universal": "electron-builder --mac --universal --dir --config electron-builder.js",
+    "dist": "electron-builder --config electron-builder.js",
+    "dist:win": "electron-builder --win --x64 --config electron-builder.js",
+    "dist:mac": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --universal --config electron-builder.js",
+    "dist:mac:arm64": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --arm64 --config electron-builder.js",
+    "dist:mac:x64": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --x64 --config electron-builder.js",
+    "dist:mac:signed": "cross-env SIGN_MAC=1 electron-builder --mac --universal --config electron-builder.js",
+    "dist:mac:signed:arm64": "cross-env SIGN_MAC=1 electron-builder --mac --arm64 --config electron-builder.js",
+    "dist:mac:signed:x64": "cross-env SIGN_MAC=1 electron-builder --mac --x64 --config electron-builder.js"
+  },
+  "dependencies": {
+    "playwright": "^1.62.0"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
+  }
+}
