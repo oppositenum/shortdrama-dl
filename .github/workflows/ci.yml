@@ -123,7 +123,7 @@ jobs:
     name: Package Windows x64
     needs: test
     runs-on: windows-2022
-    timeout-minutes: 15
+    timeout-minutes: 8
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -149,13 +149,12 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      # electron-builder 在 windows-2022 上会挂十几分钟且一行输出都不出（--dir 解包
-      # 都会挂，所以与 NSIS/winCodeSign 无关，问题在 electron-builder 自身启动阶段）。
-      # “零输出”是假象：步骤超时被 SIGKILL 时，缓冲在管道里的 stdout 全丢了，
-      # 连 DEBUG 的日志都透不出来。
-      # 这里换成后台跑 + 自己每 15s 读一次日志文件：因为是我们主动读文件，
-      # 不依赖子进程刷新管道，DEBUG 轨迹卡在哪一行就能精确看到，即使最后被 kill。
-      - name: Build unpacked smoke package
+      # 定位 windows-2022 上 electron-builder 启动即挂（连版本横幅都不打，--dir 也挂）。
+      # 直接读日志文件已证实是真·零输出，卡在打横幅之前。这里用轻量探针区分两种可能：
+      # 若 --version / --help 都秒回，说明模块能正常加载，问题在构建流水线；
+      # 若这俩也挂，说明是 electron-builder 自身在该机加载/自带二进制的问题。
+      # 每个探针最多等 30s 就判定挂起，整步 1 分钟内出结论，不再空耗 15 分钟。
+      - name: Probe electron-builder startup
         shell: bash
         env:
           ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
@@ -163,17 +162,22 @@ jobs:
           DEBUG: electron-builder
         run: |
           set +e
-          npm run pack -- --win --x64 > build.log 2>&1 &
-          PID=$!
-          for i in $(seq 1 44); do
-            sleep 15
-            if ! kill -0 "$PID" 2>/dev/null; then break; fi
-            echo "----- still running after $((i*15))s; tail of build.log: -----"
-            tail -n 8 build.log
-          done
-          wait "$PID"
-          code=$?
-          echo "===== electron-builder exit code: $code ====="
-          echo "===== full build.log ====="
-          cat build.log
-          exit "$code"
+          node -v
+          probe() {
+            local label="$1"; shift
+            echo "===== probe: $label ====="
+            "$@" > probe.log 2>&1 &
+            local pid=$!
+            local i
+            for i in $(seq 1 6); do
+              sleep 5
+              if ! kill -0 "$pid" 2>/dev/null; then
+                wait "$pid"; echo "[$label] finished rc=$?"; cat probe.log; return
+              fi
+            done
+            echo "[$label] STILL HANGING after 30s"
+            cat probe.log
+            kill "$pid" 2>/dev/null
+          }
+          probe "electron-builder --version" ./node_modules/.bin/electron-builder --version
+          probe "electron-builder --help" ./node_modules/.bin/electron-builder --help
