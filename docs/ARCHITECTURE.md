@@ -65,12 +65,12 @@ Electron 不导入 Python 模块，Python 也不依赖 Electron API。唯一正�
 正式 Python 子进程启动前，Electron 依次执行：
 
 1. 根据 `process.platform` 选择主机流程：`darwin` 为 macOS，`win32` 为 Windows；其他系统明确拒绝 App 抓取自动准备。
-2. 验证 Python 3.8+、`frida==17.15.5` 和 `cryptography>=41`；需要时在开发项目 `.venv/` 或打包应用用户数据目录创建隔离环境。缺少 Python 时，macOS 使用 Homebrew，Windows 使用 WinGet 安装 Python 3.12。
+2. 验证 Python 3.11+、`frida==17.16.4` 和 `cryptography>=41`；需要时在开发项目 `.venv/` 或打包应用用户数据目录创建隔离环境（失败时会清除并 `--clear` 重建）。缺少 Python 时，macOS 使用 Homebrew，Windows 使用 WinGet 安装 Python 3.12。
 3. 验证系统 `ffmpeg`/`ffprobe`；缺失时经用户确认，macOS 使用 Homebrew，Windows 使用 WinGet，并在安装后重新校验两个命令。
 4. macOS 调用 `start_avd.sh`，Windows 调用 `start_avd.ps1`。先以 check 模式探测，已有设备直接复用；已有但停止的 `hongguo` AVD 自动启动；缺少 SDK/AVD 时经用户确认后以 install-missing 模式准备。
 5. 将脚本返回的设备序列号写入 Python 子进程的 `ANDROID_SERIAL`。
 6. 将应用用户数据目录下的 `runtime/android` 通过 `HONGGUO_RUNTIME_DIR` 传给 Python，作为所有抓取缓存的可写根目录。
-7. Python 检查设备 Frida Server。缺少或版本不匹配时，从官方 Frida Release 下载到应用用户数据缓存，然后推送并启动。
+7. Python 检查设备 Frida Server。缺少或版本不匹配时，从官方 Frida Release 下载到应用用户数据缓存（长超时、多镜像重试；可选 `SHORTDRAMA_GITHUB_PROXY` / `SHORTDRAMA_FRIDA_SERVER`），然后推送并启动。
 
 环境准备进程也受 Electron 取消操作管理。取消期间不会启动正式 Python 抓取进程。
 
@@ -81,7 +81,7 @@ Electron 不导入 Python 模块，Python 也不依赖 Electron API。唯一正�
 CLI 参数和工作目录如下；解释器使用已经过版本和依赖验证的路径或命令：
 
 ```text
-executable: <validated Python 3.8+>
+executable: <validated Python 3.11+>
 cwd:        解析出的 Python 组件目录
 environment: buildGrabEnv() 返回的当前环境、补充 PATH、ANDROID_SERIAL 和 HONGGUO_RUNTIME_DIR
 
@@ -234,8 +234,8 @@ Electron 负责 `.complete`，Python 不读写它：
 
 正式第三方 Python 依赖：
 
-- `frida==17.15.5`：Python API，用于按设备序列号 attach 并加载 Hook。
-- `frida-tools==14.5.1`：固定版本的 CLI 工具集，用于安装和诊断。
+- `frida==17.16.4`：Python API，用于按设备序列号 attach 并加载 Hook（含 macOS Intel dyld/SG_READ_ONLY 修复）。
+- `frida-tools==14.10.4`：固定版本的 CLI 工具集，用于安装和诊断。
 - `cryptography>=41`：AES-128-CTR 解密。
 
 Python 标准库依赖包括 `argparse`、`json`、`os`、`re`、`shutil`、`signal`、`sqlite3`、`struct`、`subprocess`、`sys`、`tempfile`、`threading` 和 `time`，不应写进 requirements。
@@ -248,7 +248,7 @@ Python 标准库依赖包括 `argparse`、`json`、`os`、`re`、`shutil`、`sig
 | Frida Server | Android 设备 | 必须匹配 Python Frida 版本与 ABI |
 | `ffmpeg` | `decrypt_mdl.py` | 解密后 MP4 重封装 |
 | `ffprobe` | 主入口和解密辅助 | 成片时长读取与完整性终检 |
-| Python 3.8+ | Electron 与主入口 | 启动正式入口；辅助脚本复用同一个 `sys.executable` |
+| Python 3.11+ | Electron 与主入口 | 启动正式入口；辅助脚本复用同一个 `sys.executable` |
 | `sdkmanager` / `avdmanager` / `emulator` | Electron 环境准备脚本 | 按需安装 Android 组件、创建并启动 AVD |
 | Chrome/Edge | Playwright | 网页媒体请求捕获的优先浏览器 |
 | 系统 `ffmpeg` | Electron | 用于网页 HLS/DASH；从 PATH、Homebrew 或 WinGet 安装目录解析 |

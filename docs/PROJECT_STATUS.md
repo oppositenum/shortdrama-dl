@@ -36,7 +36,7 @@ Python 组件随应用打包到真实文件系统中的 `resources/python`，不
 - macOS 使用 Homebrew、Bash 和 `python/start_avd.sh`。
 - Windows 使用 WinGet、Windows PowerShell 和 `python/start_avd.ps1`。
 - Linux 不会误用 macOS 或 Windows 安装流程，App 抓取环境自动准备会明确报告不支持。
-- 抓取前会验证 Python 3.8+、Python 依赖、ffmpeg/ffprobe、Android SDK、ADB 设备和 AVD。
+- 抓取前会验证 Python 3.11+、Python 依赖（`frida==17.16.4`）、ffmpeg/ffprobe、Android SDK、ADB 设备和 AVD。
 - 已安装但未启动的 AVD 会自动启动；缺少 SDK 或 AVD 时，经用户确认后安装并创建。
 - Windows 自动创建 AVD 当前只支持 x64 主机和 `x86_64` 系统镜像。
 - 设备端 Frida Server 缺失或版本不匹配时，应用从官方 Release 下载匹配版本并缓存到应用用户数据目录。

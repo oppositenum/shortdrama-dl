@@ -117,7 +117,7 @@ Python 使用 `__file__` 定位同目录资源，因此 `hongguo_grab.py`、`cap
 
 单播放页下载和整剧封面解析本身无需 Android、ADB、Frida 或 Python，最终用户也不需要安装 Node.js 或 npm；但详情页/分类页的视频全集现在全部依赖 Android App 链路。单播放页的直连 MP4 使用 Electron 自带的 Node.js 网络栈，遇到 HLS/DASH 时需要系统 FFmpeg。系统 Chrome/Edge 是网页解析的首选浏览器。浏览器或 FFmpeg 缺失时，应用会先确认，再调用当前系统的包管理器安装与本机 CPU 匹配的版本。
 
-Android App 抓取链路还需要 Python 3.8+、`adb`、支持 `adb root` 的 Android 设备/模拟器、匹配版本的 Frida、`cryptography`，以及系统 `ffmpeg`/`ffprobe`。应用根据 `process.platform` 和 CPU 架构选择安装路径：
+Android App 抓取链路还需要 Python 3.11+、`adb`、支持 `adb root` 的 Android 设备/模拟器、匹配版本的 Frida（当前锁 `17.16.4`）、`cryptography`，以及系统 `ffmpeg`/`ffprobe`。应用根据 `process.platform` 和 CPU 架构选择安装路径：
 
 - macOS 使用 Homebrew、Bash 和 `~/Library/Android/sdk`；Apple Silicon AVD 使用 `arm64-v8a`，Intel AVD 使用 `x86_64`。
 - Windows x64 使用 WinGet、Windows PowerShell 和 `%LOCALAPPDATA%\Android\Sdk`，AVD 使用 `x86_64`。
@@ -191,7 +191,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\.venv\Scripts\Activate.ps1
 ```
 
-上述命令仍适合开发者提前准备环境。正式应用在第一次使用 App 抓取时也会自检：优先复用版本合格的 Python；缺少 Frida/cryptography 时，开发态在项目 `.venv/`、打包态在应用用户数据目录创建隔离环境并按 `requirements.txt` 安装。没有 Python 时，应用征得确认后在 macOS 使用 Homebrew 安装 Python，在 Windows 使用 WinGet 安装 Python 3.12；Windows 同时识别 `py -3` 和常见的用户级 Python 安装目录。
+上述命令仍适合开发者提前准备环境。正式应用在第一次使用 App 抓取时也会自检：优先复用版本合格的 Python 3.11+；缺少或无法 import 锁定版本的 Frida/cryptography 时，开发态在项目 `.venv/`、打包态在应用用户数据目录清除并重建隔离环境，再按 `requirements.txt` 安装。没有合格 Python 时，应用征得确认后在 macOS 使用 Homebrew 安装 Python，在 Windows 使用 WinGet 安装 Python 3.12；Windows 同时识别 `py -3.12`/`py -3.11`/`py -3` 和常见的用户级 Python 安装目录。
 
 ### 3. 安装系统 ffmpeg（HLS/DASH 与 Android 链路需要）
 
@@ -601,7 +601,7 @@ PC 端 `frida` 与设备端 `frida-server` 必须完全同版本，设备二进�
 
 ### 找不到 Frida Server
 
-联网时应用会从 Frida 官方 Release 下载正确版本并缓存；离线时可预先推送到 `/data/local/tmp/frida-server`，或放入 `python/frida-server-<abi>`。二进制仍不纳入 Git 和 Electron 安装包。
+联网时应用会从 Frida 官方 Release 下载正确版本并缓存（超时 180s、多源重试，并内置若干 GitHub 镜像回退）。直连 GitHub 很慢时，可设置环境变量 `SHORTDRAMA_GITHUB_PROXY`（例如 `https://ghfast.top`）优先走代理；离线时可设置 `SHORTDRAMA_FRIDA_SERVER` 指向本机二进制，或预先推送到 `/data/local/tmp/frida-server`，或放入 `python/frida-server-<abi>`。二进制仍不纳入 Git 和 Electron 安装包。
 
 ### 没有 root 权限
 

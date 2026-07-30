@@ -48,7 +48,7 @@
 
 | 命令 | 调用位置 | 是否随项目分发 |
 |---|---|---|
-| Python 3.8+ | Electron 启动正式入口；正式入口通过 `sys.executable` 启动 `decrypt_mdl.py` | 否；Electron 可按系统安装 Python、创建隔离 venv 并安装包依赖 |
+| Python 3.11+ | Electron 启动正式入口；正式入口通过 `sys.executable` 启动 `decrypt_mdl.py` | 否；Electron 可按系统安装 Python、创建隔离 venv 并安装包依赖 |
 | `sdkmanager` / `avdmanager` / `emulator` | `start_avd.sh` / `start_avd.ps1` 安装 SDK 包、创建和启动 AVD | 否；macOS/Windows 首次使用可在确认后按系统准备 |
 | Java 17 | Windows `sdkmanager.bat` 运行时 | 否；Windows 缺少时经确认通过 WinGet 安装 Eclipse Temurin JDK 17 |
 | `adb` | Python 设备、UI、文件、数据库和 Frida Server 操作 | 否 |
@@ -60,8 +60,8 @@
 
 | 依赖 | 版本 | 使用依据 |
 |---|---|---|
-| `frida` | `17.15.5` | `hongguo_grab.py` 函数内 import，按序列号获取设备、attach 和加载 Script |
-| `frida-tools` | `14.5.1` | 项目固定的配套工具版本，用于 CLI 诊断 |
+| `frida` | `17.16.4` | `hongguo_grab.py` 函数内 import，按序列号获取设备、attach 和加载 Script |
+| `frida-tools` | `14.10.4` | 项目固定的配套工具版本，用于 CLI 诊断 |
 | `cryptography` | `>=41` | `decrypt_mdl.py` 从 `cryptography.hazmat.primitives.ciphers` 导入 AES/CTR |
 
 `sqlite3`、`argparse`、`json`、`struct`、`subprocess` 等属于 Python 标准库，不进入 requirements。

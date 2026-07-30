@@ -1164,6 +1164,11 @@ async function installHostDependency(kind, message, detail, status) {
   return true;
 }
 
+// 与 python/requirements.txt 同步。升级时必须同步改校验常量、文档与 frida-server 期望版本。
+const FRIDA_VERSION = '17.16.4';
+// frida >= 17.16 需要 typing.NotRequired(Python 3.11+)；也避开 macOS 系统自带 3.9。
+const MIN_PYTHON = [3, 11];
+
 function venvPython(venvDir) {
   return process.platform === 'win32'
     ? path.join(venvDir, 'Scripts', 'python.exe')
@@ -1172,7 +1177,15 @@ function venvPython(venvDir) {
 
 function systemPythonCandidates() {
   if (hostPlatform() !== 'windows') {
-    return [process.env.SHORTDRAMA_PYTHON, 'python3', 'python'].filter(Boolean);
+    // 优先绝对路径：Homebrew / MacPorts，避免 PATH 末尾的 /usr/bin/python3(常为 3.9)抢先。
+    return [
+      process.env.SHORTDRAMA_PYTHON,
+      '/opt/homebrew/bin/python3',
+      '/usr/local/bin/python3',
+      '/opt/local/bin/python3',
+      'python3',
+      'python',
+    ].filter(Boolean);
   }
   return [
     process.env.SHORTDRAMA_PYTHON,
@@ -1184,16 +1197,64 @@ function systemPythonCandidates() {
   ].filter(Boolean);
 }
 
-async function resolveWindowsPyExecutable(env) {
+function pythonVersionCheckArgs(minVersion = MIN_PYTHON) {
+  const [major, minor] = minVersion;
+  return [
+    '-c',
+    `import sys; raise SystemExit(0 if sys.version_info >= (${major}, ${minor}) else 1)`,
+  ];
+}
+
+function fridaValidationArgs() {
+  return [
+    '-c',
+    [
+      'from importlib.metadata import version',
+      'import frida, cryptography',
+      `assert version("frida") == "${FRIDA_VERSION}"`,
+      'assert tuple(int(x) for x in version("cryptography").split(".")[:2]) >= (41, 0)',
+    ].join('; '),
+  ];
+}
+
+function summarizeProcessFailure(result, maxLines = 8) {
+  const text = `${result.stderr || ''}\n${result.stdout || ''}`.trim();
+  if (!text) return `退出码 ${result.code == null ? '?' : result.code}`;
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-maxLines)
+    .join(' | ');
+}
+
+/** 校验解释器是否能 import 锁定版本的 Frida/cryptography；失败时把末尾错误写入日志。 */
+async function pythonRuntimeOk(pythonBin, env) {
+  const r = await runSetupProcess(pythonBin, fridaValidationArgs(), { env, showOutput: false });
+  if (r.code === 0) return true;
+  log(`Python 依赖校验未通过（${pythonBin}）：${summarizeProcessFailure(r)}`, 'warn');
+  return false;
+}
+
+async function resolveWindowsPyExecutable(env, minVersion = MIN_PYTHON) {
   if (hostPlatform() !== 'windows') return null;
-  const r = await runSetupProcess(
-    'py',
-    ['-3', '-c', 'import sys; print(sys.executable)'],
-    { env, showOutput: false }
-  );
-  if (r.code !== 0) return null;
-  const candidate = r.stdout.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).pop();
-  return candidate || null;
+  // 优先 3.12/3.11，再退回满足最低版本的 py -3。
+  const versionSelectors = ['-3.12', '-3.11', '-3'];
+  for (const selector of versionSelectors) {
+    if (isCanceled) throw new Error('__CANCELED__');
+    const r = await runSetupProcess(
+      'py',
+      [selector, '-c', 'import sys; print(sys.executable)'],
+      { env, showOutput: false }
+    );
+    if (r.code !== 0) continue;
+    const candidate = r.stdout.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).pop();
+    if (!candidate) continue;
+    if (await commandSucceeds(candidate, pythonVersionCheckArgs(minVersion), buildGrabEnv({ pythonBin: candidate }))) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 async function findBasePython(versionCheck) {
@@ -1203,11 +1264,26 @@ async function findBasePython(versionCheck) {
       return { command: candidate, prefixArgs: [] };
     }
   }
-  if (hostPlatform() === 'windows' &&
-      await commandSucceeds('py', ['-3', ...versionCheck], buildGrabEnv())) {
-    return { command: 'py', prefixArgs: ['-3'] };
+  if (hostPlatform() === 'windows') {
+    for (const selector of ['-3.12', '-3.11', '-3']) {
+      if (isCanceled) throw new Error('__CANCELED__');
+      if (await commandSucceeds('py', [selector, ...versionCheck], buildGrabEnv())) {
+        return { command: 'py', prefixArgs: [selector] };
+      }
+    }
   }
   return null;
+}
+
+function removeManagedVenv(managedVenv) {
+  try {
+    if (fs.existsSync(managedVenv)) {
+      fs.rmSync(managedVenv, { recursive: true, force: true });
+      log(`已清除不可用的隔离 Python 环境：${managedVenv}`);
+    }
+  } catch (err) {
+    log(`清除隔离 Python 环境失败（将尝试 --clear 重建）：${err.message}`, 'warn');
+  }
 }
 
 async function ensurePythonRuntime(grabDir) {
@@ -1216,15 +1292,7 @@ async function ensurePythonRuntime(grabDir) {
   if (platform === 'unsupported') {
     throw new Error(`App 抓取环境自动准备仅支持 macOS 和 Windows（当前：${process.platform}）`);
   }
-  const validation = [
-    '-c',
-    [
-      'from importlib.metadata import version',
-      'import frida, cryptography',
-      'assert version("frida") == "17.15.5"',
-      'assert tuple(int(x) for x in version("cryptography").split(".")[:2]) >= (41, 0)',
-    ].join('; '),
-  ];
+  const minPythonLabel = MIN_PYTHON.join('.');
   const managedVenv = app.isPackaged
     ? path.join(app.getPath('userData'), 'runtime', 'python')
     : path.join(__dirname, '.venv');
@@ -1238,24 +1306,25 @@ async function ensurePythonRuntime(grabDir) {
 
   for (const candidate of [...new Set(preferred)]) {
     if (isCanceled) throw new Error('__CANCELED__');
-    if (await commandSucceeds(candidate, validation, buildGrabEnv({ pythonBin: candidate }))) {
+    if (await pythonRuntimeOk(candidate, buildGrabEnv({ pythonBin: candidate }))) {
       return candidate;
     }
   }
 
   const launcherPython = await resolveWindowsPyExecutable(buildGrabEnv());
   if (launcherPython &&
-      await commandSucceeds(launcherPython, validation, buildGrabEnv({ pythonBin: launcherPython }))) {
+      await pythonRuntimeOk(launcherPython, buildGrabEnv({ pythonBin: launcherPython }))) {
     return launcherPython;
   }
 
-  const versionCheck = ['-c', 'import sys; raise SystemExit(0 if sys.version_info >= (3, 8) else 1)'];
+  const versionCheck = pythonVersionCheckArgs(MIN_PYTHON);
   let basePython = await findBasePython(versionCheck);
 
   if (!basePython && platform === 'macos' && await commandSucceeds('brew', ['--version'], buildGrabEnv())) {
     const install = await confirmEnvironmentInstall(
-      'App 抓取需要 Python 3.8 或更高版本',
-      '将使用 Homebrew 安装 Python，并在应用专用目录创建隔离环境。'
+      `App 抓取需要 Python ${minPythonLabel} 或更高版本`,
+      `将使用 Homebrew 安装 Python（≥${minPythonLabel}），并在应用专用目录创建隔离环境。\n` +
+        '说明：Frida 17.16+ 需要 Python 3.11+；macOS 自带的 3.9 无法使用。'
     );
     if (isCanceled) throw new Error('__CANCELED__');
     if (!install) return null;
@@ -1267,10 +1336,12 @@ async function ensurePythonRuntime(grabDir) {
   } else if (!basePython && platform === 'windows') {
     const wingetEnv = buildGrabEnv();
     if (!await commandSucceeds('winget.exe', ['--version'], wingetEnv)) {
-      throw new Error('Windows 缺少 Python 3.8+，且未找到 winget；请先安装 Microsoft App Installer 后重试');
+      throw new Error(
+        `Windows 缺少 Python ${minPythonLabel}+，且未找到 winget；请先安装 Microsoft App Installer 后重试`
+      );
     }
     const install = await confirmEnvironmentInstall(
-      'App 抓取需要 Python 3.8 或更高版本',
+      `App 抓取需要 Python ${minPythonLabel} 或更高版本`,
       '将使用 Windows Package Manager (winget) 安装 Python 3.12，并在应用专用目录创建隔离环境。'
     );
     if (isCanceled) throw new Error('__CANCELED__');
@@ -1287,18 +1358,24 @@ async function ensurePythonRuntime(grabDir) {
   }
   if (!basePython) {
     const installer = platform === 'macos'
-      ? '未找到可用的 Python 3.8+；请先安装 Homebrew，或设置 SHORTDRAMA_PYTHON'
-      : 'Python 安装结束后仍未找到 Python 3.8+；可设置 SHORTDRAMA_PYTHON 指向 python.exe';
+      ? `未找到可用的 Python ${minPythonLabel}+；请先安装 Homebrew，或设置 SHORTDRAMA_PYTHON 指向 Python ${minPythonLabel}+`
+      : `Python 安装结束后仍未找到 Python ${minPythonLabel}+；可设置 SHORTDRAMA_PYTHON 指向 python.exe`;
     throw new Error(installer);
   }
 
   setStatus('正在准备 Python 依赖…');
-  log('首次使用 App 抓取：正在创建隔离 Python 环境并安装 Frida/cryptography');
+  log(`准备隔离 Python 环境（Frida ${FRIDA_VERSION} / Python ≥${minPythonLabel}）并安装依赖`);
+  // 旧 venv 可能装过 17.15.x 或错误架构的原生扩展；不 --clear 会 already satisfied 后继续失败。
+  removeManagedVenv(managedVenv);
   fs.mkdirSync(path.dirname(managedVenv), { recursive: true });
-  let r = await runSetupProcess(basePython.command, [...basePython.prefixArgs, '-m', 'venv', managedVenv], {
-    env: buildGrabEnv(),
-    showOutput: true,
-  });
+  let r = await runSetupProcess(
+    basePython.command,
+    [...basePython.prefixArgs, '-m', 'venv', '--clear', managedVenv],
+    {
+      env: buildGrabEnv(),
+      showOutput: true,
+    }
+  );
   if (isCanceled || r.signal === 'SIGTERM') throw new Error('__CANCELED__');
   if (r.code !== 0) throw new Error(`创建 Python 虚拟环境失败：${r.stderr.trim() || `退出码 ${r.code}`}`);
 
@@ -1315,8 +1392,11 @@ async function ensurePythonRuntime(grabDir) {
   });
   if (isCanceled || r.signal === 'SIGTERM') throw new Error('__CANCELED__');
   if (r.code !== 0) throw new Error(`安装 Python 依赖失败：${r.stderr.trim() || `退出码 ${r.code}`}`);
-  if (!await commandSucceeds(pythonBin, validation, buildGrabEnv({ pythonBin }))) {
-    throw new Error('Python 依赖安装结束，但 Frida/cryptography 版本校验失败');
+  if (!await pythonRuntimeOk(pythonBin, buildGrabEnv({ pythonBin }))) {
+    throw new Error(
+      `Python 依赖安装结束，但 Frida/cryptography 校验失败（需要 frida==${FRIDA_VERSION} 且可 import；` +
+        '详见上方「Python 依赖校验未通过」日志）'
+    );
   }
   return pythonBin;
 }

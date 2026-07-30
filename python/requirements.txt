@@ -2,11 +2,14 @@
 #
 # ⚠️ frida 必须锁版本,原因有二:
 #   1) frida 的 Python 端与设备端 frida-server 版本必须严格一致。
-#      本项目要求的 frida-server 版本是 v17.15.5,故此处锁 17.15.5。
-#      frida-server 不随仓库分发,需按设备 ABI 自行准备。
-#      换 frida-server 时,这里也要同步改。
-#   2) frida >= 17.16 用了 Python 3.11+ 的 typing.NotRequired,在本机的
-#      Python 3.9.6 上直接 ImportError。
-frida==17.15.5        # 注入抓 AES key;版本须与设备端 frida-server 一致
-frida-tools==14.5.1   # 配套 CLI 工具
+#      本项目要求的 frida-server 版本是 v17.16.4,故此处锁 17.16.4。
+#      frida-server 不随仓库分发;运行时按 frida.__version__ 自动下载匹配包。
+#      换 frida 时,这里、main.js 校验常量与文档要同步改。
+#   2) 需要 Python 3.11+:
+#      - frida >= 17.16 使用 typing.NotRequired(3.11+ 标准库)。
+#      - frida 17.15.x 的 macOS x86_64 wheel 在较新 macOS 上会因
+#        __DATA_CONST 缺少 SG_READ_ONLY 被 dyld 拒载(Intel 真机必现)。
+#        官方在 17.16.1 起改用现代链接器修复了该问题。
+frida==17.16.4        # 注入抓 AES key;版本须与设备端 frida-server 一致
+frida-tools==14.10.4  # 配套 CLI 工具(要求 frida>=17.10,<18)
 cryptography>=41      # AES-128-CTR 解密

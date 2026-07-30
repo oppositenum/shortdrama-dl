@@ -117,7 +117,7 @@ Python resolves its companion resources relative to `__file__`. Keep `hongguo_gr
 
 Single player-page downloads and whole-series cover parsing do not themselves require Android, ADB, Frida, or Python, and end users do not need Node.js or npm. Whole-series video from a detail/category page now depends entirely on the Android App workflow. Direct MP4 downloads from a single player page use Electron's Node.js network stack; only HLS/DASH requires system FFmpeg. System Chrome or Edge is preferred for page inspection. If the browser or FFmpeg is missing, the app asks before invoking the host package manager to install the build matching the current CPU.
 
-The Android App workflow additionally requires Python 3.8+, `adb`, an Android device or emulator capable of `adb root`, matching Frida components, `cryptography`, and system `ffmpeg`/`ffprobe`. Platform and CPU detection controls setup:
+The Android App workflow additionally requires Python 3.11+, `adb`, an Android device or emulator capable of `adb root`, matching Frida components (currently pinned to `17.16.4`), `cryptography`, and system `ffmpeg`/`ffprobe`. Platform and CPU detection controls setup:
 
 - macOS uses Homebrew, Bash, and `~/Library/Android/sdk`; Apple Silicon AVDs use `arm64-v8a`, while Intel AVDs use `x86_64`.
 - Windows x64 uses WinGet, Windows PowerShell, and `%LOCALAPPDATA%\Android\Sdk`; its AVD uses `x86_64`.
@@ -191,7 +191,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\.venv\Scripts\Activate.ps1
 ```
 
-These commands remain useful for developers who want to prepare the environment in advance. On first App capture, Electron validates Python and its package versions. If Frida or cryptography is missing, development uses `<project>/.venv`, while a packaged app creates an isolated environment under its user-data directory. If Python itself is missing, the app asks before installing it through Homebrew on macOS or installing Python 3.12 through WinGet on Windows. Windows discovery also supports `py -3` and common per-user Python locations.
+These commands remain useful for developers who want to prepare the environment in advance. On first App capture, Electron validates Python 3.11+ and its package versions. If the pinned Frida/cryptography import fails, development uses `<project>/.venv` and packaged apps clear and recreate an isolated environment under the user-data directory, then install from `requirements.txt`. If a suitable Python is missing, the app asks before installing it through Homebrew on macOS or installing Python 3.12 through WinGet on Windows. Windows discovery also supports `py -3.12` / `py -3.11` / `py -3` and common per-user Python locations.
 
 ### 3. Install system ffmpeg (HLS/DASH and Android workflows)
 
@@ -597,7 +597,7 @@ The Python package and Android Frida Server must have the exact same version, an
 
 ### Frida Server is missing
 
-When online, the app downloads the correct binary from the official Frida Release and caches it. For offline use, install it at `/data/local/tmp/frida-server`, or put it at `python/frida-server-<abi>`. It remains absent from Git and packaged applications.
+When online, the app downloads the correct binary from the official Frida Release and caches it (180s socket timeout, multi-source retries, plus built-in GitHub mirror fallbacks). If GitHub is slow, set `SHORTDRAMA_GITHUB_PROXY` (for example `https://ghfast.top`) to prefer a proxy prefix. Offline, set `SHORTDRAMA_FRIDA_SERVER` to a local binary, push it to `/data/local/tmp/frida-server`, or place it at `python/frida-server-<abi>`. The binary remains absent from Git and packaged applications.
 
 ### Root is unavailable
 
