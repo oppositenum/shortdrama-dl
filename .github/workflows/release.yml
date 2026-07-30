@@ -249,7 +249,11 @@ jobs:
             throw 'Configure both WINDOWS_CSC_LINK and WINDOWS_CSC_KEY_PASSWORD, or neither.'
           }
           "signed=$([bool]$env:CSC_LINK)".ToLowerInvariant() | Add-Content -Path $env:GITHUB_OUTPUT
-          npm run dist:win
+          # 直接调 electron-builder，不能用 `npm run dist:win`。Windows 上 electron-builder
+          # 会嵌套调用 npm（npm prefix -w、@electron/rebuild），若它是 `npm run` 的子进程，
+          # 嵌套 npm 会因继承的 stdio 句柄死锁，整步静默挂死（CI 里表现为无输出、超时）。
+          & ./node_modules/.bin/electron-builder.cmd --win --x64 --config electron-builder.js --publish never
+          if ($LASTEXITCODE -ne 0) { throw "electron-builder exited with $LASTEXITCODE" }
 
       - name: Verify Windows installer
         shell: pwsh
