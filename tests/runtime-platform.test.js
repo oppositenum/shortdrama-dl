@@ -205,3 +205,22 @@ test('ADBKeyBoard is fetched from a pinned source and is not redistributed', () 
   const pythonResource = builder.extraResources.find((item) => item.to === 'python');
   assert.ok(!pythonResource.filter.includes('ADBKeyboard.apk'));
 });
+
+test('PowerShell scripts have no scope-qualifier lookalikes like "$Name:"', () => {
+  // PowerShell 把 "$Name:" 当作用域限定符（$env:PATH 那种）。写在插值字符串里
+  // 就是【整个脚本都加载不了】的语法错误，不是运行到那一行才炸——Windows 的
+  // Android 环境准备会直接瘫掉。实测踩过：start_avd.ps1 里一句
+  // "Could not start AVD $AvdName: ..." 让整个脚本报 parse error。
+  // CI 的 PowerShell 语法检查只在 Windows runner 上跑，macOS 上开发时看不到，
+  // 所以这里用纯文本扫描兜住，任何平台都能拦。
+  const legalScopes = /^\$(env|script|global|local|private|using|variable|function|workflow):/i;
+  for (const rel of ['python/start_avd.ps1', 'scripts/setup-python.ps1']) {
+    const src = fs.readFileSync(path.join(projectRoot, rel), 'utf8');
+    const offenders = (src.match(/\$[A-Za-z_][A-Za-z0-9_]*:/g) || [])
+      .filter((m) => !legalScopes.test(m));
+    assert.deepEqual(
+      offenders, [],
+      `${rel} 里这些写法会被当成作用域限定符，应改成 \${...} 包起来：${offenders.join(', ')}`
+    );
+  }
+});

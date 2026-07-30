@@ -389,7 +389,7 @@ if (-not $ReadySerial) {
             "@$AvdName", "-no-snapshot", "-writable-system", "-gpu", "auto"
         ) -RedirectStandardOutput "$logBase.out.log" -RedirectStandardError "$logBase.err.log" -WindowStyle Hidden | Out-Null
     } catch {
-        Stop-WithState 14 "emulator_start_failed" "Could not start AVD $AvdName: $($_.Exception.Message)"
+        Stop-WithState 14 "emulator_start_failed" "Could not start AVD ${AvdName}: $($_.Exception.Message)"
     }
 
     $deadline = [DateTime]::UtcNow.AddSeconds($BootTimeout)
