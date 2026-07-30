@@ -226,6 +226,17 @@ def ui_find_more(xml):
         if (bb[2] - bb[0]) > _W * 0.2: continue          # 排除大容器,只要小图标
         if best is None or (cx - cy) > (best[0] - best[1]): best = (cx, cy)
     return best
+
+# 下载入口的文案也随版本变:老版(如 7.2.7.32)叫'下载到本地',新版叫'离线缓存'。
+# 只认死一个文案,迟早在某台/某次更新后找不到面板。这里逐个匹配已知文案。
+DL_ENTRY_TEXTS = ('下载到本地', '离线缓存')
+DL_ENTRY_LABEL = '/'.join(DL_ENTRY_TEXTS)                 # 日志用:下载到本地/离线缓存
+def ui_find_dl_entry(xml):
+    """定位'更多'菜单里的下载入口:逐个匹配已知文案(下载到本地/离线缓存)。"""
+    for t in DL_ENTRY_TEXTS:
+        c = ui_find(xml, text=t)
+        if c: return c
+    return None
 def net(on):
     for svc in ("wifi", "data"): sh("svc", svc, "enable" if on else "disable")
 
@@ -799,7 +810,7 @@ def _open_dl_panel():
     for i in range(3):
         x = dump_stable()
         if x and ('全选' in x or '开始下载' in x): return x        # 面板已经开着了
-        dl = ui_find(x, text='下载到本地')
+        dl = ui_find_dl_entry(x)
         if not dl:
             more = ui_find_more(x)
             if not more:                                          # 控制层可能收起来了:轻点唤出再找
@@ -811,14 +822,14 @@ def _open_dl_panel():
                 dbg(f"[dl] 没定位到右上角'更多'按钮,退回比例坐标兜底(第{i+1}/3次)")
                 tap(int(_W * 0.919), int(_H * 0.056))             # 右上角 ⋮ 兜底(贴近实测中心)
             time.sleep(2)
-            dl = ui_find(dump_stable(), text='下载到本地')
+            dl = ui_find_dl_entry(dump_stable())
         if dl:
             tap(*dl); time.sleep(2.5)
             p = dump_stable()
             if p: return p
             dbg(f"[dl] 面板点开了但读不到布局(dump 超时?),重试 {i+1}/3")
         else:
-            dbg(f"[dl] 更多菜单里没出现'下载到本地'(可能菜单没点开),重试 {i+1}/3")
+            dbg(f"[dl] 更多菜单里没出现'{DL_ENTRY_LABEL}'(可能菜单没点开),重试 {i+1}/3")
         time.sleep(1.5)
     return ""
 
@@ -899,7 +910,7 @@ def download_all(N, timeout=1800):
             logev("error", "清库后重新进入该剧失败"); return len(offline_set()) >= 1
         panel = _open_dl_panel()
         if not panel:
-            logev("error", "没找到'下载到本地'菜单"); return False
+            logev("error", f"没找到'{DL_ENTRY_LABEL}'菜单"); return False
         sa = ui_find(panel, text='全选')
         if sa: tap(*sa); time.sleep(1.5); panel = ui_dump()
         st = ui_find(panel, text='开始下载')

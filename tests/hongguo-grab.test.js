@@ -174,6 +174,20 @@ only_back = "<hierarchy>" + \
             "clickable": "true", "bounds": "[20,94][86,160]"}) + "</hierarchy>"
 assert find_more(only_back) is None, find_more(only_back)
 
+# 下载入口文案随版本变:老版'下载到本地'、新版'离线缓存',两者都要能定位。
+find_dl = ns["ui_find_dl_entry"]
+old_label = "<hierarchy>" + \
+    node(**{"class": "android.widget.TextView", "text": "下载到本地",
+            "bounds": "[160,1337][355,1395]"}) + "</hierarchy>"
+new_label = "<hierarchy>" + \
+    node(**{"class": "android.widget.TextView", "text": "离线缓存",
+            "bounds": "[160,1337][355,1395]"}) + "</hierarchy>"
+assert find_dl(old_label) == (257, 1366), find_dl(old_label)
+assert find_dl(new_label) == (257, 1366), find_dl(new_label)
+# 无关文案不能误命中
+assert find_dl("<hierarchy>" + node(**{"class": "android.widget.TextView",
+    "text": "下载记录", "bounds": "[0,0][100,100]"}) + "</hierarchy>") is None
+
 print("search detection ok")
 `;
 
