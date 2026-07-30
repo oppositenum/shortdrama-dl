@@ -26,6 +26,11 @@ Environment overrides:
   ANDROID_SERIAL, ANDROID_HOME, ANDROID_SDK_ROOT
   SHORTDRAMA_AVD_NAME, SHORTDRAMA_ANDROID_API, SHORTDRAMA_ANDROID_ARCH
   SHORTDRAMA_BOOT_TIMEOUT, SHORTDRAMA_SDK_ROOT
+
+Canonical emulator hardware profile (forced on every managed AVD):
+  SHORTDRAMA_SCREEN_W (1080), SHORTDRAMA_SCREEN_H (2400), SHORTDRAMA_SCREEN_DPI (420)
+  SHORTDRAMA_RAM_MB (4096), SHORTDRAMA_VM_HEAP_MB (512), SHORTDRAMA_DATA_MB (8192)
+  SHORTDRAMA_CPU_CORES (4)
 "@
 }
 
@@ -42,6 +47,19 @@ $Mode = if ($Check) { "check" } else { "ensure" }
 $AvdName = if ($env:SHORTDRAMA_AVD_NAME) { $env:SHORTDRAMA_AVD_NAME } else { "hongguo" }
 $AndroidApi = if ($env:SHORTDRAMA_ANDROID_API) { $env:SHORTDRAMA_ANDROID_API } else { "34" }
 $BootTimeout = if ($env:SHORTDRAMA_BOOT_TIMEOUT) { [int]$env:SHORTDRAMA_BOOT_TIMEOUT } else { 420 }
+
+# Canonical emulator hardware profile. Every managed AVD is forced to exactly
+# these values so that all emulators — regardless of host machine — are identical.
+# Physical devices are used as-is (see Enforce-RuntimeSpec). Defaults match the
+# pixel_6 profile (1080x2400@420) and the resolution the grab script assumes.
+$ScreenW  = if ($env:SHORTDRAMA_SCREEN_W)   { $env:SHORTDRAMA_SCREEN_W }   else { "1080" }
+$ScreenH  = if ($env:SHORTDRAMA_SCREEN_H)   { $env:SHORTDRAMA_SCREEN_H }   else { "2400" }
+$ScreenDpi= if ($env:SHORTDRAMA_SCREEN_DPI) { $env:SHORTDRAMA_SCREEN_DPI } else { "420" }
+$RamMb    = if ($env:SHORTDRAMA_RAM_MB)     { $env:SHORTDRAMA_RAM_MB }     else { "4096" }
+$VmHeapMb = if ($env:SHORTDRAMA_VM_HEAP_MB) { $env:SHORTDRAMA_VM_HEAP_MB } else { "512" }
+$DataMb   = if ($env:SHORTDRAMA_DATA_MB)    { $env:SHORTDRAMA_DATA_MB }    else { "8192" }
+$CpuCores = if ($env:SHORTDRAMA_CPU_CORES)  { $env:SHORTDRAMA_CPU_CORES }  else { "4" }
+
 $DefaultSdkRoot = Join-Path $env:LOCALAPPDATA "Android\Sdk"
 $SdkRoot = if ($env:SHORTDRAMA_SDK_ROOT) {
     $env:SHORTDRAMA_SDK_ROOT
@@ -85,6 +103,65 @@ function Get-AndroidArch {
         Stop-WithState 18 "unsupported_arch" "Windows x64 requires the x86_64 Android system image"
     }
     return "x86_64"
+}
+
+function Get-AvdConfigPath {
+    $avdHome = if ($env:ANDROID_AVD_HOME) {
+        $env:ANDROID_AVD_HOME
+    } elseif ($env:ANDROID_SDK_HOME) {
+        Join-Path $env:ANDROID_SDK_HOME ".android\avd"
+    } else {
+        Join-Path $env:USERPROFILE ".android\avd"
+    }
+    return Join-Path $avdHome "$AvdName.avd\config.ini"
+}
+
+# Rewrite the AVD's config.ini so its hardware matches the canonical profile
+# exactly. Idempotent: safe to run on an existing AVD before every start.
+function Normalize-AvdConfig {
+    $cfg = Get-AvdConfigPath
+    if (-not (Test-Path $cfg)) { return }
+    $spec = [ordered]@{
+        "hw.lcd.width"            = $ScreenW
+        "hw.lcd.height"           = $ScreenH
+        "hw.lcd.density"          = $ScreenDpi
+        "hw.ramSize"              = $RamMb
+        "vm.heapSize"             = $VmHeapMb
+        "disk.dataPartition.size" = "${DataMb}M"
+        "hw.cpu.ncore"            = $CpuCores
+        "hw.keyboard"             = "yes"
+        "hw.gpu.enabled"          = "yes"
+        "hw.gpu.mode"             = "auto"
+    }
+    # config.ini may use either "key=value" or "key = value" (Android Studio
+    # writes spaces, avdmanager does not), so trim the key before comparing.
+    $kept = foreach ($line in @(Get-Content -Path $cfg)) {
+        $key = (($line -split '=', 2)[0]).Trim()
+        if ($spec.Contains($key)) { continue }
+        $line
+    }
+    $out = @($kept)
+    foreach ($k in $spec.Keys) { $out += "$k=$($spec[$k])" }
+    Set-Content -Path $cfg -Value $out -Encoding Ascii
+    Write-Log "Normalized ${AvdName}: ${ScreenW}x${ScreenH}@${ScreenDpi}dpi, ${RamMb}MB RAM, ${VmHeapMb}MB heap, ${CpuCores} cores"
+}
+
+# After a device is ready, force the canonical resolution/density on emulators so
+# every emulator is identical. Physical devices are left untouched.
+function Enforce-RuntimeSpec([string]$Serial) {
+    $qemu = ((& $script:Adb -s $Serial shell getprop ro.boot.qemu 2>$null) | Out-String).Trim()
+    if (-not $qemu) {
+        $qemu = ((& $script:Adb -s $Serial shell getprop ro.kernel.qemu 2>$null) | Out-String).Trim()
+    }
+    $isEmu = ($qemu -eq "1") -or ($Serial -like "emulator-*")
+    if (-not $isEmu) {
+        $size = ((& $script:Adb -s $Serial shell wm size 2>$null) | Out-String).Trim()
+        Write-Log "Physical device $Serial; using as-is ($size). Emulator-only params are not forced on real hardware."
+        return
+    }
+    & $script:Adb -s $Serial shell wm size "${ScreenW}x${ScreenH}" 2>$null | Out-Null
+    & $script:Adb -s $Serial shell wm density $ScreenDpi 2>$null | Out-Null
+    Write-Log "Emulator $Serial enforced to ${ScreenW}x${ScreenH}@${ScreenDpi}dpi (RAM/heap/cores set in config.ini + launch flags)"
 }
 
 function Find-Tool([string]$Name) {
@@ -382,11 +459,13 @@ if (-not $ReadySerial) {
         }
     }
 
+    Normalize-AvdConfig
     Write-Log "Starting AVD $AvdName ..."
     $logBase = Join-Path ([IO.Path]::GetTempPath()) "shortdrama-dl-$AvdName-emulator"
     try {
         Start-Process -FilePath $script:Emulator -ArgumentList @(
-            "@$AvdName", "-no-snapshot", "-writable-system", "-gpu", "auto"
+            "@$AvdName", "-no-snapshot", "-writable-system", "-gpu", "auto",
+            "-memory", $RamMb, "-cores", $CpuCores
         ) -RedirectStandardOutput "$logBase.out.log" -RedirectStandardError "$logBase.err.log" -WindowStyle Hidden | Out-Null
     } catch {
         Stop-WithState 14 "emulator_start_failed" "Could not start AVD ${AvdName}: $($_.Exception.Message)"
@@ -422,6 +501,11 @@ $deviceId = ((& $script:Adb -s $ReadySerial shell id 2>$null) | Out-String).Trim
 if ($deviceId -notmatch 'uid=0\(') {
     Stop-WithState 16 "root_required" "Device $ReadySerial is not adb-root capable; use a Google APIs AVD, not a Google Play AVD"
 }
+
+# Normalize config.ini even when we did not start it ourselves, so the next cold
+# boot converges; then force runtime resolution/density on emulators.
+Normalize-AvdConfig
+Enforce-RuntimeSpec $ReadySerial
 
 $fridaPid = ((& $script:Adb -s $ReadySerial shell pidof frida-server 2>$null) | Out-String).Trim()
 if (-not $fridaPid) {

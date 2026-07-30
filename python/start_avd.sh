@@ -11,6 +11,19 @@ AVD_NAME="${SHORTDRAMA_AVD_NAME:-hongguo}"
 ANDROID_API="${SHORTDRAMA_ANDROID_API:-34}"
 BOOT_TIMEOUT="${SHORTDRAMA_BOOT_TIMEOUT:-420}"
 
+# Canonical emulator hardware profile. Every managed AVD is forced to exactly
+# these values so that all emulators — regardless of host machine or CPU — are
+# identical. Physical devices are used as-is (see enforce_runtime_spec).
+# The defaults match the pixel_6 profile the AVD is created from (1080x2400@420)
+# and the resolution the Python grab script's finders assume.
+SCREEN_W="${SHORTDRAMA_SCREEN_W:-1080}"
+SCREEN_H="${SHORTDRAMA_SCREEN_H:-2400}"
+SCREEN_DPI="${SHORTDRAMA_SCREEN_DPI:-420}"
+RAM_MB="${SHORTDRAMA_RAM_MB:-4096}"
+VM_HEAP_MB="${SHORTDRAMA_VM_HEAP_MB:-512}"
+DATA_MB="${SHORTDRAMA_DATA_MB:-8192}"
+CPU_CORES="${SHORTDRAMA_CPU_CORES:-4}"
+
 usage() {
   cat <<'EOF'
 Usage: start_avd.sh [--check|--ensure] [--install-missing]
@@ -23,6 +36,11 @@ Environment overrides:
   ANDROID_SERIAL, ANDROID_HOME, ANDROID_SDK_ROOT
   SHORTDRAMA_AVD_NAME, SHORTDRAMA_ANDROID_API, SHORTDRAMA_ANDROID_ARCH
   SHORTDRAMA_BOOT_TIMEOUT, SHORTDRAMA_SDK_ROOT
+
+Canonical emulator hardware profile (forced on every managed AVD):
+  SHORTDRAMA_SCREEN_W (1080), SHORTDRAMA_SCREEN_H (2400), SHORTDRAMA_SCREEN_DPI (420)
+  SHORTDRAMA_RAM_MB (4096), SHORTDRAMA_VM_HEAP_MB (512), SHORTDRAMA_DATA_MB (8192)
+  SHORTDRAMA_CPU_CORES (4)
 EOF
 }
 
@@ -144,6 +162,74 @@ host_arch() {
   esac
 }
 
+avd_config_path() {
+  local home="${ANDROID_AVD_HOME:-}"
+  if [[ -z "$home" && -n "${ANDROID_SDK_HOME:-}" ]]; then
+    home="${ANDROID_SDK_HOME}/.android/avd"
+  fi
+  home="${home:-$HOME/.android/avd}"
+  printf '%s/%s.avd/config.ini\n' "$home" "$AVD_NAME"
+}
+
+set_ini_key() {  # file key value
+  # Drop every existing line for this key (config.ini may use either "key=value"
+  # or "key = value" — Android Studio writes spaces, avdmanager does not), then
+  # append the canonical spaceless form. Guarantees exactly one occurrence.
+  local file="$1" key="$2" val="$3" tmp
+  tmp="$(mktemp)"
+  awk -v k="$key" -F'=' '{ lhs=$1; gsub(/[ \t]/,"",lhs) } lhs==k { next } { print }' \
+    "$file" >"$tmp"
+  printf '%s=%s\n' "$key" "$val" >>"$tmp"
+  mv "$tmp" "$file"
+}
+
+# Rewrite the AVD's config.ini so its hardware matches the canonical profile
+# exactly. Idempotent: safe to run on an existing AVD before every start.
+normalize_avd_config() {
+  local cfg
+  cfg="$(avd_config_path)"
+  if [[ ! -f "$cfg" ]]; then return 0; fi
+  set_ini_key "$cfg" hw.lcd.width "$SCREEN_W"
+  set_ini_key "$cfg" hw.lcd.height "$SCREEN_H"
+  set_ini_key "$cfg" hw.lcd.density "$SCREEN_DPI"
+  set_ini_key "$cfg" hw.ramSize "$RAM_MB"
+  set_ini_key "$cfg" vm.heapSize "$VM_HEAP_MB"
+  set_ini_key "$cfg" disk.dataPartition.size "${DATA_MB}M"
+  set_ini_key "$cfg" hw.cpu.ncore "$CPU_CORES"
+  set_ini_key "$cfg" hw.keyboard yes
+  set_ini_key "$cfg" hw.gpu.enabled yes
+  set_ini_key "$cfg" hw.gpu.mode auto
+  log "Normalized ${AVD_NAME}: ${SCREEN_W}x${SCREEN_H}@${SCREEN_DPI}dpi, ${RAM_MB}MB RAM, ${VM_HEAP_MB}MB heap, ${CPU_CORES} cores"
+}
+
+# After a device is ready, force the canonical resolution/density on emulators so
+# every emulator is byte-for-byte identical. Physical devices are left untouched.
+enforce_runtime_spec() {
+  local serial="$1" qemu is_emu=0 cur_size mem_kb ram_target_kb
+  qemu="$("$ADB" -s "$serial" shell getprop ro.boot.qemu 2>/dev/null | tr -d '\r' || true)"
+  if [[ -z "$qemu" ]]; then
+    qemu="$("$ADB" -s "$serial" shell getprop ro.kernel.qemu 2>/dev/null | tr -d '\r' || true)"
+  fi
+  if [[ "$qemu" == "1" || "$serial" == emulator-* ]]; then is_emu=1; fi
+
+  if [[ "$is_emu" != "1" ]]; then
+    cur_size="$("$ADB" -s "$serial" shell wm size 2>/dev/null | tr -d '\r' | awk -F': ' '/size/{v=$2} END{print v}')"
+    log "Physical device ${serial}; using as-is (size=${cur_size:-unknown}). Emulator-only params are not forced on real hardware."
+    return 0
+  fi
+
+  "$ADB" -s "$serial" shell wm size "${SCREEN_W}x${SCREEN_H}" >/dev/null 2>&1 || true
+  "$ADB" -s "$serial" shell wm density "$SCREEN_DPI" >/dev/null 2>&1 || true
+
+  mem_kb="$("$ADB" -s "$serial" shell cat /proc/meminfo 2>/dev/null | awk '/MemTotal/{print $2}')"
+  ram_target_kb=$(( RAM_MB * 1024 ))
+  if [[ -n "$mem_kb" && "$mem_kb" -lt $(( ram_target_kb * 6 / 10 )) ]]; then
+    log "WARNING: ${serial} reports ${mem_kb}kB RAM, well below the ${RAM_MB}MB target."
+    log "         config.ini was normalized; cold-boot this AVD (restart) so the new RAM/heap takes effect."
+  fi
+  log "Emulator ${serial} enforced to ${SCREEN_W}x${SCREEN_H}@${SCREEN_DPI}dpi (RAM/heap/cores set in config.ini + launch flags)"
+}
+
 refresh_tools
 
 READY_SERIAL="$(pick_ready_device || true)"
@@ -224,9 +310,11 @@ if [[ -z "$READY_SERIAL" ]]; then
       --device pixel_6
   fi
 
+  normalize_avd_config
   log "Starting AVD ${AVD_NAME} ..."
   EMULATOR_LOG="${TMPDIR:-/tmp}/shortdrama-dl-${AVD_NAME}-emulator.log"
   nohup "$EMULATOR" "@${AVD_NAME}" -no-snapshot -writable-system -gpu auto \
+    -memory "$RAM_MB" -cores "$CPU_CORES" \
     >"$EMULATOR_LOG" 2>&1 &
 
   deadline=$(( $(date +%s) + BOOT_TIMEOUT ))
@@ -259,6 +347,11 @@ DEVICE_ID="$("$ADB" -s "$READY_SERIAL" shell id 2>/dev/null | tr -d '\r' || true
 if [[ "$DEVICE_ID" != *"uid=0("* ]]; then
   fail 16 root_required "Device ${READY_SERIAL} is not adb-root capable; use a Google APIs AVD, not a Google Play AVD"
 fi
+
+# Normalize config.ini even when we did not start it ourselves, so the next cold
+# boot converges; then force runtime resolution/density on emulators.
+normalize_avd_config
+enforce_runtime_spec "$READY_SERIAL"
 
 FRIDA_PID="$("$ADB" -s "$READY_SERIAL" shell pidof frida-server 2>/dev/null | tr -d '\r' || true)"
 if [[ -z "$FRIDA_PID" ]]; then
