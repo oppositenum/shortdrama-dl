@@ -148,6 +148,32 @@ assert find_btn(old) == (980, 170)
 assert "hhx" in edit_summary(current) and "征程" in edit_summary(current), edit_summary(current)
 assert edit_summary("<hierarchy></hierarchy>") == "无 EditText"
 
+# 剧集页右上角'更多(⋮)'按钮:旧版硬编码 (0.935W,0.077H)=(1009,175) 点在按钮底边(160)之下,点空。
+find_more = ns["ui_find_more"]
+# 已知 id 命中(实测 exg,bounds [959,94][1025,160],中心 (992,127))
+by_id = "<hierarchy>" + \
+    node(**{"class": "android.widget.ImageView", "resource-id": "com.phoenix.read:id/exg",
+            "clickable": "true", "bounds": "[959,94][1025,160]"}) + "</hierarchy>"
+assert find_more(by_id) == (992, 127), find_more(by_id)
+# id 变了但有 content-desc
+by_desc = "<hierarchy>" + \
+    node(**{"class": "android.widget.ImageView", "resource-id": "com.phoenix.read:id/zzz",
+            "content-desc": "更多", "clickable": "true", "bounds": "[959,94][1025,160]"}) + "</hierarchy>"
+assert find_more(by_desc) == (992, 127), find_more(by_desc)
+# id 和 desc 都没有:靠"右上角的小可点控件"结构兜底
+by_corner = "<hierarchy>" + \
+    node(**{"class": "android.widget.ImageView", "resource-id": "x", "content-desc": "",
+            "clickable": "true", "bounds": "[959,94][1025,160]"}) + \
+    node(**{"class": "android.widget.ImageView", "resource-id": "back", "content-desc": "",
+            "clickable": "true", "bounds": "[20,94][86,160]"}) + \
+    "</hierarchy>"
+assert find_more(by_corner) == (992, 127), find_more(by_corner)
+# 左上角返回键、屏幕下方控件都不能被当成'更多'
+only_back = "<hierarchy>" + \
+    node(**{"class": "android.widget.ImageView", "resource-id": "back", "content-desc": "",
+            "clickable": "true", "bounds": "[20,94][86,160]"}) + "</hierarchy>"
+assert find_more(only_back) is None, find_more(only_back)
+
 print("search detection ok")
 `;
 

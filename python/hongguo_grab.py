@@ -196,6 +196,36 @@ def _edit_summary(xml):
         rid = (_attr(s, 'resource-id') or '?').rsplit('/', 1)[-1]
         out.append(f"{rid}='{_attr(s, 'text') or ''}'")
     return "、".join(out) if out else "无 EditText"
+
+def _bounds(b):
+    m = re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', b or '')
+    return (int(m[1]), int(m[2]), int(m[3]), int(m[4])) if m else None
+# 剧集页右上角'更多(⋮)'按钮的 id 同样是混淆的、会随版本变(见过 exg)。
+# 绝不能像旧版那样点固定比例坐标 (0.935W,0.077H):实测在 1080x2280 上算出 (1009,175),
+# 比按钮底边(y=160)还低,点了个空,菜单根本没开,后面自然找不到'下载到本地'。
+MORE_BTN_IDS = (f"{PKG}:id/exg",)
+def ui_find_more(xml):
+    """定位右上角'更多'按钮:已知 id → content-desc 含'更多/more/⋮' → 右上角的可点小控件。"""
+    for rid in MORE_BTN_IDS:
+        c = ui_find(xml, rid=rid)
+        if c: return c
+    for m in re.finditer(r'<node [^>]*>', xml or ""):
+        s = m.group(0)
+        desc = _attr(s, 'content-desc') or ''
+        if '更多' in desc or desc.lower() == 'more' or '⋮' in desc or '···' in desc:
+            c = _center(_attr(s, 'bounds'))
+            if c and c[1] < _H * 0.2: return c
+    best = None                                          # 结构兜底:右上角一个不大的可点控件
+    for m in re.finditer(r'<node [^>]*>', xml or ""):
+        s = m.group(0)
+        if _attr(s, 'clickable') != 'true': continue
+        bb = _bounds(_attr(s, 'bounds'))
+        if not bb: continue
+        cx, cy = (bb[0] + bb[2]) // 2, (bb[1] + bb[3]) // 2
+        if cx < _W * 0.85 or cy > _H * 0.15: continue    # 只认右上角
+        if (bb[2] - bb[0]) > _W * 0.2: continue          # 排除大容器,只要小图标
+        if best is None or (cx - cy) > (best[0] - best[1]): best = (cx, cy)
+    return best
 def net(on):
     for svc in ("wifi", "data"): sh("svc", svc, "enable" if on else "disable")
 
@@ -771,13 +801,24 @@ def _open_dl_panel():
         if x and ('全选' in x or '开始下载' in x): return x        # 面板已经开着了
         dl = ui_find(x, text='下载到本地')
         if not dl:
-            tap(int(_W * 0.935), int(_H * 0.077)); time.sleep(2)  # 右上角 ⋮
+            more = ui_find_more(x)
+            if not more:                                          # 控制层可能收起来了:轻点唤出再找
+                tap(_W // 2, int(_H * 0.4)); time.sleep(1.2)
+                x = dump_stable(); more = ui_find_more(x)
+            if more:
+                tap(*more)
+            else:
+                dbg(f"[dl] 没定位到右上角'更多'按钮,退回比例坐标兜底(第{i+1}/3次)")
+                tap(int(_W * 0.919), int(_H * 0.056))             # 右上角 ⋮ 兜底(贴近实测中心)
+            time.sleep(2)
             dl = ui_find(dump_stable(), text='下载到本地')
         if dl:
             tap(*dl); time.sleep(2.5)
             p = dump_stable()
             if p: return p
             dbg(f"[dl] 面板点开了但读不到布局(dump 超时?),重试 {i+1}/3")
+        else:
+            dbg(f"[dl] 更多菜单里没出现'下载到本地'(可能菜单没点开),重试 {i+1}/3")
         time.sleep(1.5)
     return ""
 
