@@ -175,6 +175,16 @@ test('package scripts expose universal, Intel, Apple Silicon and Windows builds'
   assert.match(packageJson.scripts['dist:mac:signed'], /SIGN_MAC=1.*--universal/);
   assert.match(packageJson.scripts['dist:win'], /--win --x64/);
   assert.equal(packageJson.dependencies['ffmpeg-static'], undefined);
+
+  // 每个 electron-builder 脚本都必须显式 --publish never。
+  // electron-builder 在 CI 里会自己判断要不要发布（日志原话 "Implicit publishing
+  // triggered by CI detection"），配置里写 publish: null 也拦不住这个 CLI 层的默认值。
+  // 实测代价很重：Windows 打包任务因此挂了 75 分钟、一行输出都没有，
+  // 而且发布应当只由 release.yml 里那套带校验的流程负责。
+  for (const [name, cmd] of Object.entries(packageJson.scripts)) {
+    if (!cmd.includes('electron-builder')) continue;
+    assert.match(cmd, /--publish never/, `脚本 ${name} 少了 --publish never`);
+  }
 });
 
 test('web HLS/DASH performs the same confirmed system FFmpeg preparation', () => {
@@ -223,4 +233,30 @@ test('PowerShell scripts have no scope-qualifier lookalikes like "$Name:"', () =
       `${rel} 里这些写法会被当成作用域限定符，应改成 \${...} 包起来：${offenders.join(', ')}`
     );
   }
+});
+
+test('every workflow job has a timeout and packaging jobs cache Electron', () => {
+  // GitHub 单个 job 的默认上限是 6 小时。实测有个 Windows 打包挂了 75 分钟还在跑，
+  // 没有 timeout-minutes 就会一路烧到 6 小时才被杀。
+  // 另外 setup-node 的 cache: npm 只缓 npm tarball（约 27MB），
+  // Electron 运行时和 winCodeSign/NSIS 在另外的目录，每轮都要重下约 600MB。
+  for (const rel of ['.github/workflows/ci.yml', '.github/workflows/release.yml']) {
+    const src = fs.readFileSync(path.join(projectRoot, rel), 'utf8');
+    // 只看 jobs: 段落——顶层还有 on:，它下面的 push:/pull_request: 缩进相同，会被误当成 job
+    const jobsAt = src.search(/^jobs:$/m);
+    assert.notEqual(jobsAt, -1, `${rel} 里没有 jobs:`);
+    const jobsSection = src.slice(jobsAt);
+    const blocks = jobsSection.split(/^ {2}(?=[a-z][\w-]*:$)/m).slice(1);
+    assert.ok(blocks.length >= 3, `${rel} 里没解析到 job`);
+    for (const block of blocks) {
+      const name = block.match(/^([\w-]*):/)[1];
+      assert.match(block, /^\s{4}timeout-minutes: \d+$/m, `${rel} 的 job ${name} 少了 timeout-minutes`);
+    }
+  }
+
+  const ci = fs.readFileSync(path.join(projectRoot, '.github', 'workflows', 'ci.yml'), 'utf8');
+  // 两个打包 job 都要缓存 Electron 下载，并把缓存目录告诉 electron-builder
+  assert.equal((ci.match(/name: Cache Electron downloads/g) || []).length, 2);
+  assert.equal((ci.match(/ELECTRON_CACHE:/g) || []).length, 2);
+  assert.equal((ci.match(/ELECTRON_BUILDER_CACHE:/g) || []).length, 2);
 });

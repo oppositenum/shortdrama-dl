@@ -27,6 +27,7 @@ jobs:
           - name: Windows x64
             os: windows-2022
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -86,6 +87,7 @@ jobs:
     name: Package macOS universal
     needs: test
     runs-on: macos-15
+    timeout-minutes: 30
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -98,16 +100,30 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Cache Electron downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ${{ github.workspace }}/.cache/electron
+            ${{ github.workspace }}/.cache/electron-builder
+          key: ${{ runner.os }}-${{ runner.arch }}-electron-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-electron-
+
       - name: Install locked dependencies
         run: npm ci
 
       - name: Build universal app smoke package
+        env:
+          ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+          ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
         run: npm run pack:mac:universal
 
   package-windows:
     name: Package Windows x64
     needs: test
     runs-on: windows-2022
+    timeout-minutes: 30
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -120,8 +136,21 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Cache Electron downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ${{ github.workspace }}/.cache/electron
+            ${{ github.workspace }}/.cache/electron-builder
+          key: ${{ runner.os }}-${{ runner.arch }}-electron-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-electron-
+
       - name: Install locked dependencies
         run: npm ci
 
       - name: Build NSIS smoke installer
+        env:
+          ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+          ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
         run: npm run dist:win

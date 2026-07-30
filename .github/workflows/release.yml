@@ -16,6 +16,7 @@ jobs:
   release-please:
     name: Prepare release
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       contents: write
       issues: write
@@ -39,6 +40,7 @@ jobs:
     if: needs.release-please.outputs.release_created == 'true'
     needs: release-please
     runs-on: macos-15
+    timeout-minutes: 60
     environment: release
     permissions:
       contents: read
@@ -205,6 +207,7 @@ jobs:
     if: needs.release-please.outputs.release_created == 'true'
     needs: release-please
     runs-on: windows-2022
+    timeout-minutes: 45
     environment: release
     permissions:
       contents: read
@@ -290,6 +293,7 @@ jobs:
       - build-macos
       - build-windows
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     environment: release
     permissions:
       contents: write
