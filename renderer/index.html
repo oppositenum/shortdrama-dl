@@ -57,11 +57,19 @@
           <button id="chooseGrabDir" class="btn btn-ghost">选择目录</button>
         </div>
 
+        <label class="checkbox-row">
+          <input id="introDetailed" type="checkbox" />
+          <span>简介.txt 写详细信息（默认只写剧名和剧情简介；勾选后另附集数、标签、来源和演职人员）</span>
+        </label>
+
         <div class="actions">
           <button id="start" class="btn btn-primary">
             <span class="btn-text">开始下载</span>
           </button>
-          <button id="cancel" class="btn btn-danger" disabled>取消</button>
+          <button id="stopAfterSeries" class="btn btn-ghost" disabled title="不再从清单开新的剧；当前这一部抓完、并把前面攒下的缺集补完之后才结束。要立刻中断请按「取消」">
+            抓完本部再停
+          </button>
+          <button id="cancel" class="btn btn-danger" disabled title="立即打断，正在抓的这一部会中断">取消</button>
           <button id="openDir" class="btn btn-ghost" disabled>打开文件夹</button>
         </div>
       </section>

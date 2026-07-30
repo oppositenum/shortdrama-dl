@@ -15,10 +15,12 @@ contextBridge.exposeInMainWorld('api', {
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
   /** 获取默认下载目录 */
   getDefaultDir: () => ipcRenderer.invoke('app:getDefaultDir'),
-  /** 开始下载 { url, outputDir, appGrab, grabDir } */
+  /** 开始下载 { url, outputDir, appGrab, grabDir, introDetailed } */
   startDownload: (payload) => ipcRenderer.invoke('download:start', payload),
-  /** 取消下载 */
+  /** 立即取消下载（打断正在进行的抓取） */
   cancelDownload: () => ipcRenderer.invoke('download:cancel'),
+  /** 抓完当前这一部再停止（不打断正在进行的抓取） */
+  stopAfterSeries: () => ipcRenderer.invoke('download:stop-after-series'),
   /** 打开文件夹（传文件则高亮） */
   openFolder: (target) => ipcRenderer.invoke('shell:openFolder', target),
 
@@ -31,4 +33,5 @@ contextBridge.exposeInMainWorld('api', {
   onDone: (cb) => ipcRenderer.on('download:done', (_e, d) => cb(d)),
   onError: (cb) => ipcRenderer.on('download:error', (_e, d) => cb(d)),
   onCanceled: (cb) => ipcRenderer.on('download:canceled', () => cb()),
+  onStopScheduled: (cb) => ipcRenderer.on('download:stop-scheduled', () => cb()),
 });

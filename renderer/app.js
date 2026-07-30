@@ -15,8 +15,10 @@ const appGrabCheckbox = $('appGrab');
 const grabDirInput = $('grabDir');
 const chooseGrabDirBtn = $('chooseGrabDir');
 const grabDirRow = $('grabDirRow');
+const introDetailedCheckbox = $('introDetailed');
 const startBtn = $('start');
 const cancelBtn = $('cancel');
+const stopAfterSeriesBtn = $('stopAfterSeries');
 const openDirBtn = $('openDir');
 const clearLogBtn = $('clearLog');
 
@@ -70,11 +72,16 @@ function setDownloadingUI(on) {
   downloading = on;
   startBtn.disabled = on;
   cancelBtn.disabled = !on;
+  // 温和停止只在下载中可用;每次开新任务都要把它复位回可点状态和原文案,
+  // 否则上一轮点过之后这个按钮会一直停在"已安排停止"上再也点不动。
+  stopAfterSeriesBtn.disabled = !on;
+  if (on) stopAfterSeriesBtn.textContent = '抓完本部再停';
   urlInput.disabled = on;
   chooseDirBtn.disabled = on;
   appGrabCheckbox.disabled = on;
   grabDirInput.disabled = on;
   chooseGrabDirBtn.disabled = on;
+  introDetailedCheckbox.disabled = on;
   startBtn.querySelector('.btn-text').textContent = on ? '下载中…' : '开始下载';
 }
 
@@ -184,6 +191,7 @@ startBtn.addEventListener('click', async () => {
     outputDir: selectedDir,
     appGrab: appGrabCheckbox.checked,
     grabDir: grabDirInput.value.trim(),
+    introDetailed: introDetailedCheckbox.checked,
   });
   // 结果通过 onDone / onError / onCanceled 事件反映，这里无需处理返回值
 });
@@ -191,6 +199,18 @@ startBtn.addEventListener('click', async () => {
 cancelBtn.addEventListener('click', async () => {
   cancelBtn.disabled = true;
   await window.api.cancelDownload();
+});
+
+stopAfterSeriesBtn.addEventListener('click', async () => {
+  stopAfterSeriesBtn.disabled = true;
+  stopAfterSeriesBtn.textContent = '已安排停止…';
+  await window.api.stopAfterSeries();
+  // 取消按钮【保持可用】：安排了温和停止之后，用户仍然可以改主意立刻中断
+});
+
+window.api.onStopScheduled(() => {
+  stopAfterSeriesBtn.disabled = true;
+  stopAfterSeriesBtn.textContent = '已安排停止…';
 });
 
 openDirBtn.addEventListener('click', () => {

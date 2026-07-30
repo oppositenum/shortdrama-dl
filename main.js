@@ -130,7 +130,10 @@ let currentAbort = null;     // 当前 Node 下载的 AbortController（便于�
 let currentGrab = null;      // 当前 App 抓取的 Python 子进程（便于取消时 SIGTERM）
 let currentGrabSetup = null; // 当前 App 环境准备进程（Python venv / AVD）
 let activeOutputPath = null; // 当前正在写入的目标文件（取消时清理残留）
-let isCanceled = false;      // 用户取消标志
+let isCanceled = false;      // 用户取消标志（立即停止：杀进程、抛 __CANCELED__）
+// 温和停止：抓完当前这一部再结束。【绝不能】顺手把 isCanceled 也设上——那会立刻 kill
+// 正在跑的 Python 抓取和 ffmpeg，正在抓的这一部就废了，与这个功能的意图正好相反。
+let stopAfterSeries = false;
 
 // ===========================================================================
 // 工具函数
@@ -404,9 +407,19 @@ async function extractSeriesInfo(seriesUrl) {
               vidList: list,
               episodeCnt: sd.episode_cnt || 0,
               cover: sd.series_cover || '',
-              // 只用于生成「简介.txt」。缺了也不影响下载流程，所以给默认值，
+              // 下面这些只用于生成「简介.txt」。缺了也不影响下载流程，所以一律给默认值，
               // 绝不让详情页少个字段就把整剧判失败。
+              // 【抓取范围只能由 episode_cnt / vid_list 决定】。详情页上还有一个"网页免费可看
+              // 集数"的字段（通常只有 5），历史上误拿它当过总集数，70 集的剧只抓 5 集就收工；
+              // tests/series-workflow.test.js 里有一条断言专门禁止这里再碰那个字段。
               intro: sd.series_intro || '',
+              tags: Array.isArray(sd.tags) ? sd.tags.filter((t) => typeof t === 'string') : [],
+              episodeText: sd.episode_right_text || '',
+              updatedCnt: Number(sd.series_episode_info?.episode_cnt) || 0,
+              totalEpisodeCnt: Number(sd.series_episode_info?.episode_total_cnt) || 0,
+              celebrities: (Array.isArray(sd.celebrities) ? sd.celebrities : [])
+                .filter((c) => c && typeof c === 'object')
+                .map((c) => ({ name: c.nickname || '', role: c.sub_title || '' })),
             };
           }
           return null;
@@ -722,11 +735,14 @@ async function downloadOne(media, outputPath) {
 // IPC：开始下载（整体流程编排）
 // ===========================================================================
 async function handleStartDownload(_event, payload) {
-  const { url, outputDir, appGrab, grabDir } = payload || {};
+  const { url, outputDir, appGrab, grabDir, introDetailed } = payload || {};
   isCanceled = false;
+  stopAfterSeries = false;
   activeOutputPath = null;
   // App 抓取全集：默认开启（未显式传 false 即视为开启）
-  const opts = { appGrab: appGrab !== false, grabDir: grabDir || null };
+  // 简介默认走简洁模式（只有剧名和简介），显式传 true 才写详细版
+  const opts = { appGrab: appGrab !== false, grabDir: grabDir || null,
+                 introDetailed: introDetailed === true };
 
   // 1) 校验链接
   if (!isValidUrl(url)) {
@@ -864,20 +880,63 @@ async function downloadCover(coverUrl, seriesDir) {
   }
 }
 
+/** 简洁模式的正文：只有剧名和剧情简介。 */
+function buildIntroBrief(info) {
+  const name = info.seriesName || '（未知剧名）';
+  return info.intro ? `${name}\n\n${info.intro}\n` : `${name}\n`;
+}
+
+/** 详细模式的正文：再带上集数、标签、来源和演职人员。 */
+function buildIntroDetailed(info, sourceUrl) {
+  const L = [];
+  const total = normalizeEpisodeCount(info.episodeCnt, info.vidList?.length);
+  L.push(info.seriesName || '（未知剧名）', '');
+  L.push(`剧名：${info.seriesName || ''}`);
+  if (total > 0) L.push(`集数：${info.episodeText || `全${total}集`}（共 ${total} 集）`);
+  // 连载中的剧「已更新」会少于总集数；两者相等时这行没有信息量，不写。
+  if (info.updatedCnt > 0 && info.totalEpisodeCnt > 0 && info.updatedCnt !== info.totalEpisodeCnt) {
+    L.push(`已更新：${info.updatedCnt} / 共 ${info.totalEpisodeCnt} 集`);
+  }
+  if (info.tags?.length) L.push(`标签：${info.tags.join(' / ')}`);
+  if (info.seriesId) L.push(`series_id：${info.seriesId}`);
+  if (sourceUrl) L.push(`详情页：${sourceUrl}`);
+
+  if (info.intro) L.push('', '【简介】', info.intro);
+
+  const cast = (info.celebrities || []).filter((c) => c?.name);
+  if (cast.length) {
+    L.push('', '【演职人员】');
+    // 按最长的名字补空格对齐。用展开而不是 .length：中文名逐字算宽，
+    // 而 JS 的字符串长度对代理对（部分生僻字）会多算一位。
+    const w = Math.max(...cast.map((c) => [...c.name].length));
+    for (const c of cast) {
+      L.push(`${c.name}${' '.repeat(Math.max(0, w - [...c.name].length))}  ${c.role || ''}`.trimEnd());
+    }
+  }
+
+  const t = new Date();
+  const p2 = (n) => String(n).padStart(2, '0');
+  L.push(
+    '',
+    `抓取时间：${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())} ` +
+      `${p2(t.getHours())}:${p2(t.getMinutes())}:${p2(t.getSeconds())}`
+  );
+  return L.join('\n') + '\n';
+}
+
 /**
- * 把剧名和剧情简介写成剧目文件夹里的「简介.txt」，只要这两样。
+ * 把详情页解析到的信息写成剧目文件夹里的「简介.txt」。
+ * detailed=false（默认）只写剧名和简介；detailed=true 另带集数、标签、来源和演职人员。
  *
  * 每次都重写：连载中的剧简介会改，保留旧的没意义。
  * 这是个纯附带产物，任何一步出问题都只记警告——绝不能因为写不出一个文本文件
  * 就影响视频下载（封面下载也是同样的处理原则）。
  */
-function writeSeriesIntro(info, seriesDir) {
+function writeSeriesIntro(info, seriesDir, { detailed = false, sourceUrl = '' } = {}) {
   try {
-    const name = info.seriesName || '（未知剧名）';
-    const intro = info.intro || '';
-    const text = intro ? `${name}\n\n${intro}\n` : `${name}\n`;
+    const text = detailed ? buildIntroDetailed(info, sourceUrl) : buildIntroBrief(info);
     fs.writeFileSync(path.join(seriesDir, '简介.txt'), text, 'utf8');
-    log('简介已保存：简介.txt');
+    log(`简介已保存：简介.txt（${detailed ? '详细' : '简洁'}）`);
   } catch (err) {
     log(`简介保存失败（不影响剧集）：${err.message}`, 'warn');
   }
@@ -1538,7 +1597,7 @@ function killGrab() {
  * Python 会跳过已存在且非空的分集文件，因此中断后重跑仍可续传。
  */
 async function downloadSeriesCore(url, saveDir, opts = {}) {
-  const { appGrab = true, grabDir = null } = opts;
+  const { appGrab = true, grabDir = null, introDetailed = false } = opts;
   const info = await extractSeriesInfo(url);
   if (isCanceled) throw new Error('__CANCELED__');
 
@@ -1564,7 +1623,7 @@ async function downloadSeriesCore(url, saveDir, opts = {}) {
 
   // 网页整剧流程只落两样东西：封面和简介，不打开任何分集播放器。
   await downloadCover(info.cover, seriesDir);
-  writeSeriesIntro(info, seriesDir);
+  writeSeriesIntro(info, seriesDir, { detailed: introDetailed, sourceUrl: url });
 
   const beforeCount = countExistingEpisodes(seriesDir, totalCnt);
   let appOk = 0;
@@ -1664,11 +1723,22 @@ async function downloadCategory(url, saveDir, opts = {}) {
 
   let okSeries = 0;
   let skipped = 0;
+  let stoppedEarly = false;   // 用户按了"抓完本部再停"，批量提前收工
   // 解析失败或有缺集的剧目，主循环结束后统一补漏
   let pending = [];
 
   for (let i = 0; i < list.length; i++) {
     if (isCanceled) throw new Error('__CANCELED__');
+    // 检查点放在每部剧【开始之前】：上一部已经完整跑完，这一部还没开工，是最干净的断点。
+    // 放到循环末尾就会漏掉"已下载过，跳过"那条 continue 分支。
+    if (stopAfterSeries) {
+      stoppedEarly = true;
+      log(
+        `已按要求停止开新的剧：完成 ${i}/${list.length} 部，剩余 ${list.length - i} 部不再开始`,
+        'warn'
+      );
+      break;
+    }
 
     const { seriesId, title } = list[i];
     const label = title || seriesId;
@@ -1705,7 +1775,15 @@ async function downloadCategory(url, saveDir, opts = {}) {
     }
   }
 
-  // 收尾补漏：对失败/缺集的剧目再跑若干轮；已下好的分集会自动跳过，只补缺失部分
+  // 收尾补漏：对失败/缺集的剧目再跑若干轮；已下好的分集会自动跳过，只补缺失部分。
+  //
+  // 【温和停止不跳过这里】。"抓完本部再停"的含义是"不再从清单里开新的剧",
+  // 而已经跑过的那些剧留下的缺集仍然要补完——不然停在第 200 部时，前面攒下的
+  // 缺集就永远没人管了，而那正是用户按这个按钮时最不希望发生的事。
+  // 只有硬取消（isCanceled）才连补漏一起中断。
+  if (stoppedEarly && pending.length) {
+    log(`已停止从清单开新的剧；先把前面攒下的 ${pending.length} 部缺集补完（要立刻结束请按“取消”）`, 'warn');
+  }
   for (let round = 1; round <= SERIES_RETRY_ROUNDS && pending.length; round++) {
     if (isCanceled) throw new Error('__CANCELED__');
     log(`====== 补漏第 ${round}/${SERIES_RETRY_ROUNDS} 轮：${pending.length} 部剧待补 ======`, 'warn');
@@ -1735,16 +1813,23 @@ async function downloadCategory(url, saveDir, opts = {}) {
     pending = next;
   }
 
-  const categoryComplete = pending.length === 0;
+  // 提前停止时【绝不能】报"全部完成"：pending 可能是空的,但后面几百部压根没开始。
+  const categoryComplete = pending.length === 0 && !stoppedEarly;
   setStatus(
     categoryComplete
       ? `全部完成：完整 ${okSeries}/${list.length} 部剧 ✅`
-      : `任务结束：完整 ${okSeries}/${list.length} 部剧`
+      : stoppedEarly
+        ? `已按要求停止：完整 ${okSeries}/${list.length} 部剧`
+        : `任务结束：完整 ${okSeries}/${list.length} 部剧`
   );
   log(
-    `分类批量结束：完整 ${okSeries}/${list.length} 部剧（其中跳过已下载 ${skipped} 部），保存于 ${saveDir}`,
+    `${stoppedEarly ? '分类批量已按要求提前停止' : '分类批量结束'}：` +
+      `完整 ${okSeries}/${list.length} 部剧（其中跳过已下载 ${skipped} 部），保存于 ${saveDir}`,
     'success'
   );
+  if (stoppedEarly) {
+    log('重新粘贴同一个分类链接再跑一次即可从这里继续（已完成的剧会自动跳过）', 'warn');
+  }
   if (pending.length) {
     log(
       `补漏后仍未完整（${pending.length} 部）：${pending.map((p) => p.title).join('、')}；重新粘贴分类链接再跑一次即可继续补`,
@@ -1757,6 +1842,7 @@ async function downloadCategory(url, saveDir, opts = {}) {
     complete: categoryComplete,
     okCount: okSeries,
     total: list.length,
+    stoppedEarly,
   });
   shell.openPath(saveDir);
 
@@ -1773,6 +1859,20 @@ async function handleCancel() {
   killFfmpeg();
   abortDirect();
   killGrab();
+  return { ok: true };
+}
+
+// ===========================================================================
+// IPC：抓完当前这一部再停止
+// ===========================================================================
+async function handleStopAfterSeries() {
+  // 已经硬取消过就没必要再排温和停止了
+  if (isCanceled) return { ok: true, canceled: true };
+  if (stopAfterSeries) return { ok: true, already: true };
+  stopAfterSeries = true;
+  log('已安排：抓完当前这一部后不再开新的剧，并把前面攒下的缺集补完；'
+      + '要立刻中断请按「取消」', 'warn');
+  send('download:stop-scheduled');
   return { ok: true };
 }
 
@@ -1834,6 +1934,7 @@ app.whenReady().then(() => {
   // 注册 IPC 处理器
   ipcMain.handle('download:start', handleStartDownload);
   ipcMain.handle('download:cancel', handleCancel);
+  ipcMain.handle('download:stop-after-series', handleStopAfterSeries);
   ipcMain.handle('dialog:selectFolder', handleSelectFolder);
   ipcMain.handle('shell:openFolder', handleOpenFolder);
   ipcMain.handle('app:getDefaultDir', () => app.getPath('downloads'));
