@@ -994,6 +994,9 @@ function resolveGrabDir(configured) {
  * SHORTDRAMA_SDK_ROOT 都可以指向自定义 SDK。
  */
 function buildGrabEnv({ pythonBin = null, serial = null, extra = {} } = {}) {
+  // Python 端的 stdout 必须是 UTF-8。进度协议和日志都是中文，而 Windows 上 Python
+  // 给管道挑的是系统 ANSI 代码页（cp1252 之类），第一条中文日志就会 UnicodeEncodeError
+  // 把抓取整个打死。脚本自己也会 reconfigure，这里再设一层，兼容旧解释器。
   const home = app.getPath('home');
   const platform = hostPlatform();
   const sdkRoots = [
@@ -1043,7 +1046,13 @@ function buildGrabEnv({ pythonBin = null, serial = null, extra = {} } = {}) {
   for (const dir of extras) {
     if (!merged.includes(dir)) merged.push(dir);
   }
-  const env = { ...process.env, ...extra, PATH: [...new Set(merged)].join(sep) };
+  const env = {
+    ...process.env,
+    PYTHONIOENCODING: 'utf-8',
+    PYTHONUTF8: '1',
+    ...extra,
+    PATH: [...new Set(merged)].join(sep),
+  };
   const inheritedPathKey = Object.keys(process.env).find((key) => key.toLowerCase() === 'path');
   if (inheritedPathKey && inheritedPathKey !== 'PATH') env[inheritedPathKey] = env.PATH;
   if (serial) env.ANDROID_SERIAL = serial;

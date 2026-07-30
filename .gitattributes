@@ -1,0 +1,16 @@
+# 全仓库统一用 LF 检出。
+# Windows 上 git 默认 core.autocrlf=true 会把文本文件转成 CRLF，两类后果都真实踩过：
+#   1) 测试里按 '\n}\n' 之类切函数体的写法全部失效（只在 Windows CI 上炸，本地永远是绿的）；
+#   2) start_avd.sh / setup-python.sh 带上 \r 后在 macOS/Linux 上直接不可执行。
+* text=auto eol=lf
+
+# 二进制文件绝不能碰
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.icns binary
+*.ico binary
+*.apk binary
+*.mdl binary
+*.mp4 binary

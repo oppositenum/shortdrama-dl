@@ -101,10 +101,12 @@ function runtimeFfmpegPath(options = {}) {
   const exists = options.existsSync || fs.existsSync;
   const binary = platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
   const delimiter = platform === 'win32' ? ';' : ':';
+  // 拼接也必须跟着【目标平台】走，不能用裸的 path.join——那个跟着【宿主平台】走。
+  // 在 Windows 上问 darwin 的路径时，path.join 会拼出 '/custom/bin\ffmpeg'，
+  // 于是永远匹配不上，函数悄悄退回裸 'ffmpeg'。分隔符早就按平台分了，拼接漏了。
+  const join = platform === 'win32' ? path.win32.join : path.posix.join;
   for (const dir of String(env.PATH || env.Path || '').split(delimiter).filter(Boolean)) {
-    const candidate = platform === 'win32'
-      ? path.win32.join(dir, binary)
-      : path.join(dir, binary);
+    const candidate = join(dir, binary);
     if (exists(candidate)) return candidate;
   }
 

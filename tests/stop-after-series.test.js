@@ -13,8 +13,18 @@ const projectRoot = path.resolve(__dirname, '..');
  * isCanceled / stopAfterSeries 是模块级的 let，摘出来后必须落在同一个作用域里，
  * 这样返回的 stop() 才能像真实 IPC 那样在循环跑到一半时把标志翻过去。
  */
+/**
+ * 读 main.js 并把换行统一成 LF。
+ * Windows 上 git 默认 core.autocrlf=true，检出的文件是 CRLF，
+ * 于是按 '\n}\n' 之类切函数体的写法一律匹配不到，切出来的是垃圾。
+ * 这个坑只在 Windows CI 上炸，macOS 本地怎么跑都是绿的。
+ */
+function readSource() {
+  return fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8').replace(/\r\n/g, '\n');
+}
+
 function loadDownloadCategory({series, onSeries}) {
-  const src = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
+  const src = readSource();
   const i = src.indexOf('async function downloadCategory');
   assert.notEqual(i, -1, 'main.js 里找不到 downloadCategory');
   const body = src.slice(i, src.indexOf('\n}\n', i) + 3);
@@ -164,7 +174,7 @@ test('立即取消仍然是抛 __CANCELED__，不受这次改动影响', async (
 });
 
 test('主进程不会把温和停止误当成硬取消', () => {
-  const src = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
+  const src = readSource();
   const i = src.indexOf('async function handleStopAfterSeries');
   const body = src.slice(i, src.indexOf('\n}\n', i));
   // 这个处理器【绝不能】设 isCanceled 或杀任何子进程——那会打断正在抓的这一部

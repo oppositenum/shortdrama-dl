@@ -57,6 +57,15 @@ OUTDIR = os.path.abspath(args.output_dir)
 DWELL  = max(3.0, args.dwell)
 
 # ======================= 输出协议 =======================
+# 【stdout/stderr 必须是 UTF-8】。Windows 上 Python 给管道挑的是系统 ANSI 代码页(常见 cp1252),
+# 而本脚本的进度协议和调试日志全是中文——第一条 logev() 就会
+#   UnicodeEncodeError: 'charmap' codec can't encode character '第'
+# 整个抓取当场崩掉。CI 的 Windows runner 上实测到过。
+# 这里自己 reconfigure,不依赖父进程有没有设 PYTHONIOENCODING:直接命令行跑也得是对的。
+for _s in (sys.stdout, sys.stderr):
+    try: _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception: pass        # 3.6 及以下、或 stdout 被换成别的对象时,尽力而为
+
 _out_lock = threading.Lock()
 def emit(o):
     with _out_lock:

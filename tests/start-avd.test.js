@@ -75,8 +75,17 @@ touch "$RUNNING"
   return { root, env, avdFlag };
 }
 
+// start_avd.sh 是 macOS/Linux 链路的脚本；Windows 走的是 start_avd.ps1，
+// CI 里由单独的 PowerShell 语法检查覆盖。Windows runner 上没有 /bin/bash，
+// spawnSync 直接 ENOENT、status 是 null，断言就成了 "null !== 0" 这种看不懂的失败。
+// 这类平台不适用的用例应当【跳过】而不是判失败。
+const BASH = '/bin/bash';
+const skipNoBash = process.platform === 'win32' || !fs.existsSync(BASH)
+  ? `需要 ${BASH}，当前平台不适用（Windows 走 start_avd.ps1）`
+  : false;
+
 function run(env, ...args) {
-  return spawnSync('/bin/bash', [startAvd, ...args], {
+  return spawnSync(BASH, [startAvd, ...args], {
     cwd: projectRoot,
     env,
     encoding: 'utf8',
@@ -84,7 +93,7 @@ function run(env, ...args) {
   });
 }
 
-test('check reports a ready emulator without mutating it', (t) => {
+test('check reports a ready emulator without mutating it', {skip: skipNoBash}, (t) => {
   const fixture = fakeAndroid({ avdInstalled: true, running: true });
   t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }));
   const result = run(fixture.env, '--check');
@@ -92,7 +101,7 @@ test('check reports a ready emulator without mutating it', (t) => {
   assert.match(result.stdout, /state=ready serial=emulator-5554/);
 });
 
-test('check distinguishes an installed but stopped AVD', (t) => {
+test('check distinguishes an installed but stopped AVD', {skip: skipNoBash}, (t) => {
   const fixture = fakeAndroid({ avdInstalled: true, running: false });
   t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }));
   const result = run(fixture.env, '--check');
@@ -100,7 +109,7 @@ test('check distinguishes an installed but stopped AVD', (t) => {
   assert.match(result.stdout, /state=stopped avd=hongguo/);
 });
 
-test('check reports a missing AVD when SDK managers exist', (t) => {
+test('check reports a missing AVD when SDK managers exist', {skip: skipNoBash}, (t) => {
   const fixture = fakeAndroid({ avdInstalled: false, running: false });
   t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }));
   const result = run(fixture.env, '--check');
@@ -108,7 +117,7 @@ test('check reports a missing AVD when SDK managers exist', (t) => {
   assert.match(result.stdout, /state=missing_avd avd=hongguo/);
 });
 
-test('ensure starts an installed AVD and returns its serial', (t) => {
+test('ensure starts an installed AVD and returns its serial', {skip: skipNoBash}, (t) => {
   const fixture = fakeAndroid({ avdInstalled: true, running: false });
   t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }));
   const result = run(fixture.env, '--ensure');
@@ -117,7 +126,7 @@ test('ensure starts an installed AVD and returns its serial', (t) => {
   assert.match(result.stdout, /Ready: emulator-5554, root, frida-server pid 4321/);
 });
 
-test('install-missing creates and starts the configured AVD', (t) => {
+test('install-missing creates and starts the configured AVD', {skip: skipNoBash}, (t) => {
   const fixture = fakeAndroid({ avdInstalled: false, running: false });
   t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }));
   const result = run(fixture.env, '--ensure', '--install-missing');
