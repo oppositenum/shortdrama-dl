@@ -92,6 +92,80 @@ print("advertisement handling ok")
   assert.match(result.stdout, /advertisement handling ok/);
 });
 
+test('Search input/button detection tolerates version-changed resource ids', (t) => {
+  const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shortdrama-grab-search-'));
+  t.after(() => fs.rmSync(runtimeDir, { recursive: true, force: true }));
+  const probe = String.raw`
+import os
+import runpy
+import sys
+
+script = os.environ["SHORTDRAMA_GRAB_SCRIPT"]
+sys.argv = [script, "--series-name", "x", "--start-ep", "1", "--end-ep", "1",
+            "--output-dir", os.path.dirname(script)]
+ns = runpy.run_path(script)
+ns["_W"], ns["_H"] = 1080, 2400
+find_edit = ns["ui_find_edit"]
+find_btn = ns["ui_find_search_btn"]
+edit_summary = ns["_edit_summary"]
+
+def node(**a):
+    return "<node " + " ".join('%s="%s"' % (k.replace("_", "-"), v) for k, v in a.items()) + " />"
+
+# 当前红果版本:输入框 id 变成 hhx,框里是热词(不是'请输入剧名'),按钮 id 变成 hjh。
+# 老逻辑只认 hhp / '请输入剧名' / hj_,这版会三次都找不到。
+current = "<hierarchy>" + \
+    node(**{"class": "android.widget.EditText", "resource-id": "com.phoenix.read:id/hhx",
+            "text": "粗履踏尘铺就个人逐梦征程", "bounds": "[40,120][900,220]"}) + \
+    node(**{"class": "android.widget.TextView", "resource-id": "com.phoenix.read:id/hjh",
+            "text": "搜索", "bounds": "[920,140][1040,200]"}) + \
+    "</hierarchy>"
+assert find_edit(current) == (470, 170), find_edit(current)
+assert find_btn(current) == (980, 170), find_btn(current)
+
+# 结构兜底:即使 id 再换成完全陌生的值,靠 EditText 类型+位置也能找到输入框。
+unknown = "<hierarchy>" + \
+    node(**{"class": "android.widget.EditText", "resource-id": "com.phoenix.read:id/zzz9",
+            "text": "", "bounds": "[40,120][900,220]"}) + "</hierarchy>"
+assert find_edit(unknown) == (470, 170), find_edit(unknown)
+
+# 屏幕下半部的 EditText(比如评论框)不能被当成搜索框。
+lower = "<hierarchy>" + \
+    node(**{"class": "android.widget.EditText", "resource-id": "x",
+            "text": "", "bounds": "[40,2000][900,2100]"}) + "</hierarchy>"
+assert find_edit(lower) is None, find_edit(lower)
+
+# 旧版 id 仍然要能命中(向后兼容)。
+old = "<hierarchy>" + \
+    node(**{"class": "android.widget.EditText", "resource-id": "com.phoenix.read:id/hhp",
+            "text": "请输入剧名", "bounds": "[40,120][900,220]"}) + \
+    node(**{"class": "android.widget.TextView", "resource-id": "com.phoenix.read:id/hj_",
+            "text": "搜索", "bounds": "[920,140][1040,200]"}) + "</hierarchy>"
+assert find_edit(old) == (470, 170)
+assert find_btn(old) == (980, 170)
+
+# 诊断串要带上现场的 EditText id 和文本,方便下次 App 改版时定位。
+assert "hhx" in edit_summary(current) and "征程" in edit_summary(current), edit_summary(current)
+assert edit_summary("<hierarchy></hierarchy>") == "无 EditText"
+
+print("search detection ok")
+`;
+
+  const result = spawnSync(pythonCommand(), ['-c', probe], {
+    cwd: projectRoot,
+    env: {
+      ...process.env,
+      SHORTDRAMA_GRAB_SCRIPT: grabScript,
+      HONGGUO_RUNTIME_DIR: runtimeDir,
+    },
+    encoding: 'utf8',
+    timeout: 15_000,
+  });
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /search detection ok/);
+});
+
 test('ByteVC2 offline copies fall back to a standard-HEVC rung instead of failing', (t) => {
   const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shortdrama-grab-rung-'));
   t.after(() => fs.rmSync(runtimeDir, { recursive: true, force: true }));

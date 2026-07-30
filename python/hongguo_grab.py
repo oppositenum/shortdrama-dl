@@ -161,6 +161,41 @@ def ui_find(xml, text=None, rid=None, ymax=None):
         c = _center(_attr(s, 'bounds'))
         if c and (ymax is None or c[1] <= ymax): return c
     return None
+
+# 搜索输入框/按钮的 resource-id 是【混淆的、每个红果版本都不一样】:
+# 见过输入框 hhp→hhx、搜索按钮 hj_→hjh。只认死 id 迟早随一次 App 更新全线失效。
+# 这里改成:已知 id 先命中 → 命中不了退回【结构匹配】(按控件类型+位置找),对版本变化免疫。
+SEARCH_INPUT_IDS = (f"{PKG}:id/hhp", f"{PKG}:id/hhx")
+SEARCH_BTN_IDS   = (f"{PKG}:id/hj_", f"{PKG}:id/hjh")
+def ui_find_edit(xml):
+    """定位搜索输入框:已知 id → 上半屏最靠上的 EditText(不依赖占位文案,
+    因为 deeplink 进来时框里常已填着热词/残留文本,'请输入剧名'根本不在)。"""
+    for rid in SEARCH_INPUT_IDS:
+        c = ui_find(xml, rid=rid)
+        if c: return c
+    best = None
+    for m in re.finditer(r'<node [^>]*>', xml or ""):
+        s = m.group(0)
+        if _attr(s, 'class') != 'android.widget.EditText': continue
+        c = _center(_attr(s, 'bounds'))
+        if not c or c[1] > _H * 0.35: continue      # 只认搜索栏所在的上半屏
+        if best is None or c[1] < best[1]: best = c
+    return best
+def ui_find_search_btn(xml):
+    """定位搜索按钮:已知 id → 顶部文案为'搜索'的控件。"""
+    for rid in SEARCH_BTN_IDS:
+        c = ui_find(xml, rid=rid)
+        if c: return c
+    return ui_find(xml, text='搜索', ymax=int(_H * 0.18))
+def _edit_summary(xml):
+    """失败时给出可诊断信息:页面上有哪些 EditText(id + 现有文本)。"""
+    out = []
+    for m in re.finditer(r'<node [^>]*>', xml or ""):
+        s = m.group(0)
+        if _attr(s, 'class') != 'android.widget.EditText': continue
+        rid = (_attr(s, 'resource-id') or '?').rsplit('/', 1)[-1]
+        out.append(f"{rid}='{_attr(s, 'text') or ''}'")
+    return "、".join(out) if out else "无 EditText"
 def net(on):
     for svc in ("wifi", "data"): sh("svc", svc, "enable" if on else "disable")
 
@@ -266,9 +301,87 @@ def frida_up():
 def _frida_device_version():
     return adb("shell", "/data/local/tmp/frida-server", "--version", timeout=10).stdout.strip()
 
+def _unique_urls(urls):
+    seen, out = set(), []
+    for u in urls:
+        if not u or u in seen:
+            continue
+        seen.add(u)
+        out.append(u)
+    return out
+
+def _github_asset_urls(github_https_url):
+    """官方 GitHub 地址 + 可选代理前缀 + 内置镜像回退（中国大陆直连 GitHub 常超时）。
+
+    SHORTDRAMA_GITHUB_PROXY 示例: https://ghfast.top  或  https://mirror.ghproxy.com
+    会拼成 {proxy}/{官方完整 URL}。
+    """
+    official = github_https_url
+    urls = []
+    proxy = (os.environ.get("SHORTDRAMA_GITHUB_PROXY") or "").strip().rstrip("/")
+    if proxy:
+        urls.append(f"{proxy}/{official}")
+    urls.append(official)
+    # 内置回退：顺序靠后，仅在官方失败时使用；均指向同一 GitHub 资产。
+    for prefix in (
+        "https://ghfast.top/",
+        "https://ghproxy.net/",
+        "https://mirror.ghproxy.com/",
+    ):
+        urls.append(prefix + official)
+    return _unique_urls(urls)
+
+def _http_download_to_file(urls, dest, *, max_bytes, label, timeout=120, retries=3):
+    """按 URL 列表下载到 dest；单源失败则换源/重试。timeout 为套接字读超时（秒）。"""
+    import urllib.error
+    import urllib.request
+
+    last_err = None
+    for src_i, url in enumerate(urls, 1):
+        for attempt in range(1, retries + 1):
+            try:
+                logev(
+                    "info",
+                    f"正在下载 {label}（源 {src_i}/{len(urls)}，"
+                    f"第 {attempt}/{retries} 次）...",
+                )
+                req = urllib.request.Request(
+                    url,
+                    headers={"User-Agent": "shortdrama-dl/frida-bootstrap"},
+                )
+                total = 0
+                last_log = 0
+                with urllib.request.urlopen(req, timeout=timeout) as src, open(dest, "wb") as dst:
+                    while True:
+                        chunk = src.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        total += len(chunk)
+                        if total > max_bytes:
+                            raise RuntimeError(f"{label} exceeds {max_bytes} byte safety limit")
+                        dst.write(chunk)
+                        if total - last_log >= 5 * 1024 * 1024:
+                            logev("info", f"{label} 已下载 {total // (1024 * 1024)} MB ...")
+                            last_log = total
+                if total <= 0:
+                    raise RuntimeError(f"{label} download empty")
+                logev("info", f"{label} 下载完成（{total // 1024} KB）")
+                return total
+            except Exception as e:
+                last_err = e
+                try:
+                    if os.path.exists(dest):
+                        os.remove(dest)
+                except OSError:
+                    pass
+                logev("warn", f"{label} 下载失败（{url}）: {e}")
+                if attempt < retries:
+                    time.sleep(min(2 ** attempt, 8))
+    raise RuntimeError(str(last_err) if last_err else "download failed")
+
 def _download_frida_server(abi, version):
     """Download the matching official Frida server into the writable runtime cache."""
-    import lzma, urllib.request
+    import lzma
     arch = {
         "arm64-v8a": "arm64",
         "armeabi-v7a": "arm",
@@ -284,25 +397,40 @@ def _download_frida_server(abi, version):
         os.chmod(final, 0o755)
         return final
 
+    # 允许用户预置完整二进制（离线 / 公司网络无法访问 GitHub）。
+    env_bin = (os.environ.get("SHORTDRAMA_FRIDA_SERVER") or "").strip()
+    if env_bin and os.path.isfile(env_bin) and os.path.getsize(env_bin) > 0:
+        try:
+            shutil.copy2(env_bin, final)
+            os.chmod(final, 0o755)
+            logev("info", f"使用 SHORTDRAMA_FRIDA_SERVER 提供的 frida-server: {env_bin}")
+            return final
+        except Exception as e:
+            logev("warn", f"复制 SHORTDRAMA_FRIDA_SERVER 失败: {e}")
+
     archive = final + ".xz.part"
     unpacked = final + ".part"
-    url = f"https://github.com/frida/frida/releases/download/{version}/frida-server-{version}-android-{arch}.xz"
-    logev("info", f"设备缺少匹配的 frida-server,正在下载官方 Frida {version} ({arch}) ...")
+    asset = f"frida-server-{version}-android-{arch}.xz"
+    official = f"https://github.com/frida/frida/releases/download/{version}/{asset}"
+    urls = _github_asset_urls(official)
+    logev("info", f"设备缺少匹配的 frida-server,正在获取官方 Frida {version} ({arch}) ...")
     try:
-        total = 0
-        with urllib.request.urlopen(url, timeout=60) as src, open(archive, "wb") as dst:
-            while True:
-                chunk = src.read(1024 * 1024)
-                if not chunk: break
-                total += len(chunk)
-                if total > 256 * 1024 * 1024:
-                    raise RuntimeError("Frida archive exceeds 256 MB safety limit")
-                dst.write(chunk)
+        _http_download_to_file(
+            urls,
+            archive,
+            max_bytes=256 * 1024 * 1024,
+            label=f"frida-server {version}/{arch}",
+            timeout=180,
+            retries=3,
+        )
         with lzma.open(archive, "rb") as src, open(unpacked, "wb") as dst:
             while True:
                 chunk = src.read(1024 * 1024)
-                if not chunk: break
+                if not chunk:
+                    break
                 dst.write(chunk)
+        if not os.path.isfile(unpacked) or os.path.getsize(unpacked) <= 0:
+            raise RuntimeError("unpacked frida-server is empty")
         os.chmod(unpacked, 0o755)
         os.replace(unpacked, final)
         return final
@@ -312,8 +440,10 @@ def _download_frida_server(abi, version):
     finally:
         for p in (archive, unpacked):
             try:
-                if os.path.exists(p): os.remove(p)
-            except Exception: pass
+                if os.path.exists(p):
+                    os.remove(p)
+            except Exception:
+                pass
 
 def ensure_frida_server():
     import frida
@@ -327,10 +457,23 @@ def ensure_frida_server():
     if _frida_device_version() != host_version:
         src = _download_frida_server(abi, host_version)
         if not src:
-            cand = [os.path.join(HERE, f"frida-server-{abi}"), os.path.join(HERE, "frida-server")]
-            src = next((c for c in cand if os.path.exists(c)), None)
+            cand = [
+                os.environ.get("SHORTDRAMA_FRIDA_SERVER"),
+                os.path.join(RUNTIME, f"frida-server-{host_version}-android-" + {
+                    "arm64-v8a": "arm64", "armeabi-v7a": "arm",
+                    "x86_64": "x86_64", "x86": "x86",
+                }.get(abi, "")),
+                os.path.join(HERE, f"frida-server-{abi}"),
+                os.path.join(HERE, "frida-server"),
+            ]
+            src = next((c for c in cand if c and os.path.isfile(c) and os.path.getsize(c) > 0), None)
         if not src:
-            logev("error", f"设备无匹配的 frida-server,且自动下载 Frida {host_version} 失败")
+            logev(
+                "error",
+                f"设备无匹配的 frida-server,且自动下载 Frida {host_version} 失败。"
+                "可设置 SHORTDRAMA_GITHUB_PROXY 使用 GitHub 代理，"
+                "或设置 SHORTDRAMA_FRIDA_SERVER 指向已下载的 frida-server 二进制",
+            )
             finish(3, emit_done=False)
         adb("push", src, "/data/local/tmp/frida-server")
     sh("chmod 755 /data/local/tmp/frida-server; nohup /data/local/tmp/frida-server >/dev/null 2>&1 &")
@@ -342,10 +485,12 @@ def ensure_frida_server():
         finish(3, emit_done=False)
 def ensure_adbkeyboard():
     if "com.android.adbkeyboard" not in adb("shell", "pm", "list", "packages").stdout:
-        import hashlib, urllib.request
+        import hashlib
         expected = "e698adea5633135a067b038f9a0cf41baa4de09888713a81593fb2b9682cdc59"
         commit = "4b513f3313b8392b316b37e9c08b0be2def79dda"
-        url = f"https://raw.githubusercontent.com/senzhk/ADBKeyBoard/{commit}/ADBKeyboard.apk"
+        official = f"https://raw.githubusercontent.com/senzhk/ADBKeyBoard/{commit}/ADBKeyboard.apk"
+        # raw.githubusercontent.com 与 github releases 类似，在部分网络会超时。
+        urls = _github_asset_urls(official)
         os.makedirs(RUNTIME, exist_ok=True)
         apk = os.environ.get("SHORTDRAMA_ADB_KEYBOARD_APK") or os.path.join(RUNTIME, "ADBKeyboard.apk")
 
@@ -361,16 +506,20 @@ def ensure_adbkeyboard():
             tmp = apk + f".{os.getpid()}.part"
             logev("info", "正在下载固定版本 ADBKeyBoard（GPL-2.0，仅用于中文输入）...")
             try:
-                total = 0
+                _http_download_to_file(
+                    urls,
+                    tmp,
+                    max_bytes=5 * 1024 * 1024,
+                    label="ADBKeyBoard.apk",
+                    timeout=120,
+                    retries=3,
+                )
                 digest = hashlib.sha256()
-                with urllib.request.urlopen(url, timeout=60) as src, open(tmp, "wb") as dst:
-                    while True:
-                        chunk = src.read(64 * 1024)
-                        if not chunk: break
-                        total += len(chunk)
-                        if total > 5 * 1024 * 1024: raise RuntimeError("ADBKeyBoard APK exceeds 5 MB limit")
-                        digest.update(chunk); dst.write(chunk)
-                if digest.hexdigest() != expected: raise RuntimeError("ADBKeyBoard SHA-256 mismatch")
+                with open(tmp, "rb") as fh:
+                    for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                if digest.hexdigest() != expected:
+                    raise RuntimeError("ADBKeyBoard SHA-256 mismatch")
                 os.replace(tmp, apk)
             except Exception as e:
                 try:
@@ -514,21 +663,29 @@ def search_open(name, tries=3, recovery=False):
 
     现在:进去之后必须在页面上看到这部剧的名字,看不到就退回搜索页重来。
     盲点兜底也收紧成【只有结果页里确实出现了剧名才敢点】。"""
+    last_reason = ""
     for t in range(tries):
         if CANCEL["v"]: return False
         if t: keyback(); time.sleep(1.5)                  # 重试前先退一步,免得卡在上一次的残留页面上
         open_search()
         x = dump_stable()
-        inp = ui_find(x, rid=f"{PKG}:id/hhp") or ui_find(x, text='请输入剧名')
+        inp = ui_find_edit(x)
         if not inp:                                       # dump 偶发失败/页面还没渲染好,重来一次即可,
-            dbg(f"[search] 第{t+1}次:没找到搜索输入框,重来"); time.sleep(2); continue   # 不该因此放弃整轮
+            last_reason = f"没找到搜索输入框(页面未就绪/被弹窗挡住/App UI 变更;EditText: {_edit_summary(x)})"
+            logev("warn", f"[search] 第{t+1}/{tries}次: {last_reason}")
+            time.sleep(2); continue   # 不该因此放弃整轮
         tap(*inp); time.sleep(1)
-        type_cn(name)
+        type_cn(name)                                     # type_cn 会先广播 ADB_CLEAR_TEXT 清掉框里残留
         x = ui_dump()
-        btn = ui_find(x, rid=f"{PKG}:id/hj_") or ui_find(x, text='搜索', ymax=300)
-        if not btn:
-            dbg(f"[search] 第{t+1}次:没找到搜索按钮,重来"); time.sleep(2); continue
-        tap(*btn); time.sleep(3.5)
+        btn = ui_find_search_btn(x)
+        if btn:
+            tap(*btn)
+        else:
+            # 找不到搜索按钮时不放弃:直接按输入法的搜索/回车键提交(多数搜索框都吃这一下)。
+            dbg("[search] 没定位到搜索按钮,改按 IME 搜索键提交")
+            sh("input", "keyevent", "84")                 # KEYCODE_SEARCH
+            sh("input", "keyevent", "66")                 # KEYCODE_ENTER 兜底
+        time.sleep(3.5)
         x = ui_dump()
         title = None
         for m in re.finditer(r'<node [^>]*>', x or ""):
@@ -541,7 +698,10 @@ def search_open(name, tries=3, recovery=False):
         elif _title_here(x, name):
             tap(int(_W * 0.26), int(_H * 0.30))              # 结果页确实有这部剧,才敢盲点第一个卡片
         else:
-            dbg(f"[search] 第{t+1}次:结果页里没看到《{name}》(没搜出来/没加载完),重搜")
+            last_reason = (
+                f"结果页里没看到《{name}》(未登录/无网/剧名不一致/内容不可用/结果未加载完)"
+            )
+            logev("warn", f"[search] 第{t+1}/{tries}次: {last_reason}")
             time.sleep(2); continue
         time.sleep(3.5)
         x = dump_stable()
@@ -551,14 +711,34 @@ def search_open(name, tries=3, recovery=False):
             # 按进对了处理:真进错了,抓取阶段量到的 key 在本剧索引里认不出来,那时再重进。
             dbg("[search] 进去了但界面读不到(全屏播放器常见),先按进对了处理"); return True
         if _looks_like_series_page(x) and _title_here(x, name): return True
-        dbg(f"[search] 第{t+1}次{'进的是别的剧' if _looks_like_series_page(x) else '没进成剧集页'},退回重搜")
+        if _looks_like_series_page(x):
+            last_reason = f"进的是别的剧,不是《{name}》"
+        else:
+            last_reason = "点进结果后没进入剧集页(可能被登录/青少年/协议弹窗打断)"
+        logev("warn", f"[search] 第{t+1}/{tries}次: {last_reason}")
         time.sleep(1)
     if recovery:
         logev("info", f"恢复定位时暂未通过 UI 核对《{name}》(已重试 {tries} 次);"
                       f"这是可恢复导航提示,现有分集不受影响,后续仍会用解密事件核对剧集")
     else:
-        logev("warn", f"搜索进入《{name}》连续 {tries} 次没核对上")
+        hint = f"；最后原因: {last_reason}" if last_reason else ""
+        logev(
+            "warn",
+            f"搜索进入《{name}》连续 {tries} 次没核对上{hint}。"
+            "请在模拟器里手动确认:红果已登录、能搜到该剧、无阻塞弹窗",
+        )
     return False
+def ensure_logged_hint():
+    """启动后若仍在登录/协议页,给用户明确提示(不代替人工登录)。"""
+    x = dump_stable() or ui_dump() or ""
+    markers = ("登录", "一键登录", "手机号", "验证码", "同意并继续", "用户协议", "隐私政策", "青少年模式")
+    hits = [m for m in markers if m in x]
+    if hits:
+        logev(
+            "warn",
+            "检测到疑似未完成登录/协议界面（" + "、".join(hits[:4]) + "）。"
+            "App 抓取需要已登录的红果账号；请在模拟器中手动登录后再重试",
+        )
 def read_total():
     x = dump_stable()
     m = re.search(r'全(\d+)集|共(\d+)集', x)
@@ -1708,13 +1888,22 @@ def main():
     ensure_frida_server()
     ensure_adbkeyboard()
     net(True); time.sleep(1)
+    # 强制把红果拉到前台,避免卡在桌面/安装向导导致搜不到输入框。
+    adb("shell", "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1", timeout=20)
+    time.sleep(2)
+    ensure_logged_hint()
 
     # 先进剧读总集数,决定命名位宽,并做断点续传筛选。
     # 开局【不清空离线下载】:之前(含被取消的上一轮)已下好的 .mdl 直接复用。
     # 若在此 clear_all,会把文件清掉但 App 仍记为"已下载"→点开始下载不再重下→卡在 0/63。
     # 下载在每轮结束时(delete_downloads)统一清理,正常一轮仍是干净起步。
     if not search_open(NAME):
-        logev("error", f"App 内没搜到/进不去这部剧: {NAME}")
+        logev(
+            "error",
+            f"App 内没搜到/进不去这部剧: {NAME}。"
+            "这通常不是打包/Frida 问题,而是模拟器里的红果账号或内容不可用;"
+            "请手动打开红果搜索该剧名确认能进入后再重试",
+        )
         emit({"event": "init", "device": serial, "total": 0})
         finish(2, ok=0, failed=list(range(START, END + 1)))
     total = read_total() or _total_from_grid() or _total_from_db()   # 界面→选集面板→App库,逐级兜底
