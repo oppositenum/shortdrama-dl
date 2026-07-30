@@ -149,19 +149,31 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      # shell 显式用 bash：Windows 步骤默认走 pwsh，实测 electron-builder 的输出
-      # 一行都透不出来（挂了 29 分钟连版本横幅都没有，而同一条命令在 macOS 上秒出）。
-      # 看不见进度就没法判断到底是卡住还是只是慢，先把可观测性拿回来。
-      # DEBUG 打开 electron-builder 的详细日志，它下载 winCodeSign（约 200MB，
-      # 来自 GitHub Releases）时最容易卡，需要能看到卡在哪一步。
-      # 二分用：先只做 --dir 解包，跳过 NSIS 与 winCodeSign 下载，和 macOS 那个 job 同形。
-      # 若这样也没输出，说明问题出在 electron-builder 本身在 windows-2022 上启动不了，
-      # 与 NSIS 无关；若能跑通，就锁定在 NSIS/winCodeSign 这一段。
-      # release.yml 里仍然是完整的 NSIS 构建，覆盖面没有丢。
+      # electron-builder 在 windows-2022 上会挂十几分钟且一行输出都不出（--dir 解包
+      # 都会挂，所以与 NSIS/winCodeSign 无关，问题在 electron-builder 自身启动阶段）。
+      # “零输出”是假象：步骤超时被 SIGKILL 时，缓冲在管道里的 stdout 全丢了，
+      # 连 DEBUG 的日志都透不出来。
+      # 这里换成后台跑 + 自己每 15s 读一次日志文件：因为是我们主动读文件，
+      # 不依赖子进程刷新管道，DEBUG 轨迹卡在哪一行就能精确看到，即使最后被 kill。
       - name: Build unpacked smoke package
         shell: bash
         env:
           ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
           ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
           DEBUG: electron-builder
-        run: npm run pack -- --win --x64
+        run: |
+          set +e
+          npm run pack -- --win --x64 > build.log 2>&1 &
+          PID=$!
+          for i in $(seq 1 44); do
+            sleep 15
+            if ! kill -0 "$PID" 2>/dev/null; then break; fi
+            echo "----- still running after $((i*15))s; tail of build.log: -----"
+            tail -n 8 build.log
+          done
+          wait "$PID"
+          code=$?
+          echo "===== electron-builder exit code: $code ====="
+          echo "===== full build.log ====="
+          cat build.log
+          exit "$code"
