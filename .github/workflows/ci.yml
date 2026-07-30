@@ -149,35 +149,33 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      # 定位 windows-2022 上 electron-builder 启动即挂（连版本横幅都不打，--dir 也挂）。
-      # 直接读日志文件已证实是真·零输出，卡在打横幅之前。这里用轻量探针区分两种可能：
-      # 若 --version / --help 都秒回，说明模块能正常加载，问题在构建流水线；
-      # 若这俩也挂，说明是 electron-builder 自身在该机加载/自带二进制的问题。
-      # 每个探针最多等 30s 就判定挂起，整步 1 分钟内出结论，不再空耗 15 分钟。
-      - name: Probe electron-builder startup
-        shell: bash
+      # 已确认模块加载正常（--version/--help 秒回），挂在构建流水线里。
+      # 之前 Git Bash 的 `> file` 重定向对原生 node 进程走的是 MSYS 管道而非真文件，
+      # node 缓冲、被 kill 时丢失，所以看着像“零输出”。这里改用 PowerShell 的
+      # Start-Process + RedirectStandardOutput/Error 写【原生文件】（同步落盘、kill 后仍在），
+      # 再轮询 tail，就能看到流水线到底卡在哪一步（电子/winCodeSign 下载？签名检测？）。
+      - name: Build unpacked smoke package
+        shell: pwsh
         env:
           ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
           ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
           DEBUG: electron-builder
         run: |
-          set +e
-          node -v
-          probe() {
-            local label="$1"; shift
-            echo "===== probe: $label ====="
-            "$@" > probe.log 2>&1 &
-            local pid=$!
-            local i
-            for i in $(seq 1 6); do
-              sleep 5
-              if ! kill -0 "$pid" 2>/dev/null; then
-                wait "$pid"; echo "[$label] finished rc=$?"; cat probe.log; return
-              fi
-            done
-            echo "[$label] STILL HANGING after 30s"
-            cat probe.log
-            kill "$pid" 2>/dev/null
+          $eb = Join-Path $PWD 'node_modules/.bin/electron-builder.cmd'
+          $ebArgs = @('--dir','--config','electron-builder.js','--publish','never','--win','--x64')
+          $p = Start-Process -FilePath $eb -ArgumentList $ebArgs -NoNewWindow -PassThru `
+                 -RedirectStandardOutput build.out.log -RedirectStandardError build.err.log
+          for ($i = 1; $i -le 26; $i++) {
+            Start-Sleep -Seconds 15
+            if ($p.HasExited) { break }
+            Write-Host "----- still running after $($i*15)s -----"
+            if (Test-Path build.out.log) { Write-Host '[stdout tail]'; Get-Content build.out.log -Tail 6 }
+            if (Test-Path build.err.log) { Write-Host '[stderr tail]'; Get-Content build.err.log -Tail 6 }
           }
-          probe "electron-builder --version" ./node_modules/.bin/electron-builder --version
-          probe "electron-builder --help" ./node_modules/.bin/electron-builder --help
+          if (-not $p.HasExited) { Write-Host 'TIMED OUT, killing'; $p.Kill(); Start-Sleep 2 }
+          Write-Host "===== exit code: $($p.ExitCode) ====="
+          Write-Host '===== full stdout ====='
+          if (Test-Path build.out.log) { Get-Content build.out.log }
+          Write-Host '===== full stderr ====='
+          if (Test-Path build.err.log) { Get-Content build.err.log }
+          if ($p.HasExited -and $p.ExitCode -eq 0) { exit 0 } else { exit 1 }
