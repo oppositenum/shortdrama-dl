@@ -123,7 +123,7 @@ jobs:
     name: Package Windows x64
     needs: test
     runs-on: windows-2022
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -154,10 +154,14 @@ jobs:
       # 看不见进度就没法判断到底是卡住还是只是慢，先把可观测性拿回来。
       # DEBUG 打开 electron-builder 的详细日志，它下载 winCodeSign（约 200MB，
       # 来自 GitHub Releases）时最容易卡，需要能看到卡在哪一步。
-      - name: Build NSIS smoke installer
+      # 二分用：先只做 --dir 解包，跳过 NSIS 与 winCodeSign 下载，和 macOS 那个 job 同形。
+      # 若这样也没输出，说明问题出在 electron-builder 本身在 windows-2022 上启动不了，
+      # 与 NSIS 无关；若能跑通，就锁定在 NSIS/winCodeSign 这一段。
+      # release.yml 里仍然是完整的 NSIS 构建，覆盖面没有丢。
+      - name: Build unpacked smoke package
         shell: bash
         env:
           ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
           ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
           DEBUG: electron-builder
-        run: npm run dist:win
+        run: npm run pack -- --win --x64
