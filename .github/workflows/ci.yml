@@ -149,8 +149,15 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      # shell 显式用 bash：Windows 步骤默认走 pwsh，实测 electron-builder 的输出
+      # 一行都透不出来（挂了 29 分钟连版本横幅都没有，而同一条命令在 macOS 上秒出）。
+      # 看不见进度就没法判断到底是卡住还是只是慢，先把可观测性拿回来。
+      # DEBUG 打开 electron-builder 的详细日志，它下载 winCodeSign（约 200MB，
+      # 来自 GitHub Releases）时最容易卡，需要能看到卡在哪一步。
       - name: Build NSIS smoke installer
+        shell: bash
         env:
           ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
           ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+          DEBUG: electron-builder
         run: npm run dist:win
