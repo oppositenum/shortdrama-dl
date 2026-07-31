@@ -164,8 +164,10 @@ jobs:
 
           # universal must contain both slices in every Mach-O; arm64/x64 builds must
           # contain ONLY their own slice (electron-builder single-arch output should
-          # never carry the other one; this project has no native node addons that
-          # could legitimately ship as pre-built fat binaries regardless of --arch).
+          # never carry the other one) — EXCEPT fsevents.node: the fsevents npm package
+          # always ships one prebuilt universal binary regardless of --arch (confirmed
+          # against an actual x64-only build), so it's exempt from the single-arch rule
+          # and only has to contain the slice we actually need.
           expect="${{ matrix.arch }}"
 
           verify_app() {
@@ -182,6 +184,19 @@ jobs:
               if file "$binary" | grep -q 'Mach-O'; then
                 macho_count=$((macho_count + 1))
                 archs="$(lipo -archs "$binary")"
+                if [[ "$(basename "$binary")" == "fsevents.node" ]]; then
+                  case "$expect" in
+                    arm64) [[ " $archs " == *" arm64 "* ]] || { echo "fsevents.node missing arm64 slice: $binary ($archs)" >&2; return 1; } ;;
+                    x64)   [[ " $archs " == *" x86_64 "* ]] || { echo "fsevents.node missing x64 slice: $binary ($archs)" >&2; return 1; } ;;
+                    universal)
+                      if [[ " $archs " != *" x86_64 "* || " $archs " != *" arm64 "* ]]; then
+                        echo "fsevents.node missing a slice: $binary ($archs)" >&2
+                        return 1
+                      fi
+                      ;;
+                  esac
+                  continue
+                fi
                 case "$expect" in
                   universal)
                     if [[ " $archs " != *" x86_64 "* || " $archs " != *" arm64 "* ]]; then
