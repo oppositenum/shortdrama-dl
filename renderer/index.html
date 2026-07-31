@@ -23,6 +23,48 @@
         </div>
       </header>
 
+      <!-- 环境检查 -->
+      <section class="card env-card" id="envCard">
+        <div class="env-head">
+          <button id="envToggle" class="env-toggle" type="button" aria-expanded="true">
+            <span class="env-chevron">▾</span>
+            <span>环境检查</span>
+            <span id="envSummary" class="env-summary"></span>
+          </button>
+          <div class="env-actions">
+            <button id="envRecheck" class="btn btn-mini">重新检查</button>
+            <button id="envFix" class="btn btn-mini" disabled>修复缺失项</button>
+          </div>
+        </div>
+        <div class="env-body" id="envBody">
+          <div class="env-row" data-env="python">
+            <span class="env-dot checking"></span>
+            <span class="env-label">Python 依赖</span>
+            <span class="env-msg">检查中…</span>
+          </div>
+          <div class="env-row" data-env="ffmpeg">
+            <span class="env-dot checking"></span>
+            <span class="env-label">ffmpeg/ffprobe</span>
+            <span class="env-msg">检查中…</span>
+          </div>
+          <div class="env-row" data-env="android">
+            <span class="env-dot checking"></span>
+            <span class="env-label">Android 模拟器/设备</span>
+            <span class="env-msg">检查中…</span>
+          </div>
+          <div class="env-row" data-env="hongguo_app">
+            <span class="env-dot checking"></span>
+            <span class="env-label">红果 App</span>
+            <span class="env-msg">检查中…</span>
+          </div>
+          <div class="env-row" data-env="frida_server">
+            <span class="env-dot checking"></span>
+            <span class="env-label">Frida Server</span>
+            <span class="env-msg">检查中…</span>
+          </div>
+        </div>
+      </section>
+
       <!-- 输入区 -->
       <section class="card">
         <label class="field-label" for="url">播放页 / 详情页链接</label>

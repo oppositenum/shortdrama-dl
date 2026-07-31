@@ -30,6 +30,11 @@ html,
 body {
   height: 100%;
 }
+body {
+  /* 卡片一多，内容可能比窗口高；日志卡片会先按 min-height 收缩，收缩到底之后
+     交给这里整页滚动兜底，保证不管窗口多小，日志和其它卡片始终可以滚到看见。 */
+  overflow-y: auto;
+}
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
@@ -203,6 +208,109 @@ input[readonly] {
   color: var(--text);
 }
 
+/* ---------- 环境检查 ---------- */
+.env-card {
+  padding: 14px 18px;
+}
+.env-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.env-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 4px 2px;
+  margin: -4px -2px;
+  cursor: pointer;
+}
+.env-toggle:hover {
+  color: var(--text);
+}
+.env-chevron {
+  display: inline-block;
+  transition: transform 0.15s ease;
+  color: var(--text-faint);
+}
+.env-card.collapsed .env-chevron {
+  transform: rotate(-90deg);
+}
+.env-summary {
+  display: none;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.env-card.collapsed .env-summary {
+  display: inline;
+}
+.env-actions {
+  display: flex;
+  gap: 8px;
+}
+.env-body {
+  margin-top: 10px;
+}
+.env-card.collapsed .env-body {
+  display: none;
+}
+.env-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.env-row + .env-row {
+  border-top: 1px solid var(--border);
+}
+.env-label {
+  color: var(--text);
+  flex: none;
+  width: 150px;
+}
+.env-msg {
+  color: var(--text-dim);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.env-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex-shrink: 0;
+}
+.env-dot.checking {
+  background: var(--text-faint);
+  animation: pulse 1.2s infinite;
+}
+.env-dot.ok {
+  background: var(--success);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
+}
+.env-dot.warn,
+.env-dot.missing {
+  background: var(--warn);
+  box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.15);
+}
+.env-dot.error {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+}
+.env-dot.blocked {
+  background: var(--text-faint);
+}
+
 /* ---------- 状态 & 进度 ---------- */
 .status-row {
   display: flex;
@@ -284,7 +392,9 @@ input[readonly] {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  /* 卡片一多，窗口装不下时这里先按 flex:1 收缩，但绝不小于这个高度——低于此高度改由
+     body 的 overflow-y:auto 整页滚动兜底(见上)，而不是把日志挤成看不见的一条缝。 */
+  min-height: 160px;
 }
 .log-head {
   display: flex;

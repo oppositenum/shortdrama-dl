@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld('api', {
   stopAfterSeries: () => ipcRenderer.invoke('download:stop-after-series'),
   /** 打开文件夹（传文件则高亮） */
   openFolder: (target) => ipcRenderer.invoke('shell:openFolder', target),
+  /** 只读环境检查：不装不下载不弹确认框，仅探测并报告状态 */
+  checkEnvironment: (grabDir) => ipcRenderer.invoke('env:check', { grabDir }),
+  /** 修复缺失项：走既有的交互式安装确认流程 */
+  fixEnvironment: (grabDir) => ipcRenderer.invoke('env:fix', { grabDir }),
 
   // —— 事件订阅（主进程 -> 渲染进程）——
   onLog: (cb) => ipcRenderer.on('download:log', (_e, d) => cb(d)),
@@ -34,4 +38,7 @@ contextBridge.exposeInMainWorld('api', {
   onError: (cb) => ipcRenderer.on('download:error', (_e, d) => cb(d)),
   onCanceled: (cb) => ipcRenderer.on('download:canceled', () => cb()),
   onStopScheduled: (cb) => ipcRenderer.on('download:stop-scheduled', () => cb()),
+  onEnvBegin: (cb) => ipcRenderer.on('env:begin', () => cb()),
+  onEnvItem: (cb) => ipcRenderer.on('env:item', (_e, d) => cb(d)),
+  onEnvDone: (cb) => ipcRenderer.on('env:done', () => cb()),
 });

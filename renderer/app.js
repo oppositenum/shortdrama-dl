@@ -21,6 +21,11 @@ const cancelBtn = $('cancel');
 const stopAfterSeriesBtn = $('stopAfterSeries');
 const openDirBtn = $('openDir');
 const clearLogBtn = $('clearLog');
+const envRecheckBtn = $('envRecheck');
+const envFixBtn = $('envFix');
+const envCard = $('envCard');
+const envToggle = $('envToggle');
+const envSummary = $('envSummary');
 
 const statusText = $('status');
 const statusDot = $('statusDot');
@@ -35,6 +40,10 @@ const logEl = $('log');
 let selectedDir = '';   // 用户选择的目录
 let lastFilePath = '';  // 最近一次完成/进行的目标文件路径（用于"打开文件夹"）
 let downloading = false;
+// 「修复缺失项」是否可点，只看这 3 项——红果 App / Frida Server 没有对应的修复动作
+const FIXABLE_ENV_IDS = ['python', 'ffmpeg', 'android'];
+const envItemState = { python: 'checking', ffmpeg: 'checking', android: 'checking',
+  hongguo_app: 'checking', frida_server: 'checking' }; // id -> state，供决定「修复缺失项」是否可点/展示摘要
 
 // ---------- 初始化：填充默认目录 ----------
 window.api.getDefaultDir().then((dir) => {
@@ -43,6 +52,83 @@ window.api.getDefaultDir().then((dir) => {
     dirInput.value = dir;
   }
 });
+
+// ==========================================================================
+// 环境检查
+// ==========================================================================
+const ENV_IDS = ['python', 'ffmpeg', 'android', 'hongguo_app', 'frida_server'];
+const ENV_COLLAPSE_KEY = 'shortdrama:envCollapsed';
+
+function setEnvRow(id, state, message) {
+  const row = document.querySelector(`.env-row[data-env="${id}"]`);
+  if (!row) return;
+  envItemState[id] = state;
+  const dot = row.querySelector('.env-dot');
+  dot.className = 'env-dot ' + state;
+  row.querySelector('.env-msg').textContent = message || '';
+  updateEnvSummary();
+}
+
+function resetEnvRows() {
+  for (const row of document.querySelectorAll('.env-row')) {
+    const id = row.dataset.env;
+    setEnvRow(id, 'checking', '检查中…');
+  }
+}
+
+function updateEnvSummary() {
+  const okCount = ENV_IDS.filter((id) => envItemState[id] === 'ok').length;
+  const anyChecking = ENV_IDS.some((id) => envItemState[id] === 'checking');
+  envSummary.textContent = anyChecking ? '检查中…' : `${okCount}/${ENV_IDS.length} 就绪`;
+}
+
+function setEnvCollapsed(collapsed) {
+  envCard.classList.toggle('collapsed', collapsed);
+  envToggle.setAttribute('aria-expanded', String(!collapsed));
+  try {
+    localStorage.setItem(ENV_COLLAPSE_KEY, collapsed ? '1' : '0');
+  } catch {
+    // 隐私模式等场景 localStorage 可能不可用，忽略即可，不影响本次会话使用
+  }
+}
+
+envToggle.addEventListener('click', () => {
+  setEnvCollapsed(!envCard.classList.contains('collapsed'));
+});
+
+let storedCollapsed = '0';
+try {
+  storedCollapsed = localStorage.getItem(ENV_COLLAPSE_KEY) || '0';
+} catch {
+  // 同上，忽略
+}
+setEnvCollapsed(storedCollapsed === '1');
+
+window.api.onEnvBegin(() => {
+  envRecheckBtn.disabled = true;
+  envFixBtn.disabled = true;
+  resetEnvRows();
+});
+
+window.api.onEnvItem((d) => setEnvRow(d.id, d.state, d.message));
+
+window.api.onEnvDone(() => {
+  envRecheckBtn.disabled = false;
+  envFixBtn.disabled = !FIXABLE_ENV_IDS.some(
+    (id) => envItemState[id] === 'missing' || envItemState[id] === 'warn'
+  );
+});
+
+envRecheckBtn.addEventListener('click', () => {
+  window.api.checkEnvironment(grabDirInput.value.trim());
+});
+
+envFixBtn.addEventListener('click', () => {
+  window.api.fixEnvironment(grabDirInput.value.trim());
+});
+
+// 软件一打开就自动探测一次；全程只读，不装不下载不弹确认框
+window.api.checkEnvironment(grabDirInput.value.trim());
 
 // ==========================================================================
 // UI 辅助

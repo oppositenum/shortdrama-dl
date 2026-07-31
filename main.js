@@ -134,6 +134,7 @@ let isCanceled = false;      // 用户取消标志（立即停止：杀进程、
 // 温和停止：抓完当前这一部再结束。【绝不能】顺手把 isCanceled 也设上——那会立刻 kill
 // 正在跑的 Python 抓取和 ffmpeg，正在抓的这一部就废了，与这个功能的意图正好相反。
 let stopAfterSeries = false;
+let envCheckBusy = false;    // 「环境检查」面板自动检查/重新检查/修复缺失项，三者互斥
 
 // ===========================================================================
 // 工具函数
@@ -1060,7 +1061,7 @@ function buildGrabEnv({ pythonBin = null, serial = null, extra = {} } = {}) {
 }
 
 /** 运行环境准备命令；输出可选地转发到 Electron 日志。 */
-function runSetupProcess(command, args, { cwd, env, showOutput = false } = {}) {
+function runSetupProcess(command, args, { cwd, env, showOutput = false, timeoutMs } = {}) {
   return new Promise((resolve) => {
     let settled = false;
     let stdout = '';
@@ -1092,19 +1093,41 @@ function runSetupProcess(command, args, { cwd, env, showOutput = false } = {}) {
     child.stdout.on('data', (chunk) => consume(chunk, false));
     child.stderr.on('data', (chunk) => consume(chunk, true));
 
+    // 只用于探测一台可能已经卡死的设备(adb shell 命令);不传就和以前完全一样、不设时限。
+    let timedOut = false;
+    let timeoutTimer = null;
+    let killTimer = null;
+    if (timeoutMs) {
+      timeoutTimer = setTimeout(() => {
+        timedOut = true;
+        child.kill('SIGTERM');
+        killTimer = setTimeout(() => { try { child.kill('SIGKILL'); } catch {} }, 3000);
+      }, timeoutMs);
+    }
+    const clearTimers = () => {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (killTimer) clearTimeout(killTimer);
+    };
+
     child.on('error', (err) => {
       if (settled) return;
       settled = true;
+      clearTimers();
       currentGrabSetup = null;
       resolve({ code: 127, signal: null, stdout, stderr: `${stderr}${err.message}` });
     });
     child.on('close', (code, signal) => {
       if (settled) return;
       settled = true;
+      clearTimers();
       currentGrabSetup = null;
       if (showOutput) {
         if (stdoutLine.trim()) log(`[环境] ${stdoutLine.trim()}`);
         if (stderrLine.trim()) log(`[环境] ${stderrLine.trim()}`, 'warn');
+      }
+      if (timedOut) {
+        resolve({ code: 124, signal, stdout, stderr: stderr || '超时' });
+        return;
       }
       resolve({ code: code == null ? 1 : code, signal, stdout, stderr });
     });
@@ -1168,6 +1191,8 @@ async function installHostDependency(kind, message, detail, status) {
 const FRIDA_VERSION = '17.16.4';
 // frida >= 17.16 需要 typing.NotRequired(Python 3.11+)；也避开 macOS 系统自带 3.9。
 const MIN_PYTHON = [3, 11];
+// 与 python/hongguo_grab.py 里的 PKG 保持一致，供环境检查面板直接 adb 探测用。
+const HONGGUO_PKG = 'com.phoenix.read';
 
 function venvPython(venvDir) {
   return process.platform === 'win32'
@@ -1286,13 +1311,17 @@ function removeManagedVenv(managedVenv) {
   }
 }
 
-async function ensurePythonRuntime(grabDir) {
+/**
+ * 只探测本机已有的可用 Python(env 覆盖 / 已建好的 venv / 系统 python / Windows py launcher)，
+ * 全程零副作用(不装任何东西、不弹确认框)。找到就返回可执行文件路径,找不到返回 null。
+ * 供「环境检查」面板的只读探测，以及 ensurePythonRuntime 在真正走安装流程前先尝试复用本机环境。
+ */
+async function probeExistingPython(grabDir) {
   if (isCanceled) throw new Error('__CANCELED__');
   const platform = hostPlatform();
   if (platform === 'unsupported') {
     throw new Error(`App 抓取环境自动准备仅支持 macOS 和 Windows（当前：${process.platform}）`);
   }
-  const minPythonLabel = MIN_PYTHON.join('.');
   const managedVenv = app.isPackaged
     ? path.join(app.getPath('userData'), 'runtime', 'python')
     : path.join(__dirname, '.venv');
@@ -1316,7 +1345,18 @@ async function ensurePythonRuntime(grabDir) {
       await pythonRuntimeOk(launcherPython, buildGrabEnv({ pythonBin: launcherPython }))) {
     return launcherPython;
   }
+  return null;
+}
 
+async function ensurePythonRuntime(grabDir) {
+  const found = await probeExistingPython(grabDir);
+  if (found) return found;
+
+  const platform = hostPlatform();
+  const minPythonLabel = MIN_PYTHON.join('.');
+  const managedVenv = app.isPackaged
+    ? path.join(app.getPath('userData'), 'runtime', 'python')
+    : path.join(__dirname, '.venv');
   const versionCheck = pythonVersionCheckArgs(MIN_PYTHON);
   let basePython = await findBasePython(versionCheck);
 
@@ -1463,7 +1503,7 @@ function runtimeState(output) {
   };
 }
 
-async function ensureAndroidDevice(grabDir, env) {
+async function ensureAndroidDevice(grabDir, env, { interactive = true } = {}) {
   const platform = hostPlatform();
   const checkInvocation = androidBootstrapSpec(grabDir, 'check', false, {
     platform: process.platform,
@@ -1479,6 +1519,11 @@ async function ensureAndroidDevice(grabDir, env) {
   let installMissing = false;
 
   if (check.code === 11 || check.code === 12) {
+    // 只探测模式(环境检查面板自动检查):AVD/SDK 缺失需要下载数 GB,不属于"唤醒已装好的东西",
+    // 绝不在这里弹确认框或自动装,只报状态,交给用户手动点「修复缺失项」再走下面的交互式安装。
+    if (!interactive) {
+      return { state: 'not_set_up', code: check.code, serial: null };
+    }
     installMissing = await confirmEnvironmentInstall(
       '未找到可用的红果 Android 模拟器',
       platform === 'windows'
@@ -1516,6 +1561,19 @@ async function ensureAndroidDevice(grabDir, env) {
   return result;
 }
 
+// 「开始下载」的正式流程和「环境检查」面板都会走到 Android 设备准备这一步，而它内部会
+// adb root(打断正在进行的 frida 会话)、可能拉起模拟器进程——start_avd.sh/.ps1 自己没有并发锁，
+// 两边同时各发起一次会互相打架(重复开模拟器 / root 打断正在抓取的会话)。用进行中的 Promise
+// 做去重，让两个调用方汇合到同一次真实操作上。
+let androidEnsureInFlight = null;
+function ensureAndroidDeviceShared(grabDir, env, opts) {
+  if (androidEnsureInFlight) return androidEnsureInFlight;
+  androidEnsureInFlight = ensureAndroidDevice(grabDir, env, opts).finally(() => {
+    androidEnsureInFlight = null;
+  });
+  return androidEnsureInFlight;
+}
+
 async function ensureAppGrabEnvironment(grabDir) {
   log(`检测到运行系统：${platformLabel()}，将使用对应平台的环境安装流程`);
   const pythonBin = await ensurePythonRuntime(grabDir);
@@ -1523,8 +1581,8 @@ async function ensureAppGrabEnvironment(grabDir) {
   let env = buildGrabEnv({ pythonBin });
   if (!await ensureSystemMediaTools(env)) return null;
   env = buildGrabEnv({ pythonBin });
-  const device = await ensureAndroidDevice(grabDir, env);
-  if (!device) return null;
+  const device = await ensureAndroidDeviceShared(grabDir, env, { interactive: true });
+  if (!device || !device.serial) return null;
   const runtimeDir = path.join(app.getPath('userData'), 'runtime', 'android');
   fs.mkdirSync(runtimeDir, { recursive: true });
   env = buildGrabEnv({
@@ -1534,6 +1592,135 @@ async function ensureAppGrabEnvironment(grabDir) {
   });
   log(`App 抓取环境就绪：${device.serial}`, 'success');
   return { pythonBin, env };
+}
+
+/**
+ * 只读探测红果 App 是否已安装、设备端 frida-server 状态；纯 adb shell，不装不改任何东西。
+ * 版本不对/未运行时不在这里现场修——那是 python/hongguo_grab.py 的 main() 里
+ * ensure_frida_server() 在真正开始抓取时才做的事，这里只报状态。
+ */
+async function probeHongguoAndFrida(env, serial) {
+  const pm = await runSetupProcess('adb', ['-s', serial, 'shell', 'pm', 'list', 'packages'], {
+    env, timeoutMs: 10000,
+  });
+  const installed = pm.code === 0 && pm.stdout.includes(HONGGUO_PKG);
+  send('env:item', {
+    id: 'hongguo_app',
+    state: installed ? 'ok' : 'missing',
+    message: installed ? '已安装' : `未安装（${HONGGUO_PKG}），请先在模拟器里手动安装红果 App`,
+  });
+  if (!installed) {
+    send('env:item', { id: 'frida_server', state: 'blocked', message: '待红果 App 安装后再检查' });
+    return;
+  }
+
+  const pidof = await runSetupProcess('adb', ['-s', serial, 'shell', 'pidof', 'frida-server'], {
+    env, timeoutMs: 10000,
+  });
+  const running = pidof.code === 0 && pidof.stdout.trim().length > 0;
+  if (!running) {
+    send('env:item', { id: 'frida_server', state: 'warn', message: '未运行，将在下次开始下载时自动启动' });
+    return;
+  }
+  const ver = await runSetupProcess(
+    'adb', ['-s', serial, 'shell', '/data/local/tmp/frida-server', '--version'],
+    { env, timeoutMs: 10000 }
+  );
+  const deviceVersion = ver.stdout.trim();
+  if (deviceVersion === FRIDA_VERSION) {
+    send('env:item', { id: 'frida_server', state: 'ok', message: `运行中 v${deviceVersion}` });
+  } else {
+    send('env:item', {
+      id: 'frida_server',
+      state: 'warn',
+      message: `版本不一致（设备 ${deviceVersion || '未知'} / 需要 ${FRIDA_VERSION}），将在下次开始下载时自动更新`,
+    });
+  }
+}
+
+/**
+ * 「环境检查」面板的编排：5 步顺序探测（不用 Promise.all——多路 adb/runSetupProcess 同时跑会抢
+ * 同一个 currentGrabSetup 追踪变量，顺序执行天然避免，也避免多路 adb 命令同时怼同一台设备）。
+ * interactive=false 是软件启动/「重新检查」走的只读探测：不装、不下载、不弹确认框；
+ * interactive=true 是「修复缺失项」走的原有交互式安装流程。红果 App / Frida Server 两项
+ * 永远是只读探测（没有对应的"修复"动作），不受 interactive 影响。
+ */
+async function runEnvironmentCheck(grabDirConfigured, { interactive }) {
+  if (envCheckBusy) return;
+  envCheckBusy = true;
+  send('env:begin');
+  try {
+    const grabDir = resolveGrabDir(grabDirConfigured);
+    if (!grabDir) {
+      const message = '未找到 App 抓取组件（python 目录），请检查安装或指定组件目录';
+      for (const id of ['python', 'ffmpeg', 'android', 'hongguo_app', 'frida_server']) {
+        send('env:item', { id, state: 'error', message });
+      }
+      return;
+    }
+
+    let pythonBin = null;
+    try {
+      pythonBin = interactive ? await ensurePythonRuntime(grabDir) : await probeExistingPython(grabDir);
+      send('env:item', {
+        id: 'python',
+        state: pythonBin ? 'ok' : 'missing',
+        message: pythonBin || '未找到可用的 Python（需 frida/cryptography 可用）',
+      });
+    } catch (e) {
+      send('env:item', { id: 'python', state: 'error', message: e.message });
+    }
+
+    try {
+      const mediaEnv = buildGrabEnv({ pythonBin });
+      const ffmpegOk = interactive
+        ? await ensureSystemMediaTools(mediaEnv)
+        : (await commandSucceeds('ffmpeg', ['-version'], mediaEnv)
+          && await commandSucceeds('ffprobe', ['-version'], mediaEnv));
+      send('env:item', {
+        id: 'ffmpeg',
+        state: ffmpegOk ? 'ok' : 'missing',
+        message: ffmpegOk ? '就绪' : '未找到 ffmpeg/ffprobe',
+      });
+    } catch (e) {
+      send('env:item', { id: 'ffmpeg', state: 'error', message: e.message });
+    }
+
+    let serial = null;
+    try {
+      const androidEnv = buildGrabEnv({ pythonBin });
+      const device = await ensureAndroidDeviceShared(grabDir, androidEnv, { interactive });
+      if (device && device.serial) {
+        serial = device.serial;
+        send('env:item', { id: 'android', state: 'ok', message: `已就绪：${serial}` });
+      } else if (device && device.state === 'not_set_up') {
+        send('env:item', {
+          id: 'android',
+          state: 'missing',
+          message: device.code === 11 ? 'AVD 未创建' : '缺少 Android 命令行工具',
+        });
+      } else {
+        send('env:item', { id: 'android', state: 'missing', message: '未连接可用的模拟器/设备' });
+      }
+    } catch (e) {
+      send('env:item', { id: 'android', state: 'error', message: e.message });
+    }
+
+    if (serial) {
+      try {
+        await probeHongguoAndFrida(buildGrabEnv({ serial }), serial);
+      } catch (e) {
+        send('env:item', { id: 'hongguo_app', state: 'error', message: e.message });
+        send('env:item', { id: 'frida_server', state: 'error', message: e.message });
+      }
+    } else {
+      send('env:item', { id: 'hongguo_app', state: 'blocked', message: '待设备就绪后再检查' });
+      send('env:item', { id: 'frida_server', state: 'blocked', message: '待设备就绪后再检查' });
+    }
+  } finally {
+    envCheckBusy = false;
+    send('env:done');
+  }
 }
 
 /**
@@ -1996,9 +2183,9 @@ async function handleOpenFolder(_event, target) {
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 860,
-    height: 720,
+    height: 800,
     minWidth: 720,
-    minHeight: 560,
+    minHeight: 620,
     title: '红果短剧下载器',
     backgroundColor: '#0f1115',
     show: false,
@@ -2027,6 +2214,10 @@ app.whenReady().then(() => {
   ipcMain.handle('dialog:selectFolder', handleSelectFolder);
   ipcMain.handle('shell:openFolder', handleOpenFolder);
   ipcMain.handle('app:getDefaultDir', () => app.getPath('downloads'));
+  ipcMain.handle('env:check', (_e, payload) =>
+    runEnvironmentCheck(payload && payload.grabDir, { interactive: false }));
+  ipcMain.handle('env:fix', (_e, payload) =>
+    runEnvironmentCheck(payload && payload.grabDir, { interactive: true }));
 
   createWindow();
 
