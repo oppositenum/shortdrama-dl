@@ -360,9 +360,18 @@ jobs:
             exit 1
           fi
 
+          # GitHub Releases strips/mangles non-ASCII asset filenames server-side (verified:
+          # even a correctly UTF-8-percent-encoded raw REST upload still loses the CJK
+          # characters). Rename to an ASCII slug before upload so the public download
+          # filename is stable, and so SHA256SUMS.txt matches what's actually downloadable.
+          dmg_ascii="release-assets/shortdrama-dl-${RELEASE_VERSION}-universal.dmg"
+          exe_ascii="release-assets/shortdrama-dl-${RELEASE_VERSION}-setup.exe"
+          mv "$dmg" "$dmg_ascii"
+          mv "$exe" "$exe_ascii"
+
           (
             cd release-assets
-            sha256sum "$(basename "$dmg")" "$(basename "$exe")" > SHA256SUMS.txt
+            sha256sum "$(basename "$dmg_ascii")" "$(basename "$exe_ascii")" > SHA256SUMS.txt
             sha256sum --check SHA256SUMS.txt
           )
 
