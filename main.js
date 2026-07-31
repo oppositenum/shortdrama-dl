@@ -2178,6 +2178,36 @@ async function handleOpenFolder(_event, target) {
 }
 
 // ===========================================================================
+// IPC：界面「记住上次填写内容」的持久化
+//
+// 特意不用 localStorage：渲染进程走 file:// 加载，实测这套 Electron/Chromium 组合下
+// localStorage 不会真正落盘——同一进程内 reload 能读到，但真正 quit 再重新打开永远是空的
+// （用 Playwright 反复验证过：等够时间、真正调用 app.quit()、直接检查磁盘上的 leveldb 文件，
+// 数据从未写进去）。改成主进程用 fs 直接读写 userData 下的 JSON 文件，绕开这个坑。
+// ===========================================================================
+function uiSettingsFile() {
+  return path.join(app.getPath('userData'), 'ui-settings.json');
+}
+
+function loadUiSettings() {
+  try {
+    return JSON.parse(fs.readFileSync(uiSettingsFile(), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function saveUiSettings(partial) {
+  try {
+    const merged = { ...loadUiSettings(), ...(partial || {}) };
+    fs.mkdirSync(path.dirname(uiSettingsFile()), { recursive: true });
+    fs.writeFileSync(uiSettingsFile(), JSON.stringify(merged, null, 2));
+  } catch (e) {
+    log(`保存界面设置失败：${e.message}`, 'warn');
+  }
+}
+
+// ===========================================================================
 // 窗口与生命周期
 // ===========================================================================
 function createWindow() {
@@ -2218,6 +2248,8 @@ app.whenReady().then(() => {
     runEnvironmentCheck(payload && payload.grabDir, { interactive: false }));
   ipcMain.handle('env:fix', (_e, payload) =>
     runEnvironmentCheck(payload && payload.grabDir, { interactive: true }));
+  ipcMain.handle('settings:load', () => loadUiSettings());
+  ipcMain.handle('settings:save', (_e, partial) => saveUiSettings(partial));
 
   createWindow();
 

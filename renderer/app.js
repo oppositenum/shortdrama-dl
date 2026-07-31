@@ -45,19 +45,25 @@ const FIXABLE_ENV_IDS = ['python', 'ffmpeg', 'android'];
 const envItemState = { python: 'checking', ffmpeg: 'checking', android: 'checking',
   hongguo_app: 'checking', frida_server: 'checking' }; // id -> state，供决定「修复缺失项」是否可点/展示摘要
 
-// ---------- 初始化：填充默认目录 ----------
-window.api.getDefaultDir().then((dir) => {
-  if (dir) {
-    selectedDir = dir;
-    dirInput.value = dir;
-  }
-});
+// ---------- 记忆：保存上次填写的内容 ----------
+// 存到主进程管理的 userData JSON 文件里（见 main.js 的 settings:save/settings:load），
+// 不用 localStorage——渲染进程走 file:// 加载，这套 Electron/Chromium 组合下 localStorage
+// 不会真正落盘，同进程内 reload 能读到，但真正 quit 重开永远是空的（实测反复验证过）。
+// 具体恢复逻辑见文件末尾的 initSettings()，需要等 IPC 拿到已保存内容后才能回填。
+function saveFormState() {
+  window.api.saveSettings({
+    url: urlInput.value,
+    dir: selectedDir,
+    appGrab: appGrabCheckbox.checked,
+    grabDir: grabDirInput.value,
+    introDetailed: introDetailedCheckbox.checked,
+  });
+}
 
 // ==========================================================================
 // 环境检查
 // ==========================================================================
 const ENV_IDS = ['python', 'ffmpeg', 'android', 'hongguo_app', 'frida_server'];
-const ENV_COLLAPSE_KEY = 'shortdrama:envCollapsed';
 
 function setEnvRow(id, state, message) {
   const row = document.querySelector(`.env-row[data-env="${id}"]`);
@@ -85,24 +91,12 @@ function updateEnvSummary() {
 function setEnvCollapsed(collapsed) {
   envCard.classList.toggle('collapsed', collapsed);
   envToggle.setAttribute('aria-expanded', String(!collapsed));
-  try {
-    localStorage.setItem(ENV_COLLAPSE_KEY, collapsed ? '1' : '0');
-  } catch {
-    // 隐私模式等场景 localStorage 可能不可用，忽略即可，不影响本次会话使用
-  }
+  window.api.saveSettings({ envCollapsed: collapsed });
 }
 
 envToggle.addEventListener('click', () => {
   setEnvCollapsed(!envCard.classList.contains('collapsed'));
 });
-
-let storedCollapsed = '0';
-try {
-  storedCollapsed = localStorage.getItem(ENV_COLLAPSE_KEY) || '0';
-} catch {
-  // 同上，忽略
-}
-setEnvCollapsed(storedCollapsed === '1');
 
 window.api.onEnvBegin(() => {
   envRecheckBtn.disabled = true;
@@ -126,9 +120,6 @@ envRecheckBtn.addEventListener('click', () => {
 envFixBtn.addEventListener('click', () => {
   window.api.fixEnvironment(grabDirInput.value.trim());
 });
-
-// 软件一打开就自动探测一次；全程只读，不装不下载不弹确认框
-window.api.checkEnvironment(grabDirInput.value.trim());
 
 // ==========================================================================
 // UI 辅助
@@ -236,6 +227,7 @@ chooseDirBtn.addEventListener('click', async () => {
   if (dir) {
     selectedDir = dir;
     dirInput.value = dir;
+    saveFormState();
   }
 });
 
@@ -246,13 +238,23 @@ function syncGrabDirRow() {
   grabDirInput.disabled = !on;
   chooseGrabDirBtn.disabled = !on;
 }
-appGrabCheckbox.addEventListener('change', syncGrabDirRow);
+appGrabCheckbox.addEventListener('change', () => {
+  syncGrabDirRow();
+  saveFormState();
+});
 syncGrabDirRow();
 
 chooseGrabDirBtn.addEventListener('click', async () => {
   const dir = await window.api.selectFolder();
-  if (dir) grabDirInput.value = dir;
+  if (dir) {
+    grabDirInput.value = dir;
+    saveFormState();
+  }
 });
+
+urlInput.addEventListener('input', saveFormState);
+grabDirInput.addEventListener('input', saveFormState);
+introDetailedCheckbox.addEventListener('change', saveFormState);
 
 startBtn.addEventListener('click', async () => {
   const url = urlInput.value.trim();
@@ -323,3 +325,34 @@ appendLog({
   level: 'info',
   message: '就绪。整剧链接只从网页保存封面，视频将由 App 从第 1 集开始抓取。',
 });
+
+// ==========================================================================
+// 初始化：加载上次记住的设置并回填（异步，IPC 拿到结果才能回填，所以放最后统一处理）
+// ==========================================================================
+async function initSettings() {
+  const saved = await window.api.loadSettings().catch(() => ({}));
+
+  if (saved.url) urlInput.value = saved.url;
+  if (typeof saved.appGrab === 'boolean') appGrabCheckbox.checked = saved.appGrab;
+  if (saved.grabDir) grabDirInput.value = saved.grabDir;
+  if (typeof saved.introDetailed === 'boolean') introDetailedCheckbox.checked = saved.introDetailed;
+  syncGrabDirRow();
+
+  // 保存目录：优先用上次记住的，没记住过才用系统默认下载目录
+  if (saved.dir) {
+    selectedDir = saved.dir;
+    dirInput.value = saved.dir;
+  } else {
+    const dir = await window.api.getDefaultDir();
+    if (dir) {
+      selectedDir = dir;
+      dirInput.value = dir;
+    }
+  }
+
+  setEnvCollapsed(saved.envCollapsed === true);
+  // 软件一打开就自动探测一次；全程只读，不装不下载不弹确认框。放在设置回填之后，
+  // 这样才会用上恢复出来的 grabDir，而不是空值。
+  window.api.checkEnvironment(grabDirInput.value.trim());
+}
+initSettings();

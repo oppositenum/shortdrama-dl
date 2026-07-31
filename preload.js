@@ -27,6 +27,10 @@ contextBridge.exposeInMainWorld('api', {
   checkEnvironment: (grabDir) => ipcRenderer.invoke('env:check', { grabDir }),
   /** 修复缺失项：走既有的交互式安装确认流程 */
   fixEnvironment: (grabDir) => ipcRenderer.invoke('env:fix', { grabDir }),
+  /** 读取上次记住的界面设置（链接、目录等），返回已保存的字段对象 */
+  loadSettings: () => ipcRenderer.invoke('settings:load'),
+  /** 保存界面设置，只需传有变化的字段，主进程会和已保存内容合并 */
+  saveSettings: (partial) => ipcRenderer.invoke('settings:save', partial),
 
   // —— 事件订阅（主进程 -> 渲染进程）——
   onLog: (cb) => ipcRenderer.on('download:log', (_e, d) => cb(d)),
