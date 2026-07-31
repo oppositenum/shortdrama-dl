@@ -1,78 +1,78 @@
 # shortdrama-dl
 
-[English](README.en.md)
+[中文](README.md)
 
-> ## ⚠️ 免责声明
+> ## ⚠️ Disclaimer
 >
-> **本项目仅供技术学习与研究使用。**
+> **This project is provided for technical study and research purposes only.**
 >
-> 它公开的是移动应用安全、Android 插桩（Frida）、MP4 容器解析与 CENC 加密机制的实现原理，用途限于个人学习、安全研究和技术交流。
+> It documents the implementation of mobile application security, Android instrumentation (Frida), MP4 container parsing, and CENC encryption mechanisms. Its intended use is limited to personal learning, security research, and technical discussion.
 >
-> **使用者必须自行承担全部法律责任。** 你只能用它处理自己拥有合法权利、或已获得权利人明确授权的内容。任何将本项目用于以下行为的，均与作者无关，由使用者本人承担相应的民事、行政乃至刑事责任：
+> **Users bear full legal responsibility for how they use it.** You may only process content that you own the rights to, or for which you have obtained explicit authorization from the rights holder. The author is not associated with, and accepts no responsibility for, any use of this project to:
 >
-> - 未经授权规避技术保护措施，或下载、复制、传播受版权保护的作品
-> - 违反目标平台的用户协议或服务条款
-> - 从事任何形式的盗版、牟利、商业分发或其他侵权活动
+> - Circumvent technological protection measures without authorization, or download, reproduce, or distribute copyrighted works
+> - Violate the user agreement or terms of service of any target platform
+> - Engage in piracy, commercial distribution, or any other infringing activity
 >
-> **作者不提供任何担保，也不对使用本项目造成的任何直接或间接损失承担责任。** 若你所在国家或地区的法律禁止此类工具，请立即停止使用并删除本项目。下载本项目即视为你已阅读、理解并同意本声明。
+> **The software is provided without warranty of any kind, and the author is not liable for any direct or indirect damages arising from its use.** If tools of this kind are prohibited where you live, stop using this project and delete it immediately. By downloading this project you acknowledge that you have read, understood, and accepted this disclaimer.
 >
-> 详见 [安全与合规](#安全与合规)。
+> See [Safety and Compliance](#safety-and-compliance) for details.
 
-`shortdrama-dl` 是一个由 Electron 桌面应用和 Python Android 抓取/解密组件组成的短剧下载工具，提供两种链接处理路径：
+`shortdrama-dl` is a short-drama download tool composed of an Electron desktop application and a Python Android capture/decryption component. It provides two URL-handling paths:
 
-- **单播放页**：Electron 用 Playwright 捕获该播放页的媒体请求，用 Node.js 或 ffmpeg 下载这一集。
-- **整剧详情页/分类页**：网页只解析剧名、总集数并保存封面，随后由 Android App 从第 1 集开始抓取全集。
+- **Single player page**: Electron uses Playwright to capture that page's media request and downloads that episode through Node.js or ffmpeg.
+- **Whole-series detail/category page**: the website only resolves the series name, total episode count, and cover. The Android App then captures the whole series starting at episode 1.
 
-Electron 与 Python 通过稳定的命令行和 JSON Lines 协议协作；运行边界、参数和打包资源见 [架构文档](docs/ARCHITECTURE.md)。
+Electron and Python cooperate through a stable command-line and JSON Lines protocol; see [Architecture](docs/ARCHITECTURE.md) for runtime boundaries, arguments, and packaged resources.
 
-## 功能
+## Features
 
-- Electron 图形界面、下载任务状态管理，以及「环境检查」面板（一打开就只读探测 Python/ffmpeg/模拟器/App/Frida Server 状态，不装不下载不弹窗）
-- 记住上次填写的链接、保存目录和各项开关
-- 单个播放页视频下载，MP4 直连或 HLS/DASH 走 ffmpeg
-- 详情页/分类页元数据解析、封面下载、多剧批量处理及失败补漏
-- 已有分集跳过、断点续传、`.complete` 完成状态记录
-- Android App 从第 1 集开始的全集抓取：Frida 采集解密上下文、`.mdl` 逐样本解密、ffmpeg 重封装、ffprobe 时长终检
-- 多 ADB 设备环境下的目标设备选择，单设备任务锁防止并发抓取互相干扰
-- 通过 `SIGTERM` 安全取消 Python 任务
+- Electron desktop UI, download task management, and an "environment check" panel (read-only probe of Python/ffmpeg/emulator/App/Frida Server on launch — never installs, downloads, or pops a dialog on its own)
+- Remembers the last-entered link, save directory, and other form fields
+- Single player-page downloads: direct MP4, or ffmpeg for HLS/DASH
+- Detail/category page metadata parsing, cover downloads, multi-series batch processing with retry rounds
+- Existing-file skip, resumable runs, `.complete` markers
+- Android App whole-series capture from episode 1: Frida-captured decryption context, per-sample `.mdl` decryption, ffmpeg remuxing, ffprobe duration validation
+- Target selection in multi-device ADB environments, with a per-device lock preventing concurrent capture
+- Safe Python task cancellation through `SIGTERM`
 
-Android 链路依赖已 root 的受控设备和特定 App 运行环境，不是通用 Android 下载方案；App 升级、UI 改版或 Frida Hook 符号变化都可能使该链路失效。
+The Android workflow requires a controlled rooted device and a compatible app environment — it is not a generic Android downloader. App UI changes, SQLite schema changes, or Frida hook symbol changes can break it.
 
-## 项目结构
+## Project Layout
 
 ```text
 shortdrama-dl/
-├── main.js                 # Electron 主进程、网页下载和 Python 编排
-├── preload.js               # contextBridge 白名单 IPC
+├── main.js                 # Electron main process, web flow, Python orchestration
+├── preload.js               # Allowlisted contextBridge IPC API
 ├── renderer/                 # Electron UI
-├── electron-builder.js       # 打包、签名及 Python 资源清单
+├── electron-builder.js       # Packaging, signing, Python resources
 ├── python/
-│   ├── hongguo_grab.py       # Electron 正式调用的 Python 入口
-│   ├── decrypt_mdl.py        # 单个 .mdl 解密和重封装
-│   ├── mp4parse.py           # MP4 样本表解析
-│   ├── capture_final.js      # Frida Hook 脚本
-│   ├── start_avd.sh          # macOS Android 环境检查、安装与启动
-│   ├── start_avd.ps1         # Windows Android 环境检查、安装与启动
-│   └── requirements.txt      # 正式 Python 依赖
-├── docs/                     # 架构、文件清单、项目状态、发布流程
+│   ├── hongguo_grab.py       # Production Python entry point
+│   ├── decrypt_mdl.py        # Single .mdl decryption and remux
+│   ├── mp4parse.py           # MP4 sample-table parser
+│   ├── capture_final.js      # Frida hook
+│   ├── start_avd.sh          # macOS Android checks, installation, and startup
+│   ├── start_avd.ps1         # Windows Android checks, installation, and startup
+│   └── requirements.txt      # Production Python dependencies
+├── docs/                     # Architecture, file inventory, project status, release process
 ├── README.md / README.en.md
 └── LICENSE
 ```
 
-开发态直接运行 Python 时生成的缓存、日志、数据库快照和媒体文件均被 `.gitignore` 排除；打包应用把同类缓存写入应用用户数据目录，不会修改安装包内容或破坏 macOS 代码签名。
+Runtime data generated while running Python directly in development is excluded by `.gitignore`; a packaged application writes equivalent caches under application user data and never modifies the packaged contents or invalidates the macOS code signature.
 
-## 支持平台
+## Supported Platforms
 
-| 发布目标 | 支持状态 | 建议产物 |
+| Release target | Status | Recommended artifact |
 |---|---|---|
-| macOS 12+ Apple Silicon（`arm64`） | 支持 | universal DMG，或体积更小的 arm64 DMG |
-| macOS 12+ Intel（`x64`） | 支持 | universal DMG，或体积更小的 x64 DMG |
-| Windows 10/11 x64 | 支持 | NSIS 安装包 |
-| Windows ARM64 / Linux | 不支持自动准备 Android 环境 | 仅可源码开发，网页单播放页链路仍可用 |
+| macOS 12+ Apple Silicon (`arm64`) | Supported | Universal DMG, or the smaller arm64 DMG |
+| macOS 12+ Intel (`x64`) | Supported | Universal DMG, or the smaller x64 DMG |
+| Windows 10/11 x64 | Supported | NSIS installer |
+| Windows ARM64 / Linux | Automatic Android setup unsupported | Source development only; the web single-player-page path still works |
 
-单播放页下载和整剧封面解析本身无需 Android、ADB、Frida 或 Python；详情页/分类页的整剧下载依赖 Android App 链路，还需要 Python 3.11+、`adb`、支持 `adb root` 的 Android 设备/模拟器、匹配版本的 Frida（当前锁 `17.16.4`）和系统 `ffmpeg`/`ffprobe`。这些依赖第一次使用时会自动检测，缺失时弹确认框、征得同意后再安装——不会静默改动系统。
+Single player-page downloads and whole-series cover parsing do not themselves require Android, ADB, Frida, or Python. Whole-series video from a detail/category page depends on the Android App workflow and additionally needs Python 3.11+, `adb`, an Android device/emulator capable of `adb root`, matching Frida components (currently pinned to `17.16.4`), and system `ffmpeg`/`ffprobe`. These are detected automatically on first use; missing pieces trigger a confirmation dialog before anything is installed — nothing happens silently.
 
-## 安装
+## Installation
 
 ```bash
 git clone git@github.com:oppositenum/shortdrama-dl.git
@@ -81,62 +81,62 @@ npm ci
 npm start
 ```
 
-源码开发和打包要求 Node.js 22+ 及 npm；这一要求不适用于安装 DMG/NSIS 的最终用户。系统已有 Chrome 或 Edge 即可使用网页链路；需要开发环境的 Playwright Chromium 回退时运行 `npm run fetch-browser`（安装包默认不含它）。
+Source development and packaging require Node.js 22+ and npm; end users installing the DMG/NSIS artifact do not need Node.js. If Chrome or Edge is installed, the web workflow uses it directly; run `npm run fetch-browser` for the development Playwright Chromium fallback (not included in packaged builds).
 
-只用网页单播放页/封面下载可以跳过下面这两步——它们只是 Android App 抓取链路需要，而且应用本身会在第一次使用时自动检测并询问是否安装：
+Skip the next two steps if you only use the web single-player-page/cover path — they're only needed for Android App capture, and the app detects and offers to install them itself on first use:
 
 ```bash
-# Python 环境（macOS/Linux）
+# Python environment (macOS/Linux)
 ./scripts/setup-python.sh && source .venv/bin/activate
-# Python 环境（Windows PowerShell）
+# Python environment (Windows PowerShell)
 .\scripts\setup-python.ps1; .\.venv\Scripts\Activate.ps1
 
-# 系统 ffmpeg
-brew install ffmpeg                                   # macOS
-sudo apt install ffmpeg                                # Ubuntu/Debian
-winget install --exact --id Gyan.FFmpeg --source winget # Windows
+# System ffmpeg
+brew install ffmpeg                                    # macOS
+sudo apt install ffmpeg                                 # Ubuntu/Debian
+winget install --exact --id Gyan.FFmpeg --source winget  # Windows
 ```
 
-## Android 设备准备
+## Android Device Preparation
 
-勾选「用 App 抓取全集」后，应用会自动检查/启动模拟器（`hongguo` AVD 已装但未启动会自动开机；完全没有时征得确认后安装 Android SDK、Emulator 和系统镜像）。也可以在终端手动检查：
+With "Use App to capture the whole series" enabled, the app automatically checks/starts the emulator (an installed but stopped `hongguo` AVD is booted; if nothing is installed, it asks before installing the Android SDK, Emulator, and system image). You can also check manually:
 
 ```bash
-./python/start_avd.sh --check                 # macOS
+./python/start_avd.sh --check                  # macOS
 ./python/start_avd.sh --ensure --install-missing
 
-powershell -File .\python\start_avd.ps1 -Check          # Windows
+powershell -File .\python\start_avd.ps1 -Check           # Windows
 powershell -File .\python\start_avd.ps1 -Ensure -InstallMissing
 ```
 
-真机准备：打开开发者选项和 USB 调试、连接后在设备端确认授权、设备必须已 root（自动创建的模拟器镜像默认支持 `adb root`）、安装并登录目标 App（包名 `com.phoenix.read`）。多台设备同时连接时设置 `ANDROID_SERIAL=<序列号>` 指定目标设备。常见连接问题见下方 [常见问题](#常见问题)。
+For a physical device: enable Developer Options and USB debugging, connect and approve the host authorization prompt, the device must be rooted (the auto-created emulator image supports `adb root` by default), and install/sign in to the target app (package `com.phoenix.read`). With multiple connected devices, set `ANDROID_SERIAL=<serial>` to pick one. Common connection issues are covered in [Troubleshooting](#troubleshooting).
 
-## 使用
+## Usage
 
-- **开发启动**：`npm start`（`npm run dev` 额外开启 Electron 调试日志）。
-- **单播放页**：粘贴 `/player/...` 链接，选择保存目录，点「开始下载」。
-- **整剧**：粘贴 `/detail?series_id=...` 或 `/category?...` 链接；网页只解析剧名/总集数/封面，取消勾选「用 App 抓取全集」则只保存封面。勾选时 Python 自动搜索目标剧、跳过已存在的分集、抓取全集并解密输出到同名目录。
-- 已有分集跳过和 `.complete` 完成标记见 [架构文档](docs/ARCHITECTURE.md)。
+- **Development launch**: `npm start` (`npm run dev` adds Electron debug logging).
+- **Single player page**: paste a `/player/...` link, choose a save folder, click Start Download.
+- **Whole series**: paste a `/detail?series_id=...` or `/category?...` link. The website only resolves the name/total-count/cover; clearing "Use App to capture the whole series" saves covers only. When enabled, Python searches for the series, skips existing episodes, captures the whole series, and writes decrypted output into the same series directory.
+- Existing-episode skipping and the `.complete` marker are described in [Architecture](docs/ARCHITECTURE.md).
 
-## 开发与打包
+## Development and Packaging
 
-| 命令 | 作用 |
+| Command | Purpose |
 |---|---|
-| `npm start` / `npm run dev` | 启动应用（后者带调试日志） |
-| `npm test` | 运行不连接真实设备的 mock 测试 |
-| `npm run pack` | 生成当前平台的未安装目录包 |
-| `npm run dist` | 生成当前平台分发包 |
-| `npm run dist:mac` / `:mac:arm64` / `:mac:x64` | macOS ad-hoc 签名 DMG（universal / arm64 / x64） |
-| `npm run dist:mac:signed` / `:signed:arm64` / `:signed:x64` | Developer ID 签名并公证的 DMG |
-| `npm run dist:win` | Windows x64 NSIS 安装包 |
+| `npm start` / `npm run dev` | Start the app (the latter with debug logging) |
+| `npm test` | Run environment-startup mocks without a real device |
+| `npm run pack` | Create an unpacked app directory for the current platform |
+| `npm run dist` | Build a distribution for the current platform |
+| `npm run dist:mac` / `:mac:arm64` / `:mac:x64` | macOS ad-hoc signed DMG (universal / arm64 / x64) |
+| `npm run dist:mac:signed` / `:signed:arm64` / `:signed:x64` | Developer ID signed and notarized DMG |
+| `npm run dist:win` | Windows x64 NSIS installer |
 
-安装包不内置 Python 解释器、Android 系统镜像、系统 ffmpeg、Frida Server、Chrome 或 Edge——这些由应用首次使用时按需检测和安装。CI 自动发版、Apple 签名公证配置和发布前检查清单见 [docs/RELEASE.md](docs/RELEASE.md)。
+Packaged builds do not bundle a Python interpreter, Android system image, system ffmpeg, Frida Server, Chrome, or Edge — the app detects and installs these on demand. CI auto-versioning, Apple signing/notarization setup, and the pre-release checklist live in [docs/RELEASE.md](docs/RELEASE.md).
 
-## 常见问题
+## Troubleshooting
 
-### 找不到 Python / Python 依赖缺失
+### Python is not found / Python dependencies are missing
 
-应用会先找合格的隔离环境，再检查系统解释器；找不到时 macOS 通过 Homebrew、Windows 通过 WinGet 询问安装，也可设置 `SHORTDRAMA_PYTHON` 指向解释器绝对路径。手动排查：
+The app first checks an isolated environment, then system interpreters. When missing, it offers Homebrew (macOS) or WinGet (Windows) installation; `SHORTDRAMA_PYTHON` can point to an interpreter directly. Manual check:
 
 ```bash
 source .venv/bin/activate
@@ -144,42 +144,42 @@ python -m pip install -r python/requirements.txt
 python -c "import frida, cryptography; print(frida.__version__)"
 ```
 
-### `adb` 找不到 / 设备显示 `unauthorized` 或 `offline`
+### `adb` is not found / device is `unauthorized` or `offline`
 
-应用会自动搜索常见 SDK 路径。`unauthorized` 需要解锁设备并确认 USB 调试授权弹窗；`offline` 尝试重连或 `adb kill-server && adb start-server`，不要在设备仍为 `offline` 时开始抓取。
+The app searches common SDK paths automatically. `unauthorized` needs the device unlocked with its USB-debugging prompt approved; for `offline`, reconnect or run `adb kill-server && adb start-server` — don't start capture while the device is still `offline`.
 
-### 同时连接多台 ADB 设备
+### Multiple ADB devices are connected
 
-设置 `ANDROID_SERIAL=<目标序列号>` 后再启动应用。未指定时仅在“恰好只有一个模拟器”时自动选择。
+Set `ANDROID_SERIAL=<serial>` before launch. Without it, automatic selection only succeeds when exactly one emulator candidate exists.
 
-### Frida 版本不匹配 / 找不到 Frida Server
+### Frida versions do not match / Frida Server is missing
 
-PC 端 `frida` 与设备端 `frida-server` 必须完全同版本且匹配 ABI。联网时应用会自动下载缓存并推送；直连 GitHub 慢可设 `SHORTDRAMA_GITHUB_PROXY`（如 `https://ghfast.top`），离线可设 `SHORTDRAMA_FRIDA_SERVER` 指向本机二进制。
+The PC `frida` package and device `frida-server` must be the exact same version and match the device ABI. When online, the app downloads and pushes the matching binary automatically; set `SHORTDRAMA_GITHUB_PROXY` (e.g. `https://ghfast.top`) if GitHub is slow, or `SHORTDRAMA_FRIDA_SERVER` to use a local binary offline.
 
-### 日志出现"改用服务端 1080p 源出片(抓取结束后统一下载)"
+### Log shows "switching to a server-side 1080p source (batched for download after capture finishes)"
 
-App 离线下载固定走 720p 档，其中一部分集是 ffmpeg 认不出的 ByteVC2 编码。这些集的 key 已经拿到手，只是画面文件要等整部剧抓完、统一联网后才批量下载——因为抓 key 全程要求断网（保证每次解密事件都能对应到正确集号），联网下载必须放到收尾统一做，属于正常现象。
+The app's offline downloads are always the 720p rung, and some episodes in that rung use ByteVC2, which ffmpeg cannot decode. The decryption key for those episodes is already captured — only the actual video file is deferred until the whole series finishes and the device goes back online for one batch download. This is required because key capture depends on the device staying offline the entire time (so every decryption event maps to the correct episode); downloading requires networking, so it has to happen in one batch at the end rather than mid-capture.
 
-### 没有 root 权限 / 找不到 ffmpeg 或 ffprobe
+### Root is unavailable / ffmpeg or ffprobe is missing
 
-正式整剧链路需要 `adb root`；不满足时只能用网页单播放页下载，或让详情页/分类页只保存封面。ffmpeg/ffprobe 缺失时应用会询问并自动安装，网页 FFmpeg 也可用 `SHORTDRAMA_WEB_FFMPEG` 显式覆盖。
+The production workflow needs `adb root`; without it, use the web single-player-page path, or save covers only for detail/category pages. Missing ffmpeg/ffprobe triggers an install prompt; `SHORTDRAMA_WEB_FFMPEG` can override the web executable explicitly.
 
-### 下载任务无法取消 / 打包后找不到 Python 文件
+### A task cannot be cancelled / the packaged app cannot find Python files
 
-取消走 `SIGTERM`：Python 清理半截文件、恢复网络后以退出码 `130` 结束。找不到 Python 组件目录时，可在 UI 里选择组件目录，或设置 `HONGGUO_GRAB_DIR` 临时覆盖；开发态默认 `python/`，打包态默认安装目录下的 `resources/python/`。
+Cancellation uses `SIGTERM`: Python removes partial output, restores networking, and exits with code `130`. If the Python component directory can't be found, set it explicitly in the UI or via `HONGGUO_GRAB_DIR`; development defaults to `python/`, packaged builds to `resources/python/` under the install directory.
 
-## 安全与合规
+## Safety and Compliance
 
-本项目**仅供技术学习与研究**。使用者需自行确保其使用方式合法，并**自行承担由此产生的全部法律责任**；作者不对任何滥用行为负责，亦不提供任何形式的担保。完整声明见本文档开头的「免责声明」。
+This project is **for technical study and research only**. Users must ensure their use is lawful and **bear full legal responsibility for it**; the author is not responsible for misuse and provides no warranty of any kind. See the disclaimer at the top of this document for the complete statement.
 
-- 仅处理你有权访问和下载的内容；遵守当地法律、平台服务条款和版权要求。
-- 不要将本项目用于绕过未获授权的访问控制，也不要传播未经授权的内容。
-- Android Hook、root 和 App 私有文件访问具有设备与版本风险，应只在你拥有或明确获准测试的环境中使用。
-- 不要提交账号信息、设备序列号、Cookie、Token、AES 密钥、数据库快照、Frida 抓取日志、`.mdl` 或解密后媒体。
-- Electron 渲染进程保持 `contextIsolation: true`、`nodeIntegration: false` 和 `sandbox: true`，拒绝新窗口与页面导航。
+- Process only content you are authorized to access and download; follow local law, platform terms, and copyright requirements.
+- Do not use this project to bypass access controls without authorization or distribute unauthorized content.
+- Root, hooking, and app-private file access should be used only on devices and applications you own or are explicitly authorized to test.
+- Never commit account data, device serials, cookies, tokens, AES keys, SQLite snapshots, Frida capture logs, `.mdl` files, or decrypted media.
+- Electron keeps `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true`; new windows and renderer navigation are denied.
 
-ADBKeyBoard 来自 `senzhk/ADBKeyBoard` 固定 commit（GPL-2.0，固定 SHA-256 校验），仅在设备缺少中文输入法时按需下载，不随 Git 或安装包分发；它能接收输入内容，只应安装在专用受控模拟器。
+ADBKeyBoard is fetched from a pinned `senzhk/ADBKeyBoard` commit (GPL-2.0, pinned SHA-256 verified), downloaded only when the device lacks a Chinese IME, and never redistributed with Git or the packaged app. As an input method it can receive typed content, so install it only on a dedicated controlled emulator.
 
 ## License
 
-本项目使用 MIT License，完整文本见 [LICENSE](LICENSE)。FFmpeg 由最终用户通过系统包管理器单独安装，ADBKeyBoard 由最终用户从固定上游地址下载；这些独立第三方组件分别遵循其发行包许可证。
+This project uses the MIT License. See [LICENSE](LICENSE). FFmpeg is installed separately through the system package manager and ADBKeyBoard is downloaded by the end user from its pinned upstream location; those independent components remain subject to their distribution licenses.
