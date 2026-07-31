@@ -127,7 +127,7 @@ Android App 抓取链路还需要 Python 3.11+、`adb`、支持 `adb root` 的 A
 
 ## 新电脑运行前提与自动安装边界
 
-公开分发应优先提供已 Developer ID 签名并通过 Apple 公证的 universal DMG，以及在 Windows x64 上构建和验收的 NSIS 安装包。新电脑至少需要网络、足够磁盘空间和允许启动虚拟化；Android SDK 和系统镜像会占用数 GB。
+公开分发应优先提供已 Developer ID 签名并通过 Apple 公证的 macOS DMG（universal、arm64、x64 三个都发布，方便用户按自己 CPU 架构选择体积更小的单架构包），以及在 Windows x64 上构建和验收的 NSIS 安装包。新电脑至少需要网络、足够磁盘空间和允许启动虚拟化；Android SDK 和系统镜像会占用数 GB。
 
 | 项目 | 安装包是否内置 | 应用能否自动准备 | 用户仍需完成的操作 |
 |---|---|---|---|
@@ -436,7 +436,7 @@ hdiutil verify "release/红果短剧下载器-1.0.0-universal.dmg"
 仓库包含两个工作流：
 
 - `.github/workflows/ci.yml` 在 Pull Request 和 `main` 推送时运行。它在 `macos-15`（Apple Silicon）、`macos-15-intel`（Intel）和 `windows-2022` 上执行测试、生产依赖审计和语法检查，并分别做 macOS universal 与 Windows x64 打包冒烟验证。
-- `.github/workflows/release.yml` 在 `main` 推送时运行 Release Please。普通功能提交只会创建或更新 Release PR；合并 Release PR 后，同一个工作流创建草稿 Release，构建正式 macOS universal DMG 和 Windows x64 NSIS，生成 `SHA256SUMS.txt`，全部验证通过后才把草稿公开。
+- `.github/workflows/release.yml` 在 `main` 推送时运行 Release Please。普通功能提交只会创建或更新 Release PR；合并 Release PR 后，同一个工作流创建草稿 Release，并行构建正式签名公证的 macOS universal/arm64/x64 三个 DMG 和 Windows x64 NSIS，生成 `SHA256SUMS.txt`，全部验证通过后才把草稿公开。
 
 所有第三方 Action 都固定到完整 commit SHA。CI 不读取签名 Secrets；正式构建 Job 使用名为 `release` 的 GitHub Environment。
 

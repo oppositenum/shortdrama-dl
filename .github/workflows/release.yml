@@ -36,7 +36,7 @@ jobs:
           manifest-file: .release-please-manifest.json
 
   build-macos:
-    name: Build signed macOS universal DMG
+    name: Build signed macOS DMG (${{ matrix.arch }})
     if: needs.release-please.outputs.release_created == 'true'
     needs: release-please
     runs-on: macos-15
@@ -44,6 +44,21 @@ jobs:
     environment: release
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # app_dir is electron-builder's own per-arch output folder name under release/:
+          # x64 (default arch) uses the unsuffixed "mac", the others are "mac-<arch>".
+          - arch: universal
+            npm_script: dist:mac:signed
+            app_dir: mac-universal
+          - arch: arm64
+            npm_script: dist:mac:signed:arm64
+            app_dir: mac-arm64
+          - arch: x64
+            npm_script: dist:mac:signed:x64
+            app_dir: mac
     env:
       RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
       RELEASE_VERSION: ${{ needs.release-please.outputs.version }}
@@ -71,7 +86,7 @@ jobs:
           npm test
           npm audit --omit=dev
 
-      - name: Build signed and notarized universal DMG
+      - name: Build signed and notarized ${{ matrix.arch }} DMG
         shell: bash
         env:
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
@@ -135,17 +150,23 @@ jobs:
             export APPLE_API_KEY="$key_path"
           fi
 
-          npm run dist:mac:signed
+          npm run ${{ matrix.npm_script }}
 
-      - name: Verify signed universal artifact
+      - name: Verify signed ${{ matrix.arch }} artifact
         shell: bash
         run: |
           set -euo pipefail
 
-          app_path="release/mac-universal/红果短剧下载器.app"
-          dmg_path="release/红果短剧下载器-${RELEASE_VERSION}-universal.dmg"
+          app_path="release/${{ matrix.app_dir }}/红果短剧下载器.app"
+          dmg_path="release/红果短剧下载器-${RELEASE_VERSION}-${{ matrix.arch }}.dmg"
           [[ -d "$app_path" ]] || { echo "Missing app bundle: $app_path" >&2; exit 1; }
           [[ -f "$dmg_path" ]] || { echo "Missing DMG: $dmg_path" >&2; exit 1; }
+
+          # universal must contain both slices in every Mach-O; arm64/x64 builds must
+          # contain ONLY their own slice (electron-builder single-arch output should
+          # never carry the other one; this project has no native node addons that
+          # could legitimately ship as pre-built fat binaries regardless of --arch).
+          expect="${{ matrix.arch }}"
 
           verify_app() {
             local candidate="$1"
@@ -161,10 +182,26 @@ jobs:
               if file "$binary" | grep -q 'Mach-O'; then
                 macho_count=$((macho_count + 1))
                 archs="$(lipo -archs "$binary")"
-                if [[ " $archs " != *" x86_64 "* || " $archs " != *" arm64 "* ]]; then
-                  echo "Not universal: $binary ($archs)" >&2
-                  return 1
-                fi
+                case "$expect" in
+                  universal)
+                    if [[ " $archs " != *" x86_64 "* || " $archs " != *" arm64 "* ]]; then
+                      echo "Not universal: $binary ($archs)" >&2
+                      return 1
+                    fi
+                    ;;
+                  arm64)
+                    if [[ " $archs " != *" arm64 "* || " $archs " == *" x86_64 "* ]]; then
+                      echo "Not arm64-only: $binary ($archs)" >&2
+                      return 1
+                    fi
+                    ;;
+                  x64)
+                    if [[ " $archs " != *" x86_64 "* || " $archs " == *" arm64 "* ]]; then
+                      echo "Not x64-only: $binary ($archs)" >&2
+                      return 1
+                    fi
+                    ;;
+                esac
               fi
             done < <(
               find "$candidate/Contents" -type f \
@@ -175,7 +212,7 @@ jobs:
               echo "No Mach-O files found in $candidate" >&2
               return 1
             fi
-            echo "Verified $macho_count universal Mach-O files."
+            echo "Verified $macho_count $expect Mach-O files."
           }
 
           verify_app "$app_path"
@@ -196,8 +233,8 @@ jobs:
       - name: Upload macOS artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: release-macos-${{ needs.release-please.outputs.version }}
-          path: release/红果短剧下载器-${{ needs.release-please.outputs.version }}-universal.dmg
+          name: release-macos-${{ matrix.arch }}-${{ needs.release-please.outputs.version }}
+          path: release/红果短剧下载器-${{ needs.release-please.outputs.version }}-${{ matrix.arch }}.dmg
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -349,14 +386,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          dmg="release-assets/红果短剧下载器-${RELEASE_VERSION}-universal.dmg"
-          exe="release-assets/红果短剧下载器-${RELEASE_VERSION}-setup.exe"
-          [[ -s "$dmg" ]] || { echo "Missing or empty DMG: $dmg" >&2; exit 1; }
-          [[ -s "$exe" ]] || { echo "Missing or empty installer: $exe" >&2; exit 1; }
+          declare -A originals=(
+            [universal]="release-assets/红果短剧下载器-${RELEASE_VERSION}-universal.dmg"
+            [arm64]="release-assets/红果短剧下载器-${RELEASE_VERSION}-arm64.dmg"
+            [x64]="release-assets/红果短剧下载器-${RELEASE_VERSION}-x64.dmg"
+            [exe]="release-assets/红果短剧下载器-${RELEASE_VERSION}-setup.exe"
+          )
+          for key in "${!originals[@]}"; do
+            [[ -s "${originals[$key]}" ]] || { echo "Missing or empty artifact: ${originals[$key]}" >&2; exit 1; }
+          done
 
           mapfile -t files < <(find release-assets -maxdepth 1 -type f -print | sort)
-          if [[ "${#files[@]}" -ne 2 ]]; then
-            printf 'Expected exactly two release artifacts, found:\n%s\n' "${files[*]}" >&2
+          if [[ "${#files[@]}" -ne 4 ]]; then
+            printf 'Expected exactly four release artifacts, found:\n%s\n' "${files[*]}" >&2
             exit 1
           fi
 
@@ -364,14 +406,19 @@ jobs:
           # even a correctly UTF-8-percent-encoded raw REST upload still loses the CJK
           # characters). Rename to an ASCII slug before upload so the public download
           # filename is stable, and so SHA256SUMS.txt matches what's actually downloadable.
-          dmg_ascii="release-assets/shortdrama-dl-${RELEASE_VERSION}-universal.dmg"
-          exe_ascii="release-assets/shortdrama-dl-${RELEASE_VERSION}-setup.exe"
-          mv "$dmg" "$dmg_ascii"
-          mv "$exe" "$exe_ascii"
+          mv "${originals[universal]}" "release-assets/shortdrama-dl-${RELEASE_VERSION}-universal.dmg"
+          mv "${originals[arm64]}" "release-assets/shortdrama-dl-${RELEASE_VERSION}-arm64.dmg"
+          mv "${originals[x64]}" "release-assets/shortdrama-dl-${RELEASE_VERSION}-x64.dmg"
+          mv "${originals[exe]}" "release-assets/shortdrama-dl-${RELEASE_VERSION}-setup.exe"
 
           (
             cd release-assets
-            sha256sum "$(basename "$dmg_ascii")" "$(basename "$exe_ascii")" > SHA256SUMS.txt
+            sha256sum \
+              "shortdrama-dl-${RELEASE_VERSION}-universal.dmg" \
+              "shortdrama-dl-${RELEASE_VERSION}-arm64.dmg" \
+              "shortdrama-dl-${RELEASE_VERSION}-x64.dmg" \
+              "shortdrama-dl-${RELEASE_VERSION}-setup.exe" \
+              > SHA256SUMS.txt
             sha256sum --check SHA256SUMS.txt
           )
 
@@ -381,7 +428,7 @@ jobs:
           set -euo pipefail
           gh release upload "$RELEASE_TAG" release-assets/* --clobber
 
-          expected_assets=3
+          expected_assets=5
           # Same draft-vs-published caveat as the identity-verification step above:
           # `gh release view` resolves drafts by tag, the raw `.../releases/tags/<tag>` API does not.
           actual_assets="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets | length')"

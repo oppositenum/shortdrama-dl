@@ -127,7 +127,7 @@ The current build host is Apple Silicon macOS. arm64 and universal artifacts can
 
 ## New-Computer Prerequisites and Automatic Setup Boundary
 
-Public distribution should use a Developer ID signed and Apple-notarized universal DMG, plus an NSIS installer built and accepted on Windows x64. A new computer needs network access, adequate disk space, and working hardware virtualization. Android SDK components and the system image consume several GB.
+Public distribution should use Developer ID signed and Apple-notarized macOS DMGs (universal, arm64, and x64 are all published, so users can pick the smaller single-architecture build matching their own CPU), plus an NSIS installer built and accepted on Windows x64. A new computer needs network access, adequate disk space, and working hardware virtualization. Android SDK components and the system image consume several GB.
 
 | Item | Bundled | Can the app prepare it? | User responsibility |
 |---|---|---|---|
@@ -434,7 +434,7 @@ Exact output directories can vary by electron-builder version; use the paths act
 The repository contains two workflows:
 
 - `.github/workflows/ci.yml` runs for pull requests and pushes to `main`. It tests, audits production dependencies, and checks syntax on `macos-15` (Apple Silicon), `macos-15-intel` (Intel), and `windows-2022`; it also performs macOS universal and Windows x64 packaging smoke builds.
-- `.github/workflows/release.yml` runs Release Please on pushes to `main`. Ordinary feature commits only create or update a Release PR. After that PR is merged, the same workflow creates a draft Release, builds the formal macOS universal DMG and Windows x64 NSIS installer, generates `SHA256SUMS.txt`, and publishes the draft only after all validation succeeds.
+- `.github/workflows/release.yml` runs Release Please on pushes to `main`. Ordinary feature commits only create or update a Release PR. After that PR is merged, the same workflow creates a draft Release, builds the formal signed and notarized macOS universal/arm64/x64 DMGs (in parallel) and the Windows x64 NSIS installer, generates `SHA256SUMS.txt`, and publishes the draft only after all validation succeeds.
 
 Every third-party Action is pinned to a full commit SHA. CI cannot read signing secrets. Formal build jobs use the GitHub Environment named `release`.
 
