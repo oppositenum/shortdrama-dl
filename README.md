@@ -1,6 +1,6 @@
 # shortdrama-dl
 
-[中文](README.md)
+[中文](README_CN.md)
 
 > ## ⚠️ Disclaimer
 >
@@ -55,7 +55,7 @@ shortdrama-dl/
 │   ├── start_avd.ps1         # Windows Android checks, installation, and startup
 │   └── requirements.txt      # Production Python dependencies
 ├── docs/                     # Architecture, file inventory, project status, release process
-├── README.md / README.en.md
+├── README.md / README_CN.md
 └── LICENSE
 ```
 
