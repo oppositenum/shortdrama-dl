@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.1.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.0.0...v1.1.0) (2026-07-31)
+
+
+### Features
+
+* **ci:** publish separate arm64/x64 macOS DMGs alongside universal ([74dfa55](https://github.com/oppositenum/shortdrama-dl/commit/74dfa5521979f03ba1d8d81711e20491a256e6d4))
+* **ui:** remember the last-entered link, save dir, and other form fields ([cf8bffb](https://github.com/oppositenum/shortdrama-dl/commit/cf8bffb17e1f87125dece5ae35f47af3ba8555d6))
+
+
+### Bug Fixes
+
+* **ci:** exempt fsevents.node from the single-arch verification ([c3af5ee](https://github.com/oppositenum/shortdrama-dl/commit/c3af5eed5367d32fe47ea93697c9c14cd5deed01))
+* **ci:** look up draft releases with gh release view, not the tags API ([ab98bb5](https://github.com/oppositenum/shortdrama-dl/commit/ab98bb51e18f5b2d477ee29af24dcc99617024b4))
+* **ci:** rename release assets to an ASCII slug before upload ([e07ec80](https://github.com/oppositenum/shortdrama-dl/commit/e07ec8009aea78056223bd34095de3d28b003f12))
+* **docs:** correct README cross-language links after the file swap ([1b8f71a](https://github.com/oppositenum/shortdrama-dl/commit/1b8f71aec95f1689f4a3a1d6254a7eb97915f690))
+
 ## 1.0.0 (2026-07-31)
 
 
