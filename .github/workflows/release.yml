@@ -329,7 +329,10 @@ jobs:
             echo "Tag $RELEASE_TAG points to $tag_sha, expected $RELEASE_SHA." >&2
             exit 1
           fi
-          is_draft="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq .draft)"
+          # `gh api .../releases/tags/<tag>` only resolves published releases and 404s on a
+          # draft (GitHub's REST semantics, not a permissions issue) — `gh release view` does
+          # look up drafts by tag, which is what we actually need to check here.
+          is_draft="$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)"
           if [[ "$is_draft" != "true" ]]; then
             echo "Release $RELEASE_TAG is not a draft; refusing to replace a published release." >&2
             exit 1
@@ -370,7 +373,9 @@ jobs:
           gh release upload "$RELEASE_TAG" release-assets/* --clobber
 
           expected_assets=3
-          actual_assets="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.assets | length')"
+          # Same draft-vs-published caveat as the identity-verification step above:
+          # `gh release view` resolves drafts by tag, the raw `.../releases/tags/<tag>` API does not.
+          actual_assets="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets | length')"
           if [[ "$actual_assets" -ne "$expected_assets" ]]; then
             echo "Release asset count is $actual_assets, expected $expected_assets." >&2
             exit 1
