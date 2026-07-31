@@ -329,6 +329,8 @@ Direct MP4 sources use streaming Node.js `fetch`. HLS and DASH use native system
 
 Only one task may control a device at a time. Python creates a per-device lock in the host temporary directory and releases it after a normal finish or safe cancellation.
 
+The app's offline downloads are always the 720p rung, and some episodes in that rung are encoded with ByteVC2, which ffmpeg cannot decode. When capture detects a ByteVC2 episode, it immediately keeps the decryption key it already captured but defers switching to a server-side 1080p source (standard HEVC) until the whole series has finished capturing and the device goes back online — see the FAQ entry "Log shows 'switching to a server-side 1080p source'" below for why.
+
 ### Episode Names and Completion Marker
 
 - Fewer than 100 episodes: `第01集.mp4`, `第02集.mp4`.
@@ -598,6 +600,18 @@ The Python package and Android Frida Server must have the exact same version, an
 ### Frida Server is missing
 
 When online, the app downloads the correct binary from the official Frida Release and caches it (180s socket timeout, multi-source retries, plus built-in GitHub mirror fallbacks). If GitHub is slow, set `SHORTDRAMA_GITHUB_PROXY` (for example `https://ghfast.top`) to prefer a proxy prefix. Offline, set `SHORTDRAMA_FRIDA_SERVER` to a local binary, push it to `/data/local/tmp/frida-server`, or place it at `python/frida-server-<abi>`. The binary remains absent from Git and packaged applications.
+
+### Log shows "switching to a server-side 1080p source (batched for download after capture finishes)"
+
+The app's offline downloads are always the 720p rung, and some episodes in that rung are encoded with ByteVC2 — ffmpeg has neither a decoder nor a muxer tag for it, so those episodes can't be packaged straight from the 720p copy. Fortunately every quality rung of the same episode shares one AES key (the IV for each sample lives in the file's own `senc`, so the file doesn't need to have actually been played), so the key captured while the app plays the 720p copy can decrypt a 1080p source (standard HEVC) downloaded separately from the server — which also bumps the resolution from 720x1280 to 1080x1920.
+
+This step is deferred to "after capture finishes, in one batch" on purpose, not as an implementation shortcut — it follows directly from a hard constraint of the key-capture pipeline:
+
+- The entire capture loop (`run_harvest`) runs with networking off the whole time. That's what makes "the app can only play the fully-downloaded local file" hold true, which is what lets every decryption event be reliably attributed to a specific episode — it's the foundation the episode-number mapping is built on. With networking on, the player could pull from a CDN-cached fragment instead, and the episode mapping could go wrong.
+- Downloading the 1080p source itself requires networking. Doing it the moment a ByteVC2 episode is found would mean repeatedly toggling networking on and off in the middle of the capture loop. The one place in the code that already does a brief mid-loop networking window (re-entering the series page) needs several seconds to settle networking state each time; ByteVC2 episodes can make up half a series, so toggling per episode would add up to several minutes of pure waiting, on top of a real risk of episode-mapping errors.
+- The batch download step itself isn't parallelized — it downloads one episode at a time. So switching to "download the moment it's found" would not shorten total download time; it would just turn one networking toggle into many.
+
+Seeing this log line is expected: the key for that episode has already been captured — only the actual video file is deferred until the whole series finishes and the device goes back online for one batch download.
 
 ### Root is unavailable
 
