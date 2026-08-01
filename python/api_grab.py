@@ -157,6 +157,22 @@ def try_attach_device_signer(adb_device: str):
         return None, str(e)
 
 
+# 这些原因这一趟里不会自己好：缺包、没设备。再试也只是每集重复刷同样一行日志，
+# 白等一次挂载。判定为永久失败后本次运行就不再尝试签名，直接走冷却+轮换身份。
+_PERMANENT_SIGN_FAILURES = (
+    "无法 import ttnet_signer",
+    "找不到 frida-tools",
+    "unable to find device",
+    "device not found",
+    "no device",
+)
+
+
+def _is_permanent_sign_failure(reason: str) -> bool:
+    low = (reason or "").lower()
+    return any(marker.lower() in low for marker in _PERMANENT_SIGN_FAILURES)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="红果短剧纯协议抓取")
     ap.add_argument("--series-id", required=True, help="网页/详情 series_id")
@@ -217,6 +233,7 @@ def main() -> int:
         or os.environ.get("SHORTDRAMA_DEVICE_SIGN", "").strip() in ("1", "true", "yes")
     )
     signer = None
+    sign_failures = 0
     if use_device_sign:
         signer, err = try_attach_device_signer(args.adb_device)
         if signer is None:
@@ -237,7 +254,7 @@ def main() -> int:
         2. 允许 auto_sign → **立刻**挂载 App 签名，成功则马上用
         3. 挂不上 / 未开 auto_sign → 才冷却 + 轮换 device_id（裸请求兜底）
         """
-        nonlocal signer
+        nonlocal signer, auto_sign, sign_failures
         logev("warn", f"触发风控恢复（{reason}）")
 
         if client.signer is not None:
@@ -251,12 +268,18 @@ def main() -> int:
             if s is not None:
                 signer = s
                 client.set_signer(s)
+                sign_failures = 0
                 logev("info", "已挂载 App TTNet 签名，后续请求走签名路径")
                 return True
+            sign_failures += 1
             logev(
                 "warn",
                 f"挂载签名失败: {err}；改为冷却 {args.risk_cooldown:.0f}s 后轮换身份再试裸请求",
             )
+            # 缺包或没设备这类原因不会自己好转，别在后面每一集再重刷一遍同样的失败。
+            if _is_permanent_sign_failure(err) or sign_failures >= 2:
+                auto_sign = False
+                logev("warn", "本次运行不再尝试挂载 App 签名，后续风控只做冷却+轮换身份")
         else:
             logev(
                 "info",

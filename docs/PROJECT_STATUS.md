@@ -6,7 +6,7 @@
 
 桌面端以 Electron 为主进程，负责网页解析、单播放页媒体请求捕获、封面下载、任务状态、环境准备和 Python 子进程编排。详情页/分类页的整剧流程不会下载网页分集，只解析剧名、总集数和封面；抓取可走 **纯协议**（`grabMode=api` → `api_grab.py`，无需安卓）或 **App 抓取**（`grabMode=app` → `hongguo_grab.py`）。`series-workflow.js` 集中保存总集数、App 区间和完成标记规则。Android 抓取组件位于 `python/`，负责 ADB 设备控制、App 离线下载、SQLite 映射、Frida 数据采集、`.mdl` 解密、MP4 重封装和时长终检。
 
-**纯协议（2026-08-01）：** `video_detail` / `video_model` 裸 HTTP 即可 `code=0`；`spade_a` 本地解包 + `decrypt_mdl` 出片已端到端验证（无 Frida、无六神头）。风控 `110001` 时优先自动挂载 App 签名兜底。  
+**纯协议（2026-08-01）：** `video_detail` / `video_model` 裸 HTTP 即可 `code=0`；`spade_a` 本地解包 + `decrypt_mdl` 出片已端到端验证（无 Frida、无六神头）。风控 `110001` 时优先自动挂载 App 签名兜底：不会为了下载去启动模拟器，但本机已有模拟器在跑就借它的签名；`SHORTDRAMA_API_DEVICE_SIGN=0` 可关闭，只做冷却+轮换身份。签名回退需要 `frida-tools` 自带的 Java bridge，纯协议环境会一并安装；bridge 目录一律向 `frida_tools` 包本身查询（`SHORTDRAMA_FRIDA_BRIDGES` 可覆盖），不写死 venv 位置或解释器小版本。收到 110001 后立即交回上层，不再换 host、不再重试——那只会用同一身份多挨几次拒绝。  
 学习讲义：[REVERSE_LEARNING.md](REVERSE_LEARNING.md)；接口细节：[API_REVERSE.md](API_REVERSE.md)。
 
 正式 Python 仓库运行资源（打包白名单）：

@@ -22,7 +22,7 @@
 | `python/api_grab.py` | Electron **纯协议**抓取入口（独立功能）；video_detail/model → CDN → spade 解包 → 解密 | `main.js` 的 `grabWithApi(...)` |
 | `python/api_client.py` | 红果业务 HTTP 客户端（device query、video_detail/model） | `api_grab.py` import |
 | `python/spade_keys.py` | `spade_a` 离线解包为 AES-128 key + 可选 key 缓存 | `api_grab.py` import |
-| `python/ttnet_signer.py` | 110001 时经 Frida 调用 App TTNet 签名（可选回退） | `api_grab.py` 动态 import |
+| `python/ttnet_signer.py` | 110001 时经 Frida 调用 App TTNet 签名（可选回退）；Java bridge 目录向 `frida_tools` 包查询，`SHORTDRAMA_FRIDA_BRIDGES` 可覆盖 | `api_grab.py` 动态 import |
 | `python/decrypt_mdl.py` | 单文件 AES-128-CTR 解密、ffmpeg 重封装、ffprobe 时长与轨道校验；接受 `.mdl` 或自行下载的同集分片，`--key` 可显式指定密钥 | `hongguo_grab.py` / `api_grab.py` 通过绝对路径启动 |
 | `python/mp4parse.py` | 解析 `moov/trak/stsz/stco/co64/stsc` 展开样本 offset/size；另读 `sinf/frma` 真实编码与 `senc` 起始计数器，据此识别 ByteVC2 | `decrypt_mdl.py` 与 `hongguo_grab.py` 静态 import |
 | `python/capture_final.js` | Frida Hook `libttffmpeg.so` AES CTR 函数，向 Python 发送 CRYPT 事件 | `hongguo_grab.py` 的 `frida_attach()` 使用 `open(...).read()` 动态加载 |
@@ -65,7 +65,7 @@
 | 依赖 | 版本 | 使用依据 |
 |---|---|---|
 | `frida` | `17.16.4` | `hongguo_grab.py` 函数内 import，按序列号获取设备、attach 和加载 Script |
-| `frida-tools` | `14.10.4` | 项目固定的配套工具版本，用于 CLI 诊断 |
+| `frida-tools` | `14.10.4` | 项目固定的配套工具版本，用于 CLI 诊断；另外 `ttnet_signer.py` 的签名回退要用它自带的 `frida_tools/bridges/java.js`，纯协议环境也必须装 |
 | `cryptography` | `>=41` | `decrypt_mdl.py` 从 `cryptography.hazmat.primitives.ciphers` 导入 AES/CTR |
 
 `sqlite3`、`argparse`、`json`、`struct`、`subprocess` 等属于 Python 标准库，不进入 requirements。

@@ -1276,6 +1276,9 @@ async function installHostDependency(kind, message, detail, status) {
 
 // 与 python/requirements.txt 同步。升级时必须同步改校验常量、文档与 frida-server 期望版本。
 const FRIDA_VERSION = '17.16.4';
+// 纯协议遇 110001 想借模拟器 App 签名时，ttnet_signer 需要 frida-tools 自带的
+// Java bridge（frida_tools/bridges/java.js）。只装 frida 是不够的。
+const FRIDA_TOOLS_VERSION = '14.10.4';
 // frida >= 17.16 需要 typing.NotRequired(Python 3.11+)；也避开 macOS 系统自带 3.9。
 const MIN_PYTHON = [3, 11];
 // 与 python/hongguo_grab.py 里的 PKG 保持一致，供环境检查面板直接 adb 探测用。
@@ -1550,10 +1553,12 @@ async function ensurePythonRuntime(grabDir, opts = {}) {
   });
   if (isCanceled || r.signal === 'SIGTERM') throw new Error('__CANCELED__');
   if (r.code !== 0) throw new Error(`升级 pip 失败：${r.stderr.trim() || `退出码 ${r.code}`}`);
-  // App：完整 requirements。纯协议：cryptography 必装；顺带装 Frida，供 110001 自动签名回退。
+  // App：完整 requirements。纯协议：cryptography 必装；frida + frida-tools 顺带装，
+  // 供 110001 自动签名回退——bridge 在 frida-tools 里，少装它签名一定挂不上。
   const pipArgs = requireFrida
     ? ['-m', 'pip', 'install', '-r', path.join(grabDir, 'requirements.txt')]
-    : ['-m', 'pip', 'install', 'cryptography>=41', `frida==${FRIDA_VERSION}`];
+    : ['-m', 'pip', 'install', 'cryptography>=41', `frida==${FRIDA_VERSION}`,
+       `frida-tools==${FRIDA_TOOLS_VERSION}`];
   r = await runSetupProcess(pythonBin, pipArgs, {
     env: buildGrabEnv({ pythonBin }),
     showOutput: true,
@@ -1741,11 +1746,42 @@ async function ensureAppGrabEnvironment(grabDir) {
  * 纯协议下载环境：Python + cryptography + ffmpeg，不需要安卓设备 / Frida。
  * 与 App 模式可共用 venv；纯协议校验不强制 Frida。运行缓存写入 runtime/api。
  */
+/**
+ * 补齐 110001 签名回退需要的 frida-tools（bridge 在它里面）。
+ *
+ * 纯协议的必需依赖只有 cryptography，解释器校验也只查 cryptography——这是故意的：
+ * frida 装不上也不该拖垮裸请求主路径。但正因为校验不查 frida-tools，早先建好的
+ * venv 不会因为缺它而重建，于是风控回退会一直挂不上签名。这里在准备环境时补一次，
+ * 装不上只警告，不影响下载。
+ */
+async function ensureSignFallbackDeps(pythonBin, env) {
+  const probe = await runSetupProcess(pythonBin, ['-c', 'import frida_tools'], {
+    env,
+    showOutput: false,
+  });
+  if (probe.code === 0) return true;
+  if (isCanceled) throw new Error('__CANCELED__');
+
+  log('补装 frida-tools（纯协议遇风控时借模拟器 App 签名要用它的 Java bridge）…');
+  const r = await runSetupProcess(
+    pythonBin,
+    ['-m', 'pip', 'install', `frida==${FRIDA_VERSION}`, `frida-tools==${FRIDA_TOOLS_VERSION}`],
+    { env, showOutput: true }
+  );
+  if (isCanceled || r.signal === 'SIGTERM') throw new Error('__CANCELED__');
+  if (r.code !== 0) {
+    log('frida-tools 补装失败：遇 110001 只能冷却+轮换身份，裸请求下载不受影响', 'warn');
+    return false;
+  }
+  return true;
+}
+
 async function ensureApiGrabEnvironment(grabDir) {
   log(`检测到运行系统：${platformLabel()}，准备纯协议下载环境（无需安卓）`);
   const pythonBin = await ensurePythonRuntime(grabDir, { requireFrida: false });
   if (!pythonBin) return null;
   let env = buildGrabEnv({ pythonBin });
+  await ensureSignFallbackDeps(pythonBin, env);
   if (!await ensureSystemMediaTools(env, { purpose: '纯协议下载' })) return null;
   env = buildGrabEnv({ pythonBin });
   const runtimeDir = path.join(app.getPath('userData'), 'runtime', 'api');
@@ -2074,9 +2110,16 @@ function grabWithApi({
       // 分集间隔，降低连打 video_model 触发 110001 的概率
       '--interval', String(process.env.SHORTDRAMA_API_INTERVAL || '1.2'),
       '--risk-cooldown', String(process.env.SHORTDRAMA_RISK_COOLDOWN || '45'),
-      // 遇 110001 自动尝试 Frida App 签名（模拟器有红果时）
-      '--device-sign-auto',
     ];
+    // 纯协议本身不需要模拟器，也永远不会为了下载去启动一个。但如果本机恰好已经
+    // 有模拟器在跑，遇 110001 时借它的 App 签名比干等冷却有效得多。默认开启，
+    // SHORTDRAMA_API_DEVICE_SIGN=0 可以关掉，保持完全不碰安卓。
+    const deviceSignAuto = process.env.SHORTDRAMA_API_DEVICE_SIGN !== '0';
+    if (deviceSignAuto) {
+      args.push('--device-sign-auto');
+    } else {
+      log('已关闭纯协议的模拟器签名回退（SHORTDRAMA_API_DEVICE_SIGN=0），遇风控只冷却重试');
+    }
     if (seriesName) args.push('--series-name', seriesName);
     if (keyCache) args.push('--key-cache', keyCache);
     const adbDevice =
@@ -2085,7 +2128,11 @@ function grabWithApi({
       'emulator-5554';
     args.push('--adb-device', String(adbDevice));
 
-    const child = spawn(pythonBin, args, { cwd: grabDir, env: grabEnv });
+    // api_grab.py 自己也默认开启签名回退，只靠不传参数关不掉，必须把环境变量也带上。
+    const childEnv = deviceSignAuto
+      ? grabEnv
+      : { ...grabEnv, SHORTDRAMA_DEVICE_SIGN_AUTO: '0' };
+    const child = spawn(pythonBin, args, { cwd: grabDir, env: childEnv });
     currentGrab = child;
 
     let okCount = 0;

@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import time
 import urllib.error
@@ -36,7 +37,37 @@ import frida
 
 PKG = "com.phoenix.read"
 ROOT = Path(__file__).resolve().parents[1]
-BRIDGE_DIR = ROOT / ".venv/lib/python3.14/site-packages/frida_tools/bridges"
+
+
+def resolve_bridge_dir() -> Optional[Path]:
+    """定位 frida-tools 自带的 Java bridge 目录。
+
+    绝不能写死路径：正式版的 venv 在应用用户数据目录（.../runtime/python），
+    不在项目里；解释器小版本决定 lib/pythonX.Y，Windows 又是 Lib\\site-packages。
+    写死其中任何一段，换台机器或换个 Python 版本就会以
+    "frida Java bridge missing" 收场，而 frida-tools 其实装得好好的。
+    正确做法是问包自己在哪。
+    """
+    env = os.environ.get("SHORTDRAMA_FRIDA_BRIDGES", "").strip()
+    if env and Path(env).is_dir():
+        return Path(env)
+    try:
+        import frida_tools  # noqa: WPS433  运行期才需要，import 失败走下面的兜底
+
+        for base in frida_tools.__path__:
+            cand = Path(base) / "bridges"
+            if cand.is_dir():
+                return cand
+    except Exception:
+        pass
+    # 兜底：开发态项目内 venv，解释器版本和平台目录名都不写死。
+    for pattern in (".venv/lib/*/site-packages/frida_tools/bridges",
+                    ".venv/Lib/site-packages/frida_tools/bridges"):
+        for cand in ROOT.glob(pattern):
+            if cand.is_dir():
+                return cand
+    return None
+
 
 USER_AGENT = (
     "com.phoenix.read/72732 (Linux; U; Android 14; zh_CN; "
@@ -238,8 +269,12 @@ class TtnetDeviceSigner:
         raise TtnetSignerError(f"app {self.package} not running on {self.device_id}")
 
     def attach(self, pid: Optional[int] = None) -> None:
-        if not BRIDGE_DIR.is_dir():
-            raise TtnetSignerError(f"frida Java bridge missing: {BRIDGE_DIR}")
+        bridge_dir = resolve_bridge_dir()
+        if bridge_dir is None:
+            raise TtnetSignerError(
+                "找不到 frida-tools 的 Java bridge（需要 pip install frida-tools，"
+                "或用 SHORTDRAMA_FRIDA_BRIDGES 指向 frida_tools/bridges 目录）"
+            )
         if pid is None:
             pid = self.ensure_app()
         self._device = frida.get_device(self.device_id)
@@ -254,7 +289,7 @@ class TtnetDeviceSigner:
                 return
             if p.get("type") == "frida:load-bridge":
                 stem = str(p.get("name", "")).lower()
-                bridge = next(BRIDGE_DIR.glob(stem + ".js"))
+                bridge = next(bridge_dir.glob(stem + ".js"))
                 self._script.post(
                     {
                         "type": "frida:bridge-loaded",
