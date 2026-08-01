@@ -149,6 +149,8 @@ App 的离线下载**固定走 720p 档**，与播放器里选的清晰度无关
 
 `buildGrabEnv()` 保留当前进程环境并按系统补 PATH。macOS 增加 Homebrew、MacPorts 与 `~/Library/Android/sdk`；Windows 增加 WinGet Links/Packages、用户 Python 目录与 `%LOCALAPPDATA%\Android\Sdk`。两端都识别 `ANDROID_HOME`、`ANDROID_SDK_ROOT` 与 `SHORTDRAMA_SDK_ROOT`。Windows 同时维护大小写可能不同的继承 PATH 键，避免 GUI 进程环境丢失新安装工具。
 
+macOS 还会自己找 JDK 并设置 `JAVA_HOME`，把该 JDK 的 `bin` 放在 PATH 最前面。`sdkmanager`/`avdmanager` 是 Java 程序，而 macOS 自带的 `/usr/bin/java` 只是占位程序：没装 JDK 时它只会打印 `Unable to locate a Java Runtime`，sdkmanager 解析不到版本号，再拿空串做整数比较，报出与 Java 无关的 `test: : integer expression expected`——许可证和 SDK 包其实一个都没装上。Homebrew 的 `openjdk` 又是 keg-only，既不进 `/usr/local/bin` 也不注册到 `java_home`，所以按目录直接找：Homebrew keg（`openjdk`、`openjdk@25/21/17`）、`/Library/Java/JavaVirtualMachines` 与用户同名目录（按目录名倒序取新版本）。追加到 PATH 末尾无效——`/usr/bin` 一直排在前面。`python/start_avd.sh` 在调用 sdkmanager/avdmanager 之前用同一套顺序再确认一次（`java -version` 必须真的能跑），缺 JDK 且允许安装时用 Homebrew 装 `openjdk@17`，否则直接报可照做的提示；`SHORTDRAMA_JAVA_HOME` 可覆盖。
+
 多设备选择通过 `ANDROID_SERIAL` 传给 ADB 和 Frida。未设置时，Python 仅在多设备中存在唯一 `emulator-*` 时自动选择它。
 
 ## 6. stdout JSON Lines 协议

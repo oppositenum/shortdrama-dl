@@ -266,3 +266,71 @@ test('every workflow job has a timeout and packaging jobs cache Electron', () =>
   assert.equal((ci.match(/ELECTRON_CACHE:/g) || []).length, 2);
   assert.equal((ci.match(/ELECTRON_BUILDER_CACHE:/g) || []).length, 2);
 });
+
+/**
+ * resolveMacJavaHome 住在 main.js 里，一 require 就会拉起 Electron；
+ * 这里按 series-intro.test.js 的老办法把源码摘出来单独求值，只喂它真正用到的依赖。
+ */
+function loadMacJavaResolver({ fsImpl, homeDir, env }) {
+  const src = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
+  const start = src.indexOf('let cachedMacJavaHome;');
+  assert.notEqual(start, -1, 'main.js 里找不到 resolveMacJavaHome');
+  const end = src.indexOf('\n/**', start);
+  const body = src.slice(start, end);
+  const app = { getPath: () => homeDir };
+  // 这段代码只在 macOS 上跑，路径一律用 POSIX 语义；Windows runner 上注入
+  // 原生的 path 会把分隔符换成反斜杠，测的就不是真实行为了。
+  return new Function(
+    'fs', 'path', 'app', 'process',
+    `${body};return resolveMacJavaHome;`
+  )(fsImpl, path.posix, app, { env });
+}
+
+// 实测踩过：Homebrew 的 openjdk 是 keg-only，既不进 /usr/local/bin 也不注册到
+// java_home，而 /usr/bin/java 只是个占位程序 —— 机器上明明装了 JDK，sdkmanager
+// 还是只会报 "Unable to locate a Java Runtime"。所以必须自己按目录找出 JDK Home。
+test('macOS JDK lookup finds a keg-only Homebrew OpenJDK', () => {
+  const brewHome = '/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home';
+  const resolve = loadMacJavaResolver({
+    homeDir: '/Users/tester',
+    env: {},
+    fsImpl: {
+      existsSync: (p) => p === path.posix.join(brewHome, 'bin', 'java'),
+      readdirSync: () => { throw new Error('ENOENT'); },
+    },
+  });
+  assert.equal(resolve(), brewHome);
+});
+
+test('macOS JDK lookup falls back to the standard JVM directory, newest first', () => {
+  const jvmRoot = '/Library/Java/JavaVirtualMachines';
+  const resolve = loadMacJavaResolver({
+    homeDir: '/Users/tester',
+    env: {},
+    fsImpl: {
+      existsSync: (p) => p.startsWith(jvmRoot) && p.endsWith('/Contents/Home/bin/java'),
+      readdirSync: (dir) => {
+        if (dir !== jvmRoot) throw new Error('ENOENT');
+        return ['temurin-17.jdk', 'temurin-21.jdk'];
+      },
+    },
+  });
+  assert.equal(resolve(), path.posix.join(jvmRoot, 'temurin-21.jdk', 'Contents', 'Home'));
+});
+
+test('macOS JDK lookup reports nothing rather than guessing when no JDK exists', () => {
+  const resolve = loadMacJavaResolver({
+    homeDir: '/Users/tester',
+    env: {},
+    fsImpl: { existsSync: () => false, readdirSync: () => { throw new Error('ENOENT'); } },
+  });
+  assert.equal(resolve(), null);
+});
+
+test('the grab environment exports JAVA_HOME and puts the JDK ahead of /usr/bin', () => {
+  const src = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
+  // 追加在 PATH 末尾没用：/usr/bin 一直在前面，占位的 /usr/bin/java 会一直赢。
+  assert.match(src, /const merged = pythonDir \? \[pythonDir, \.\.\.leading, \.\.\.current\]/);
+  assert.match(src, /if \(javaHome\) leading\.push\(path\.join\(javaHome, 'bin'\)\)/);
+  assert.match(src, /\.\.\.\(javaHome \? \{ JAVA_HOME: javaHome \} : \{\}\)/);
+});

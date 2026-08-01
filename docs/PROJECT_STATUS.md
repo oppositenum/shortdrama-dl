@@ -44,6 +44,7 @@ Python 组件随应用打包到真实文件系统中的 `resources/python`，不
 - Linux 不会误用 macOS 或 Windows 安装流程，App 抓取环境自动准备会明确报告不支持。
 - 抓取前会验证 Python 3.11+、Python 依赖（`frida==17.16.4`）、ffmpeg/ffprobe、Android SDK、ADB 设备和 AVD。
 - 已安装但未启动的 AVD 会自动启动；缺少 SDK 或 AVD 时，经用户确认后安装并创建。
+- 安装 SDK 包或创建 AVD 需要 JDK 17+（`sdkmanager`/`avdmanager` 是 Java 程序），macOS 和 Windows 都是。macOS 会识别 Homebrew 的 keg-only `openjdk` 和 `/Library/Java/JavaVirtualMachines`，缺失时用 Homebrew 装 `openjdk@17`；只是启动已装好的 AVD 则不需要 Java。
 - Windows 自动创建 AVD 当前只支持 x64 主机和 `x86_64` 系统镜像。
 - 设备端 Frida Server 缺失或版本不匹配时，应用从官方 Release 下载匹配版本并缓存到应用用户数据目录。
 

@@ -1008,6 +1008,60 @@ function resolveApiGrabDir(configured) {
 }
 
 /**
+ * 找一个真正能跑的 JDK（macOS）。
+ *
+ * 背景：Android cmdline-tools 的 sdkmanager 只认 JAVA_HOME 和 PATH 上的 java。
+ * macOS 自带的 /usr/bin/java 只是个占位程序，没装 JDK 时执行会打印
+ * "Unable to locate a Java Runtime" 并返回非零；sdkmanager 拿不到版本号，
+ * 就会在自己脚本里对空字符串做整数比较，报出与 Java 毫无关系的
+ * "test: : integer expression expected"。而 Homebrew 的 openjdk 是 keg-only，
+ * 既不进 /usr/local/bin 也不注册到 java_home，机器上明明有 JDK 也用不上。
+ *
+ * 所以这里直接按目录找 JDK Home：Homebrew 的 keg 目录 + 系统/用户 JVM 目录。
+ * 找到就返回 Home 路径（内含 bin/java），没有返回 null。
+ */
+let cachedMacJavaHome;
+function resolveMacJavaHome() {
+  if (cachedMacJavaHome !== undefined) return cachedMacJavaHome;
+
+  const hasJava = (home) => {
+    try {
+      return !!home && fs.existsSync(path.join(home, 'bin', 'java'));
+    } catch {
+      return false;
+    }
+  };
+
+  const candidates = [];
+  if (process.env.JAVA_HOME) candidates.push(process.env.JAVA_HOME.trim());
+  for (const brewPrefix of ['/opt/homebrew/opt', '/usr/local/opt']) {
+    // openjdk 无后缀的是当前主版本；@版本 的是并存的旧版本，新到旧排。
+    for (const formula of ['openjdk', 'openjdk@25', 'openjdk@21', 'openjdk@17']) {
+      candidates.push(path.join(brewPrefix, formula, 'libexec', 'openjdk.jdk', 'Contents', 'Home'));
+    }
+  }
+  // /Library/... 是 Temurin/Oracle 这类标准安装位置，java_home 找的也是这里；
+  // 目录名带版本号，倒序排一遍优先拿新的。
+  for (const root of [
+    '/Library/Java/JavaVirtualMachines',
+    path.join(app.getPath('home'), 'Library', 'Java', 'JavaVirtualMachines'),
+  ]) {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(root).sort().reverse();
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      candidates.push(path.join(root, entry, 'Contents', 'Home'));
+    }
+  }
+
+  cachedMacJavaHome = candidates.find(hasJava) || null;
+  return cachedMacJavaHome;
+}
+
+/**
  * 构造供 Python 子进程使用的 PATH。
  *
  * 背景：macOS 从 Finder/DMG 启动的 GUI 应用只有最小 PATH
@@ -1031,8 +1085,14 @@ function buildGrabEnv({ pythonBin = null, serial = null, extra = {} } = {}) {
     process.env.ANDROID_HOME,
   ].filter((x) => x && x.trim()).map((x) => x.trim());
   const extras = [];
+  // JDK 的 bin 必须排在最前面：/usr/bin 一直在 PATH 里，追加在后面永远抢不过
+  // 那个只会报 "Unable to locate a Java Runtime" 的 /usr/bin/java 占位程序。
+  const leading = [];
+  let javaHome = null;
 
   if (platform === 'macos') {
+    javaHome = resolveMacJavaHome();
+    if (javaHome) leading.push(path.join(javaHome, 'bin'));
     extras.push(
       '/opt/homebrew/bin',
       '/usr/local/bin',
@@ -1068,7 +1128,7 @@ function buildGrabEnv({ pythonBin = null, serial = null, extra = {} } = {}) {
   const pythonDir = pythonBin && (path.isAbsolute(pythonBin) || pythonBin.includes(path.sep))
     ? path.dirname(pythonBin)
     : null;
-  const merged = pythonDir ? [pythonDir, ...current] : [...current];
+  const merged = pythonDir ? [pythonDir, ...leading, ...current] : [...leading, ...current];
   for (const dir of extras) {
     if (!merged.includes(dir)) merged.push(dir);
   }
@@ -1076,6 +1136,8 @@ function buildGrabEnv({ pythonBin = null, serial = null, extra = {} } = {}) {
     ...process.env,
     PYTHONIOENCODING: 'utf-8',
     PYTHONUTF8: '1',
+    // sdkmanager 优先读 JAVA_HOME；Homebrew 的 openjdk 是 keg-only，不设这个就找不到。
+    ...(javaHome ? { JAVA_HOME: javaHome } : {}),
     ...extra,
     PATH: [...new Set(merged)].join(sep),
   };

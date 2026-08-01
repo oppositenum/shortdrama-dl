@@ -48,6 +48,16 @@ const envItemState = { python: 'checking', ffmpeg: 'checking', android: 'checkin
   hongguo_app: 'checking', frida_server: 'checking' };
 
 // ---------- 抓取方式 ----------
+// 设置结构版本。1（或缺失）= 只有「App 抓取」开关的旧版本；2 = 三选一的 grabMode。
+// 旧设置里的 appGrab: true 是当年的默认值而不是用户的选择，迁移时不能直接当成
+// "用户要 App 抓取"，否则升级后仍会去装模拟器——见 GRAB_MODE_LABEL 下面的迁移逻辑。
+const SETTINGS_VERSION = 2;
+const GRAB_MODE_LABEL = {
+  api: '纯协议下载（无需模拟器）',
+  app: 'App 抓取（需 root 安卓 + Frida）',
+  none: '仅保存封面与简介',
+};
+
 function getGrabMode() {
   if (modeApi && modeApi.checked) return 'api';
   if (modeNone && modeNone.checked) return 'none';
@@ -61,9 +71,34 @@ function setGrabMode(mode) {
   syncGrabDirRow();
 }
 
+/**
+ * 从已保存的设置里定出启动时的抓取方式。
+ * 返回 { mode, migrated }：migrated=true 表示这次是从旧版默认值迁移过来的，
+ * 调用方需要提示用户，并把新的 settingsVersion 落盘，避免下次又迁一遍。
+ */
+function resolveSavedGrabMode(saved = {}) {
+  const known = (m) => m === 'app' || m === 'api' || m === 'none';
+
+  // 新版设置：用户选过什么就是什么，选 App 抓取也不再动它。
+  if (saved.settingsVersion >= SETTINGS_VERSION) {
+    return { mode: known(saved.grabMode) ? saved.grabMode : 'api', migrated: false };
+  }
+  // 旧版设置：关掉过抓取是用户的主动选择，尊重它。
+  if (saved.grabMode === 'none' || saved.appGrab === false) {
+    return { mode: 'none', migrated: false };
+  }
+  // grabMode:'app' / appGrab:true 都只是旧版默认值，不是选择，迁到新默认「纯协议」。
+  if (saved.grabMode === 'app' || saved.appGrab === true) {
+    return { mode: 'api', migrated: true };
+  }
+  // 头一次运行，或旧设置里本来就是纯协议：直接用新默认，没什么可提示的。
+  return { mode: 'api', migrated: false };
+}
+
 // ---------- 记忆：保存上次填写的内容 ----------
 function saveFormState() {
   window.api.saveSettings({
+    settingsVersion: SETTINGS_VERSION,
     url: urlInput.value,
     dir: selectedDir,
     grabMode: getGrabMode(),
@@ -342,21 +377,29 @@ function now() {
   return new Date().toLocaleTimeString('zh-CN', { hour12: false });
 }
 
-appendLog({
-  time: now(),
-  level: 'info',
-  message:
-    '就绪。默认「纯协议下载」（无需模拟器）；「App 抓取」作备用。网页只解析封面/简介与 series_id。',
-});
-
 async function initSettings() {
   const saved = await window.api.loadSettings().catch(() => ({}));
 
   if (saved.url) urlInput.value = saved.url;
-  if (saved.grabMode === 'app' || saved.grabMode === 'api' || saved.grabMode === 'none') {
-    setGrabMode(saved.grabMode);
-  } else if (typeof saved.appGrab === 'boolean') {
-    setGrabMode(saved.appGrab ? 'app' : 'none');
+  // 抓取方式先于就绪提示确定：提示里报的必须是本次真正生效的模式，
+  // 不能是一句写死的"默认纯协议"——那正是"日志说纯协议、实际去装模拟器"的来源。
+  const { mode, migrated } = resolveSavedGrabMode(saved);
+  setGrabMode(mode);
+  appendLog({
+    time: now(),
+    level: 'info',
+    message:
+      `就绪。当前抓取方式：${GRAB_MODE_LABEL[mode]}。网页只解析封面/简介与 series_id。`,
+  });
+  if (migrated) {
+    appendLog({
+      time: now(),
+      level: 'warn',
+      message:
+        '已把旧版默认的「App 抓取」迁移为「纯协议下载」（旧版没有这个选项，勾选状态只是当年的默认值）。' +
+        '仍要用模拟器抓取的话，在上面选回「App 抓取」即可，之后不再改动。',
+    });
+    window.api.saveSettings({ settingsVersion: SETTINGS_VERSION, grabMode: mode, appGrab: false });
   }
   if (saved.grabDir) grabDirInput.value = saved.grabDir;
   if (typeof saved.introDetailed === 'boolean') introDetailedCheckbox.checked = saved.introDetailed;

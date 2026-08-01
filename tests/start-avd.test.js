@@ -62,17 +62,31 @@ fi
 touch "$RUNNING"
 `);
 
-  executable(path.join(sdk, 'cmdline-tools', 'latest', 'bin', 'sdkmanager'), 'exit 0');
-  executable(path.join(sdk, 'cmdline-tools', 'latest', 'bin', 'avdmanager'), `touch ${JSON.stringify(avdFlag)}`);
+  // sdkmanager/avdmanager 是 Java 程序。真实的 sdkmanager 拿不到 JDK 时不会好好报错，
+  // 只会打一句 "test: : integer expression expected"，所以假的这两个把自己看到的
+  // JAVA_HOME 记下来，用例据此确认脚本在调用它们之前确实把 JDK 准备好了。
+  const javaHomeSeen = path.join(root, 'java-home-seen');
+  const recordJavaHome = `printf '%s\\n' "\${JAVA_HOME:-}" >> ${JSON.stringify(javaHomeSeen)}`;
+  executable(path.join(sdk, 'cmdline-tools', 'latest', 'bin', 'sdkmanager'), `${recordJavaHome}\nexit 0`);
+  executable(
+    path.join(sdk, 'cmdline-tools', 'latest', 'bin', 'avdmanager'),
+    `${recordJavaHome}\ntouch ${JSON.stringify(avdFlag)}`
+  );
+
+  // 自带一个假 JDK：宿主装没装 Java 都不影响用例结果。
+  const javaHome = path.join(root, 'jdk');
+  executable(path.join(javaHome, 'bin', 'java'), 'echo \'openjdk version "17.0.99"\' >&2');
 
   const env = {
     ...process.env,
     HOME: root,
     SHORTDRAMA_SDK_ROOT: sdk,
     SHORTDRAMA_BOOT_TIMEOUT: '5',
+    SHORTDRAMA_JAVA_HOME: javaHome,
     PATH: '/usr/bin:/bin',
   };
-  return { root, env, avdFlag };
+  delete env.JAVA_HOME;
+  return { root, env, avdFlag, javaHome, javaHomeSeen };
 }
 
 // start_avd.sh 是 macOS/Linux 链路的脚本；Windows 走的是 start_avd.ps1，
@@ -134,4 +148,34 @@ test('install-missing creates and starts the configured AVD', {skip: skipNoBash}
   assert.equal(fs.existsSync(fixture.avdFlag), true);
   assert.match(result.stdout, /Creating root-capable Google APIs AVD hongguo/);
   assert.match(result.stdout, /state=ready serial=emulator-5554/);
+});
+
+// 实测踩过：macOS 上没有真 JDK 时，/usr/bin/java 只是个占位程序，接受许可证那步
+// 会打出 "Unable to locate a Java Runtime" 加一句 sdkmanager 自己的
+// "test: : integer expression expected"，而许可证和 SDK 包一个都没装上。
+// 安装链路必须先备好 JDK 再碰 sdkmanager/avdmanager。
+test('install-missing hands a real JDK to sdkmanager and avdmanager', {skip: skipNoBash}, (t) => {
+  const fixture = fakeAndroid({ avdInstalled: false, running: false });
+  t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }));
+  const result = run(fixture.env, '--ensure', '--install-missing');
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, new RegExp(`Using Java at ${fixture.javaHome}`));
+
+  const seen = fs.readFileSync(fixture.javaHomeSeen, 'utf8').trim().split('\n');
+  assert.ok(seen.length >= 2, `sdkmanager/avdmanager 未被调用：${seen}`);
+  for (const value of seen) {
+    assert.equal(value, fixture.javaHome);
+  }
+});
+
+test('the Java check runs before the first sdkmanager call', {skip: skipNoBash}, () => {
+  const source = fs.readFileSync(startAvd, 'utf8');
+  const ensureJava = source.indexOf('\n    ensure_java\n');
+  const licenses = source.indexOf('--licenses');
+  const createAvd = source.indexOf('create avd');
+  assert.ok(ensureJava > 0, '安装链路里没有 ensure_java');
+  assert.ok(ensureJava < licenses, 'ensure_java 必须在接受许可证之前');
+  assert.ok(source.lastIndexOf('\n    ensure_java\n') < createAvd, 'ensure_java 必须在建 AVD 之前');
+  // 不能只看文件存不存在：/usr/bin/java 一直在，但没 JDK 时跑起来就报错。
+  assert.match(source, /"\$1" -version >\/dev\/null 2>&1/);
 });
