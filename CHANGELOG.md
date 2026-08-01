@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.1.0...v1.2.0) (2026-08-01)
+
+
+### Features
+
+* **api:** add pure-protocol download mode that needs no Android device ([990cba1](https://github.com/oppositenum/shortdrama-dl/commit/990cba146362d96c0714bda52e791cf4bb5ab7cf))
+* **api:** pure-protocol download mode with no Android device required ([543b8e9](https://github.com/oppositenum/shortdrama-dl/commit/543b8e98192f2b7786ab403135ca228aee032075))
+* **log:** report how long each series took end to end ([398089a](https://github.com/oppositenum/shortdrama-dl/commit/398089af928f53e5f79c4085bfde381846404ad0))
+
 ## [1.1.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.0.0...v1.1.0) (2026-07-31)
 
 
