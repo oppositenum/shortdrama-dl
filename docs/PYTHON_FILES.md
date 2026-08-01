@@ -18,8 +18,12 @@
 
 | 目标文件 | 保留原因 | 被谁调用/读取 |
 |---|---|---|
-| `python/hongguo_grab.py` | Electron 正式 App 抓取入口；实现 CLI、ADB、Frida、SQLite 映射、任务状态和事件协议 | `main.js` 的 `grabWithApp(...)` 通过已验证的 Python 解释器启动 |
-| `python/decrypt_mdl.py` | 单文件 AES-128-CTR 解密、ffmpeg 重封装、ffprobe 时长与轨道校验；接受 `.mdl` 或自行下载的同集分片，`--key` 可显式指定密钥 | `hongguo_grab.py` 的 `decrypt_to(...)` 通过绝对路径启动 |
+| `python/hongguo_grab.py` | Electron App 抓取入口；CLI、ADB、Frida、SQLite 映射、任务状态和事件协议 | `main.js` 的 `grabWithApp(...)` |
+| `python/api_grab.py` | Electron **纯协议**抓取入口（独立功能）；video_detail/model → CDN → spade 解包 → 解密 | `main.js` 的 `grabWithApi(...)` |
+| `python/api_client.py` | 红果业务 HTTP 客户端（device query、video_detail/model） | `api_grab.py` import |
+| `python/spade_keys.py` | `spade_a` 离线解包为 AES-128 key + 可选 key 缓存 | `api_grab.py` import |
+| `python/ttnet_signer.py` | 110001 时经 Frida 调用 App TTNet 签名（可选回退） | `api_grab.py` 动态 import |
+| `python/decrypt_mdl.py` | 单文件 AES-128-CTR 解密、ffmpeg 重封装、ffprobe 时长与轨道校验；接受 `.mdl` 或自行下载的同集分片，`--key` 可显式指定密钥 | `hongguo_grab.py` / `api_grab.py` 通过绝对路径启动 |
 | `python/mp4parse.py` | 解析 `moov/trak/stsz/stco/co64/stsc` 展开样本 offset/size；另读 `sinf/frma` 真实编码与 `senc` 起始计数器，据此识别 ByteVC2 | `decrypt_mdl.py` 与 `hongguo_grab.py` 静态 import |
 | `python/capture_final.js` | Frida Hook `libttffmpeg.so` AES CTR 函数，向 Python 发送 CRYPT 事件 | `hongguo_grab.py` 的 `frida_attach()` 使用 `open(...).read()` 动态加载 |
 | `python/start_avd.sh` | macOS 检查 Android SDK/设备，按需安装 API 34 Google APIs AVD，并在抓取前启动到 root 就绪 | `main.js` 的 `ensureAndroidDevice(...)`；支持独立 `--check`/`--ensure` |
@@ -40,7 +44,7 @@
 
 ## 不纳入运行闭包
 
-正式 Python 仓库运行闭包仅包含上表列出的七个文件。未被 Electron 调用、未被 Python import、未被 `subprocess` 启动，也未被运行时动态读取的独立批处理、实验、修复和调试脚本不属于 `shortdrama-dl`。
+正式 Python 仓库运行闭包仅包含上表列出的打包白名单文件。未被 Electron 调用、未被 Python import、未被 `subprocess` 启动，也未被运行时动态读取的独立批处理、实验、修复和调试脚本不属于 `shortdrama-dl`。
 
 静态分析没有发现无法确认的代码或模板动态依赖。`frida-server*` 和 `ADBKeyboard.apk` 不随仓库提交；运行时下载固定来源并校验，离线用户提供文件只作为后备来源。
 

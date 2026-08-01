@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('api', {
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
   /** 获取默认下载目录 */
   getDefaultDir: () => ipcRenderer.invoke('app:getDefaultDir'),
-  /** 开始下载 { url, outputDir, appGrab, grabDir, introDetailed } */
+  /** 开始下载 { url, outputDir, grabMode: 'app'|'api'|'none', appGrab?, grabDir, introDetailed } */
   startDownload: (payload) => ipcRenderer.invoke('download:start', payload),
   /** 立即取消下载（打断正在进行的抓取） */
   cancelDownload: () => ipcRenderer.invoke('download:cancel'),
@@ -23,10 +23,12 @@ contextBridge.exposeInMainWorld('api', {
   stopAfterSeries: () => ipcRenderer.invoke('download:stop-after-series'),
   /** 打开文件夹（传文件则高亮） */
   openFolder: (target) => ipcRenderer.invoke('shell:openFolder', target),
-  /** 只读环境检查：不装不下载不弹确认框，仅探测并报告状态 */
-  checkEnvironment: (grabDir) => ipcRenderer.invoke('env:check', { grabDir }),
+  /** 只读环境检查：不装不下载不弹确认框；grabMode 决定是否探测安卓/Frida */
+  checkEnvironment: (grabDir, grabMode) =>
+    ipcRenderer.invoke('env:check', { grabDir, grabMode }),
   /** 修复缺失项：走既有的交互式安装确认流程 */
-  fixEnvironment: (grabDir) => ipcRenderer.invoke('env:fix', { grabDir }),
+  fixEnvironment: (grabDir, grabMode) =>
+    ipcRenderer.invoke('env:fix', { grabDir, grabMode }),
   /** 读取上次记住的界面设置（链接、目录等），返回已保存的字段对象 */
   loadSettings: () => ipcRenderer.invoke('settings:load'),
   /** 保存界面设置，只需传有变化的字段，主进程会和已保存内容合并 */

@@ -11,7 +11,9 @@ const $ = (id) => document.getElementById(id);
 const urlInput = $('url');
 const dirInput = $('dir');
 const chooseDirBtn = $('chooseDir');
-const appGrabCheckbox = $('appGrab');
+const modeApp = $('modeApp');
+const modeApi = $('modeApi');
+const modeNone = $('modeNone');
 const grabDirInput = $('grabDir');
 const chooseGrabDirBtn = $('chooseGrabDir');
 const grabDirRow = $('grabDirRow');
@@ -43,18 +45,29 @@ let downloading = false;
 // 「修复缺失项」是否可点，只看这 3 项——红果 App / Frida Server 没有对应的修复动作
 const FIXABLE_ENV_IDS = ['python', 'ffmpeg', 'android'];
 const envItemState = { python: 'checking', ffmpeg: 'checking', android: 'checking',
-  hongguo_app: 'checking', frida_server: 'checking' }; // id -> state，供决定「修复缺失项」是否可点/展示摘要
+  hongguo_app: 'checking', frida_server: 'checking' };
+
+// ---------- 抓取方式 ----------
+function getGrabMode() {
+  if (modeApi && modeApi.checked) return 'api';
+  if (modeNone && modeNone.checked) return 'none';
+  return 'app';
+}
+
+function setGrabMode(mode) {
+  if (mode === 'api' && modeApi) modeApi.checked = true;
+  else if (mode === 'none' && modeNone) modeNone.checked = true;
+  else if (modeApp) modeApp.checked = true;
+  syncGrabDirRow();
+}
 
 // ---------- 记忆：保存上次填写的内容 ----------
-// 存到主进程管理的 userData JSON 文件里（见 main.js 的 settings:save/settings:load），
-// 不用 localStorage——渲染进程走 file:// 加载，这套 Electron/Chromium 组合下 localStorage
-// 不会真正落盘，同进程内 reload 能读到，但真正 quit 重开永远是空的（实测反复验证过）。
-// 具体恢复逻辑见文件末尾的 initSettings()，需要等 IPC 拿到已保存内容后才能回填。
 function saveFormState() {
   window.api.saveSettings({
     url: urlInput.value,
     dir: selectedDir,
-    appGrab: appGrabCheckbox.checked,
+    grabMode: getGrabMode(),
+    appGrab: getGrabMode() === 'app', // 兼容旧设置字段
     grabDir: grabDirInput.value,
     introDetailed: introDetailedCheckbox.checked,
   });
@@ -113,12 +126,20 @@ window.api.onEnvDone(() => {
   );
 });
 
+function runEnvCheck() {
+  window.api.checkEnvironment(grabDirInput.value.trim(), getGrabMode());
+}
+
+function runEnvFix() {
+  window.api.fixEnvironment(grabDirInput.value.trim(), getGrabMode());
+}
+
 envRecheckBtn.addEventListener('click', () => {
-  window.api.checkEnvironment(grabDirInput.value.trim());
+  runEnvCheck();
 });
 
 envFixBtn.addEventListener('click', () => {
-  window.api.fixEnvironment(grabDirInput.value.trim());
+  runEnvFix();
 });
 
 // ==========================================================================
@@ -130,7 +151,7 @@ function appendLog({ time, level, message }) {
   line.innerHTML =
     `<span class="log-time">${time || ''}</span>` +
     `<span class="log-msg"></span>`;
-  line.querySelector('.log-msg').textContent = message; // 用 textContent 防止 XSS
+  line.querySelector('.log-msg').textContent = message;
   logEl.appendChild(line);
   logEl.scrollTop = logEl.scrollHeight;
 }
@@ -149,15 +170,15 @@ function setDownloadingUI(on) {
   downloading = on;
   startBtn.disabled = on;
   cancelBtn.disabled = !on;
-  // 温和停止只在下载中可用;每次开新任务都要把它复位回可点状态和原文案,
-  // 否则上一轮点过之后这个按钮会一直停在"已安排停止"上再也点不动。
   stopAfterSeriesBtn.disabled = !on;
   if (on) stopAfterSeriesBtn.textContent = '抓完本部再停';
   urlInput.disabled = on;
   chooseDirBtn.disabled = on;
-  appGrabCheckbox.disabled = on;
-  grabDirInput.disabled = on;
-  chooseGrabDirBtn.disabled = on;
+  if (modeApp) modeApp.disabled = on;
+  if (modeApi) modeApi.disabled = on;
+  if (modeNone) modeNone.disabled = on;
+  grabDirInput.disabled = on || getGrabMode() === 'none';
+  chooseGrabDirBtn.disabled = on || getGrabMode() === 'none';
   introDetailedCheckbox.disabled = on;
   startBtn.querySelector('.btn-text').textContent = on ? '下载中…' : '开始下载';
 }
@@ -178,7 +199,6 @@ window.api.onProgress((d) => {
   speedEl.textContent = d.speed || '';
 });
 
-// 分类页批量时的剧目进度前缀（如"第 3/500 部《xxx》"）
 let seriesLabel = '';
 
 window.api.onSeries((d) => {
@@ -231,17 +251,22 @@ chooseDirBtn.addEventListener('click', async () => {
   }
 });
 
-// 勾选状态联动工具目录行的可用性（不勾选时置灰）
 function syncGrabDirRow() {
-  const on = appGrabCheckbox.checked;
-  grabDirRow.style.opacity = on ? '' : '0.5';
-  grabDirInput.disabled = !on;
-  chooseGrabDirBtn.disabled = !on;
+  const needsTools = getGrabMode() !== 'none';
+  grabDirRow.style.opacity = needsTools ? '' : '0.5';
+  grabDirInput.disabled = !needsTools || downloading;
+  chooseGrabDirBtn.disabled = !needsTools || downloading;
 }
-appGrabCheckbox.addEventListener('change', () => {
-  syncGrabDirRow();
-  saveFormState();
-});
+
+for (const el of [modeApp, modeApi, modeNone]) {
+  if (!el) continue;
+  el.addEventListener('change', () => {
+    syncGrabDirRow();
+    saveFormState();
+    // 切换抓取方式后重跑环境检查（纯协议不查安卓/Frida）
+    if (!downloading) runEnvCheck();
+  });
+}
 syncGrabDirRow();
 
 chooseGrabDirBtn.addEventListener('click', async () => {
@@ -264,7 +289,6 @@ startBtn.addEventListener('click', async () => {
     return;
   }
 
-  // 重置界面
   setProgress(0);
   timemarkEl.textContent = '--:--:--';
   speedEl.textContent = '';
@@ -274,14 +298,15 @@ startBtn.addEventListener('click', async () => {
   setDot('running');
   statusText.textContent = '准备中…';
 
+  const grabMode = getGrabMode();
   await window.api.startDownload({
     url,
     outputDir: selectedDir,
-    appGrab: appGrabCheckbox.checked,
+    grabMode,
+    appGrab: grabMode === 'app',
     grabDir: grabDirInput.value.trim(),
     introDetailed: introDetailedCheckbox.checked,
   });
-  // 结果通过 onDone / onError / onCanceled 事件反映，这里无需处理返回值
 });
 
 cancelBtn.addEventListener('click', async () => {
@@ -293,7 +318,6 @@ stopAfterSeriesBtn.addEventListener('click', async () => {
   stopAfterSeriesBtn.disabled = true;
   stopAfterSeriesBtn.textContent = '已安排停止…';
   await window.api.stopAfterSeries();
-  // 取消按钮【保持可用】：安排了温和停止之后，用户仍然可以改主意立刻中断
 });
 
 window.api.onStopScheduled(() => {
@@ -310,7 +334,6 @@ clearLogBtn.addEventListener('click', () => {
   logEl.innerHTML = '';
 });
 
-// 回车即开始下载
 urlInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !downloading) startBtn.click();
 });
@@ -319,26 +342,26 @@ function now() {
   return new Date().toLocaleTimeString('zh-CN', { hour12: false });
 }
 
-// 首屏欢迎日志
 appendLog({
   time: now(),
   level: 'info',
-  message: '就绪。整剧链接只从网页保存封面，视频将由 App 从第 1 集开始抓取。',
+  message:
+    '就绪。默认「纯协议下载」（无需模拟器）；「App 抓取」作备用。网页只解析封面/简介与 series_id。',
 });
 
-// ==========================================================================
-// 初始化：加载上次记住的设置并回填（异步，IPC 拿到结果才能回填，所以放最后统一处理）
-// ==========================================================================
 async function initSettings() {
   const saved = await window.api.loadSettings().catch(() => ({}));
 
   if (saved.url) urlInput.value = saved.url;
-  if (typeof saved.appGrab === 'boolean') appGrabCheckbox.checked = saved.appGrab;
+  if (saved.grabMode === 'app' || saved.grabMode === 'api' || saved.grabMode === 'none') {
+    setGrabMode(saved.grabMode);
+  } else if (typeof saved.appGrab === 'boolean') {
+    setGrabMode(saved.appGrab ? 'app' : 'none');
+  }
   if (saved.grabDir) grabDirInput.value = saved.grabDir;
   if (typeof saved.introDetailed === 'boolean') introDetailedCheckbox.checked = saved.introDetailed;
   syncGrabDirRow();
 
-  // 保存目录：优先用上次记住的，没记住过才用系统默认下载目录
   if (saved.dir) {
     selectedDir = saved.dir;
     dirInput.value = saved.dir;
@@ -351,8 +374,6 @@ async function initSettings() {
   }
 
   setEnvCollapsed(saved.envCollapsed === true);
-  // 软件一打开就自动探测一次；全程只读，不装不下载不弹确认框。放在设置回填之后，
-  // 这样才会用上恢复出来的 grabDir，而不是空值。
-  window.api.checkEnvironment(grabDirInput.value.trim());
+  runEnvCheck();
 }
 initSettings();

@@ -18,7 +18,7 @@
           <span class="logo">🎬</span>
           <div>
             <h1>红果短剧下载器</h1>
-            <p class="subtitle">粘贴播放页链接，一键抓取并下载为 MP4</p>
+            <p class="subtitle">粘贴播放页 / 详情页链接；支持 App 抓取与独立纯协议下载</p>
           </div>
         </div>
       </header>
@@ -72,7 +72,7 @@
           <input
             id="url"
             type="text"
-            placeholder="播放页 /player/... 网页下单集；详情/分类页保存封面后由 App 从第1集抓全集"
+            placeholder="播放页 /player/... 下单集；详情/分类页选抓取方式后从第1集下全集"
             autocomplete="off"
             spellcheck="false"
           />
@@ -84,15 +84,26 @@
           <button id="chooseDir" class="btn btn-ghost">选择文件夹</button>
         </div>
 
-        <label class="checkbox-row">
-          <input id="appGrab" type="checkbox" checked />
-          <span>用 App 抓取全集（网页只保存封面，视频从第 1 集开始全部由 App 抓取，需已 root 安卓设备）</span>
-        </label>
+        <div class="field-label">整剧抓取方式</div>
+        <div class="mode-group" id="grabModeGroup" role="radiogroup" aria-label="整剧抓取方式">
+          <label class="checkbox-row">
+            <input type="radio" name="grabMode" id="modeApi" value="api" checked />
+            <span>纯协议下载（推荐：无需 App/模拟器，仅网络 + Python + ffmpeg）</span>
+          </label>
+          <label class="checkbox-row">
+            <input type="radio" name="grabMode" id="modeApp" value="app" />
+            <span>App 抓取（需 root 安卓 + Frida；风控 110001 时的备用路径）</span>
+          </label>
+          <label class="checkbox-row">
+            <input type="radio" name="grabMode" id="modeNone" value="none" />
+            <span>仅保存封面与简介（不下载视频）</span>
+          </label>
+        </div>
         <div class="input-row" id="grabDirRow">
           <input
             id="grabDir"
             type="text"
-            placeholder="App 抓取组件目录，留空使用项目内置 python 目录（也可用 HONGGUO_GRAB_DIR 覆盖）"
+            placeholder="Python 组件目录，留空使用内置 python/（HONGGUO_GRAB_DIR 可覆盖）"
             autocomplete="off"
             spellcheck="false"
           />

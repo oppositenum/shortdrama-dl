@@ -14,12 +14,17 @@ Electron 主进程位于项目根目录 `main.js`，负责：
 - 用 Node.js `fetch` 下载直连 MP4。
 - 用 `fluent-ffmpeg` + 当前系统原生 FFmpeg 合并 HLS/DASH；缺少时经用户确认安装。
 - 管理剧集目录、封面、断点续传和 `.complete`。
-- 处理整剧时从第 1 集启动 Python 子进程抓取全集。
+- 处理整剧时按抓取方式启动 Python 子进程：`app` → `hongguo_grab.py`，`api` → `api_grab.py`，`none` 仅封面。
 - 解析 Python stdout JSON Lines、筛选 stderr、处理退出码和取消操作。
 
 ### Python
 
-Python 正式入口为 `python/hongguo_grab.py`，负责：
+Python 正式入口有两套（互不替代）：
+
+1. **`python/hongguo_grab.py`**（App 抓取，原有）  
+2. **`python/api_grab.py`**（纯协议，**默认推荐**；依赖 `api_client.py` / `spade_keys.py` / `decrypt_mdl.py`；只需 cryptography + ffmpeg，不需 Frida）
+
+App 抓取入口负责：
 
 - 校验 CLI 参数和主机依赖。
 - 选择 ADB 设备并对同一设备加进程锁。
@@ -38,16 +43,28 @@ Electron 不导入 Python 模块，Python 也不依赖 Electron API。唯一正�
 
 ## 2. Electron 启动位置
 
-正式调用位于 `main.js` 的 `grabWithApp(...)`。触发条件为：
+正式调用位于 `main.js`：
+
+- `grabWithApp(...)`：`grabMode === 'app'`
+- `grabWithApi(...)`：`grabMode === 'api'`
+
+公共触发条件：
 
 1. 处理的是详情页或分类页中的整剧。
-2. App 抓取选项未显式关闭。
+2. `grabMode` 为 `app` 或 `api`（`none` 只存封面）。
 3. 能从 `episode_cnt` 或 `vid_list.length` 确定大于 0 的总集数。
 4. 输出目录中尚未实际存在从第 1 集到总集数的全部非空分集。
 5. 未收到取消请求。
-6. 能解析到包含 `hongguo_grab.py` 的工具目录。
+6. 能解析到对应脚本：`hongguo_grab.py` 或 `api_grab.py`。
 
 单播放页下载不会启动 Python。整剧网页路径只保存封面，不会捕获或下载网页分集。
+
+`download:start` 载荷字段：
+
+| 字段 | 说明 |
+|---|---|
+| `grabMode` | `'app'` \| `'api'` \| `'none'`（推荐） |
+| `appGrab` | 兼容旧 UI：`false` → `none`，否则默认 `app` |
 
 ## 3. Python 组件目录解析
 
@@ -85,15 +102,26 @@ executable: <validated Python 3.11+>
 cwd:        解析出的 Python 组件目录
 environment: buildGrabEnv() 返回的当前环境、补充 PATH、ANDROID_SERIAL 和 HONGGUO_RUNTIME_DIR
 
-arguments:
+arguments (App 模式):
   hongguo_grab.py
   --series-name <seriesName>
   --start-ep 1
   --end-ep <totalEpisodeCount>
   --output-dir <absolute series directory>
+
+arguments (纯协议模式):
+  api_grab.py
+  --series-id <seriesId>
+  --series-name <seriesName>   # 可选，仅日志/目录名提示
+  --start-ep 1
+  --end-ep <totalEpisodeCount>
+  --output-dir <absolute series directory>
+  --key-cache <userData>/runtime/api/key_cache.json
 ```
 
-Electron 没有向正式调用传 `--series-id`、`--dwell`、`--keep-download` 或 `--prefer-1080p`，但 Python CLI 继续接受这些兼容参数：
+纯协议子进程环境额外设置 `HONGGUO_RUNTIME_DIR` / `SHORTDRAMA_KEY_CACHE` 指向 `runtime/api`，**不**设置 `ANDROID_SERIAL`。
+
+Electron 没有向 App 正式调用传 `--series-id`、`--dwell`、`--keep-download` 或 `--prefer-1080p`，但 Python CLI 继续接受这些兼容参数：
 
 | 参数 | 必填 | 当前语义 |
 |---|---|---|

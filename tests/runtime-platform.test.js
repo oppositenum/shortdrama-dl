@@ -110,7 +110,13 @@ test('packaging includes both platform scripts and the runtime router', () => {
   assert.ok(pythonResource);
   assert.ok(pythonResource.filter.includes('start_avd.sh'));
   assert.ok(pythonResource.filter.includes('start_avd.ps1'));
-  assert.equal(pythonResource.filter.length, 7);
+  assert.equal(pythonResource.filter.length, PYTHON_RESOURCE_FILES.length);
+  assert.ok(pythonResource.filter.includes('api_grab.py'));
+  assert.ok(pythonResource.filter.includes('spade_keys.py'));
+  assert.ok(pythonResource.filter.includes('api_client.py'));
+  assert.ok(pythonResource.filter.includes('api_client.py'));
+  assert.ok(pythonResource.filter.includes('spade_keys.py'));
+  assert.ok(pythonResource.filter.includes('hongguo_grab.py'));
 });
 
 test('system FFmpeg path follows overrides, PATH and native package-manager locations', () => {

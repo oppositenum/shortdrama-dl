@@ -116,6 +116,8 @@ test('界面选项一路传到写文件，且默认简洁', () => {
 
   assert.match(app, /introDetailed: introDetailedCheckbox\.checked/);
   assert.match(main, /introDetailed: introDetailed === true/);   // 只有显式 true 才详细
-  assert.match(main, /const \{ appGrab = true, grabDir = null, introDetailed = false \} = opts/);
+  // grabMode 为主；opts 解构仍默认 introDetailed=false
+  assert.match(main, /const grabMode = opts\.grabMode/);
+  assert.match(main, /const \{ grabDir = null, introDetailed = false \} = opts/);
   assert.match(main, /writeSeriesIntro\(info, seriesDir, \{ detailed: introDetailed/);
 });

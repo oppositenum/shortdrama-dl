@@ -125,7 +125,13 @@ input[readonly] {
   color: var(--text-dim);
 }
 
-/* ---------- App 抓取开关 ---------- */
+/* ---------- 抓取方式 / 勾选行 ---------- */
+.mode-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
 .checkbox-row {
   display: flex;
   align-items: flex-start;
@@ -136,7 +142,11 @@ input[readonly] {
   cursor: pointer;
   user-select: none;
 }
-.checkbox-row input[type="checkbox"] {
+.mode-group .checkbox-row {
+  margin-bottom: 4px;
+}
+.checkbox-row input[type="checkbox"],
+.checkbox-row input[type="radio"] {
   margin-top: 2px;
   width: 15px;
   height: 15px;
