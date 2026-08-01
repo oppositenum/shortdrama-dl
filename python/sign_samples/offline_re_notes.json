@@ -1,0 +1,30 @@
+{
+  "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAKLoKYy_WceXWJgdBEHQRwMF3BwPm1XRLXuH80XgW8jIByvFyeMOkou&iid=674438832722825&device_id=674438832718729&ac=mobile&channel=69310258a&aid=8662&app_name=novelread&version_code=72732&version_name=7.2.7.32&device_platform=android&os=android&ssmix=a&device_type=sdk_gphone64_arm64&device_brand=google&language=en&os_api=34&os_version=14&manifest_version_code=72732&resolution=1080*2209&dpi=420&update_version_code=72732&_rticket=1785522438862&normal_session_cnt_in_day=25&gender=2&cold_start_session_cnt_in_day=13&host_abi=arm64-v8a&dragon_device_type=phone&sys_mini_window=1&pv_player=72732&app_mini_window=0&normal_session_id=24612471-8254-421e-95ce-d19022095224%231&compliance_status=0&har_status=0&cold_start_session_id=ba293ea4-ed54-46bf-9bcf-96adca4bf4b8&cold_start_session_cnt_in_life=33&charging=0&normal_session_cnt_in_life=69&is_power_save_mode=0&app_dark_mode=0&screen_brightness=102&battery_pct=100&down_speed=4300&sys_dark_mode=0&need_personal_recommend=1&player_so_load=1&font_scale=100&is_android_pad_screen=0&network_type=1&rom_version=sdk_gphone64_arm64-userdebug%2014%20UE1A.230829.050%2012077443%20dev-keys&current_volume=0&cdid=6ee55855-ffe1-4876-8ffd-31ed1815e32e",
+  "stub": "48398E4DDAB5136975B30EFAE5883F55",
+  "ticket": "1785522438413",
+  "headers": {
+    "Content-Type": "application/json; charset=utf-8",
+    "Accept": "application/json",
+    "User-Agent": "com.phoenix.read/72732 (Linux; U; Android 14; zh_CN; sdk_gphone64_arm64; Build/UE1A.230829.036;tt-ok/10.0.0.1)",
+    "x-ss-stub": "48398E4DDAB5136975B30EFAE5883F55",
+    "x-ss-req-ticket": "1785522438413",
+    "X-Ladon": "L4MVOg==",
+    "X-Khronos": "1785522439",
+    "X-Argus": "B+lsag==",
+    "X-Gorgon": "840490b204049cdc99e9acdafed4d600f7711c5ca8d5a436a640",
+    "X-Helios": "lfTUA2+H/7fbwJ3QKQQullXWSkBiVxSr8BpZBE1j+yBM+8jw",
+    "X-Medusa": "AulsaiqiI6BOnGEpOFzCRiWEoDwFIgABnYrRgGAogRwJGPzA4dGO4aK3Rleb/3jFgB9i+2F/3nyhsUZtAchgF0QsluVE0XEA0ro79hw68LNF8/vhYVPgmY7uwhc46La13tEzQ7BxexmESgdVZiiBf6KWc1Roptpe2u8ajr/pf5R2G9n2IhDKfKdNGdsDPS6QkBYZZAkfYywwJ9BRWmPwFNVeJhovyo12YQZ+mSE0lZkcExcjgqHuuaLltJOpLljp6kj2TL12Rd0CLHDiUYt5q2mDhN7sFwVBqJAFo7mGQpbiFW9u1MGtnzgQtiXYCDnPH795WBSwUVGKskiPsCtBT1JdOYFc+kOuUJM6qQDPk1/GnMXq3fMofTLZ04TuzIyVzd5sik2U0WmOwLbMK5MB7fSaYTa58XHKoxjMXhOt+KpGQOtGHHBHSLYfLlmOi2wfto2sWoZc8cNGOsINUVYqa0x9Gkj2JRKDYx74UFDSALJERVPm4nguDW4JGOhapbOigzH+hYjgdiXSavaP3f+HlXLO7E18hqGfwt25wDmrMZ4cbZdOgqnjA+4nt4bn+R+qIVfkWApydx0JOV1wj+xDCmI6iiKu7laYvM1vihj6wMtEMZyZjy4IWoi+4PVp1vUuMCfAdZqdm6KIcMzHzA8d+0puaeo6MBWfFaHukslOfzkqPnNxaU07IJlGy5ghv8BmK+KMYTr54ATLXGLSWrLLT/bfR+7Ji3RBbTdmdmaI9UTMYckjZ9I9XxNd6U7i2GKmvZ269qsYisgENai6GqDPjwlPtwPnyzBGunf0mVG9JNGCAmJfIJedvsKnzg1VmeYiEfQFSRHPELKDLsL2syDqvRVKil1mHwFGK0+EN3zwvnNVh3Ww2Y1SPkVd5yZfFYVqFL+bnzYrylRu7lHwZ9rzGMx7MuVMkv2NbKaAtpMuZDgqKjtq987+dRYIkdfdcO2NKzmR9TBlXfVYNszjMu0XNwA+ApF7CKUIN6n8m7E4zctV/X29AWwP6ZwFbbNxKK/4uq5pNsdzmPdn4EemrBD96o0w/sPTrGIdbHJCbGKvwu3AT4mRvefaail7RUwQTsngwjbVh034p3lqlHgpdSOvMT9GbmadkSb8bIazPh9/rZWqo8GJBZQ1dT8S2VHUTZx9YpMOlzZ8zeAH0c9sRYS41Lfo7c4p0MydX0u0rVVRHImpSEh/ad3YTcqhxUXeXlkpZ4+uiUsmPrX7uDcFkjU9tT8F//s/Bfv/mGY="
+  },
+  "notes": {
+    "f3_opcode_sign": "0x3000001",
+    "f3_opcode_strdec": "0x1000001",
+    "native": "ms.bd.c.f3.a -> libmetasec_ml.so",
+    "java_chain": "tryAddSecurityFactor -> ms.bd.c.y4 -> f3.a",
+    "handle_field": "ms.bd.c.z4.a (long session handle passed as f3 arg c)",
+    "argus_short": "base64(LE uint32(X-Khronos)) — verified on f3_diff_corpus 6/6",
+    "khronos": "ticket_ms // 1000 (native may +1 on skew)",
+    "gorgon": "8404 || mid2 || 0000 || body20; body encrypted, per-request key (not public 0404 fixed key)",
+    "product_path": "2026-08-01 bare HTTP video_detail/model code=0; api_grab e2e ep1+ep2 no Frida",
+    "vm": "FUN_00273ba4 @ 0x173ba4 jumptable CFF — Medusa/Helios/Ladon/Gorgon body still open"
+  }
+}

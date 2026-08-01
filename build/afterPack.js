@@ -18,6 +18,10 @@ const { execFileSync } = require('child_process');
 
 const PYTHON_RESOURCE_FILES = Object.freeze([
   'hongguo_grab.py',
+  'api_grab.py',
+  'api_client.py',
+  'spade_keys.py',
+  'ttnet_signer.py',
   'decrypt_mdl.py',
   'mp4parse.py',
   'capture_final.js',
@@ -71,7 +75,7 @@ exports.cleanPythonResources = cleanPythonResources;
 
 exports.default = async function afterPack(context) {
   // electron-builder 可能复用已有输出目录。无论 macOS 还是 Windows，都在签名/制品生成前
-  // 把 Python 资源约束为固定七个文件，防止历史 .mdl、数据库或捕获日志混入安装包。
+  // 把 Python 资源约束为白名单文件，防止历史 .mdl、数据库或捕获日志混入安装包。
   const removed = cleanPythonResources(pythonResourcesDir(context));
   if (removed.length) {
     console.log(`  • [afterPack] 已移除 Python 运行时残留: ${removed.join(', ')}`);

@@ -735,15 +735,29 @@ async function downloadOne(media, outputPath) {
 // ===========================================================================
 // IPC：开始下载（整体流程编排）
 // ===========================================================================
+/** 归一化抓取方式：'app' | 'api' | 'none'。兼容旧字段 appGrab。 */
+function normalizeGrabMode(payload = {}) {
+  const mode = payload.grabMode;
+  if (mode === 'app' || mode === 'api' || mode === 'none') return mode;
+  // 旧版只传 appGrab 布尔值
+  if (payload.appGrab === false) return 'none';
+  return 'app';
+}
+
 async function handleStartDownload(_event, payload) {
-  const { url, outputDir, appGrab, grabDir, introDetailed } = payload || {};
+  const { url, outputDir, grabDir, introDetailed } = payload || {};
   isCanceled = false;
   stopAfterSeries = false;
   activeOutputPath = null;
-  // App 抓取全集：默认开启（未显式传 false 即视为开启）
+  // grabMode: app（默认/兼容）| api（纯协议）| none（仅封面）
   // 简介默认走简洁模式（只有剧名和简介），显式传 true 才写详细版
-  const opts = { appGrab: appGrab !== false, grabDir: grabDir || null,
-                 introDetailed: introDetailed === true };
+  const grabMode = normalizeGrabMode(payload);
+  const opts = {
+    grabMode,
+    appGrab: grabMode === 'app', // 兼容 downloadSeriesCore 内部旧逻辑
+    grabDir: grabDir || null,
+    introDetailed: introDetailed === true,
+  };
 
   // 1) 校验链接
   if (!isValidUrl(url)) {
@@ -951,15 +965,16 @@ function writeSeriesIntro(info, seriesDir, { detailed = false, sourceUrl = '' } 
 // 这里把 Python 的事件映射到本应用既有的 download:* 通道，UI 无需感知来源。
 // ===========================================================================
 const GRAB_SCRIPT = 'hongguo_grab.py';
+const API_GRAB_SCRIPT = 'api_grab.py';
 
 /**
- * 解析 App 抓取工具目录，按优先级依次探测：
+ * 解析 Python 组件目录，按优先级依次探测：
  *   1) 界面传入的路径（保留现有覆盖能力）
  *   2) 环境变量 HONGGUO_GRAB_DIR
  *   3) 统一项目内置目录：开发态用 <project>/python，打包态用 <resources>/python
- * 校验目录下存在 hongguo_grab.py，返回可用绝对路径；不可用返回 null。
+ * 校验目录下存在 requiredScript，返回可用绝对路径；不可用返回 null。
  */
-function resolveGrabDir(configured) {
+function resolvePythonDir(configured, requiredScript) {
   const candidates = [];
   if (configured && String(configured).trim()) candidates.push(String(configured).trim());
 
@@ -974,12 +989,22 @@ function resolveGrabDir(configured) {
 
   for (const dir of candidates) {
     try {
-      if (fs.existsSync(path.join(dir, GRAB_SCRIPT))) return path.resolve(dir);
+      if (fs.existsSync(path.join(dir, requiredScript))) return path.resolve(dir);
     } catch {
       /* 忽略无权限等异常，试下一个 */
     }
   }
   return null;
+}
+
+/** App 抓取：目录内须有 hongguo_grab.py */
+function resolveGrabDir(configured) {
+  return resolvePythonDir(configured, GRAB_SCRIPT);
+}
+
+/** 纯协议抓取：目录内须有 api_grab.py */
+function resolveApiGrabDir(configured) {
+  return resolvePythonDir(configured, API_GRAB_SCRIPT);
 }
 
 /**
@@ -1230,6 +1255,19 @@ function pythonVersionCheckArgs(minVersion = MIN_PYTHON) {
   ];
 }
 
+/** 纯协议模式：只需 cryptography（AES 解密）。 */
+function cryptoValidationArgs() {
+  return [
+    '-c',
+    [
+      'from importlib.metadata import version',
+      'import cryptography',
+      'assert tuple(int(x) for x in version("cryptography").split(".")[:2]) >= (41, 0)',
+    ].join('; '),
+  ];
+}
+
+/** App 抓取：Frida 锁版本 + cryptography。 */
 function fridaValidationArgs() {
   return [
     '-c',
@@ -1253,11 +1291,17 @@ function summarizeProcessFailure(result, maxLines = 8) {
     .join(' | ');
 }
 
-/** 校验解释器是否能 import 锁定版本的 Frida/cryptography；失败时把末尾错误写入日志。 */
-async function pythonRuntimeOk(pythonBin, env) {
-  const r = await runSetupProcess(pythonBin, fridaValidationArgs(), { env, showOutput: false });
+/**
+ * 校验解释器依赖。
+ * @param {{ requireFrida?: boolean }} opts  纯协议 requireFrida=false，仅校验 cryptography
+ */
+async function pythonRuntimeOk(pythonBin, env, opts = {}) {
+  const requireFrida = opts.requireFrida !== false;
+  const args = requireFrida ? fridaValidationArgs() : cryptoValidationArgs();
+  const r = await runSetupProcess(pythonBin, args, { env, showOutput: false });
   if (r.code === 0) return true;
-  log(`Python 依赖校验未通过（${pythonBin}）：${summarizeProcessFailure(r)}`, 'warn');
+  const need = requireFrida ? `frida==${FRIDA_VERSION}+cryptography` : 'cryptography>=41';
+  log(`Python 依赖校验未通过（${pythonBin}，需要 ${need}）：${summarizeProcessFailure(r)}`, 'warn');
   return false;
 }
 
@@ -1316,11 +1360,16 @@ function removeManagedVenv(managedVenv) {
  * 全程零副作用(不装任何东西、不弹确认框)。找到就返回可执行文件路径,找不到返回 null。
  * 供「环境检查」面板的只读探测，以及 ensurePythonRuntime 在真正走安装流程前先尝试复用本机环境。
  */
-async function probeExistingPython(grabDir) {
+/**
+ * @param {string} grabDir
+ * @param {{ requireFrida?: boolean }} [opts]
+ */
+async function probeExistingPython(grabDir, opts = {}) {
+  const requireFrida = opts.requireFrida !== false;
   if (isCanceled) throw new Error('__CANCELED__');
   const platform = hostPlatform();
   if (platform === 'unsupported') {
-    throw new Error(`App 抓取环境自动准备仅支持 macOS 和 Windows（当前：${process.platform}）`);
+    throw new Error(`抓取环境自动准备仅支持 macOS 和 Windows（当前：${process.platform}）`);
   }
   const managedVenv = app.isPackaged
     ? path.join(app.getPath('userData'), 'runtime', 'python')
@@ -1335,21 +1384,27 @@ async function probeExistingPython(grabDir) {
 
   for (const candidate of [...new Set(preferred)]) {
     if (isCanceled) throw new Error('__CANCELED__');
-    if (await pythonRuntimeOk(candidate, buildGrabEnv({ pythonBin: candidate }))) {
+    if (await pythonRuntimeOk(candidate, buildGrabEnv({ pythonBin: candidate }), { requireFrida })) {
       return candidate;
     }
   }
 
   const launcherPython = await resolveWindowsPyExecutable(buildGrabEnv());
   if (launcherPython &&
-      await pythonRuntimeOk(launcherPython, buildGrabEnv({ pythonBin: launcherPython }))) {
+      await pythonRuntimeOk(launcherPython, buildGrabEnv({ pythonBin: launcherPython }), { requireFrida })) {
     return launcherPython;
   }
   return null;
 }
 
-async function ensurePythonRuntime(grabDir) {
-  const found = await probeExistingPython(grabDir);
+/**
+ * @param {string} grabDir
+ * @param {{ requireFrida?: boolean }} [opts]
+ *   requireFrida=false：纯协议，装 cryptography 即可；true：App 抓取，装完整 requirements（含 Frida）
+ */
+async function ensurePythonRuntime(grabDir, opts = {}) {
+  const requireFrida = opts.requireFrida !== false;
+  const found = await probeExistingPython(grabDir, { requireFrida });
   if (found) return found;
 
   const platform = hostPlatform();
@@ -1359,12 +1414,15 @@ async function ensurePythonRuntime(grabDir) {
     : path.join(__dirname, '.venv');
   const versionCheck = pythonVersionCheckArgs(MIN_PYTHON);
   let basePython = await findBasePython(versionCheck);
+  const purpose = requireFrida ? 'App 抓取' : '纯协议下载';
 
   if (!basePython && platform === 'macos' && await commandSucceeds('brew', ['--version'], buildGrabEnv())) {
     const install = await confirmEnvironmentInstall(
-      `App 抓取需要 Python ${minPythonLabel} 或更高版本`,
+      `${purpose}需要 Python ${minPythonLabel} 或更高版本`,
       `将使用 Homebrew 安装 Python（≥${minPythonLabel}），并在应用专用目录创建隔离环境。\n` +
-        '说明：Frida 17.16+ 需要 Python 3.11+；macOS 自带的 3.9 无法使用。'
+        (requireFrida
+          ? '说明：Frida 17.16+ 需要 Python 3.11+；macOS 自带的 3.9 无法使用。'
+          : '说明：纯协议只需 Python + cryptography；推荐 3.11+。')
     );
     if (isCanceled) throw new Error('__CANCELED__');
     if (!install) return null;
@@ -1381,7 +1439,7 @@ async function ensurePythonRuntime(grabDir) {
       );
     }
     const install = await confirmEnvironmentInstall(
-      `App 抓取需要 Python ${minPythonLabel} 或更高版本`,
+      `${purpose}需要 Python ${minPythonLabel} 或更高版本`,
       '将使用 Windows Package Manager (winget) 安装 Python 3.12，并在应用专用目录创建隔离环境。'
     );
     if (isCanceled) throw new Error('__CANCELED__');
@@ -1404,7 +1462,11 @@ async function ensurePythonRuntime(grabDir) {
   }
 
   setStatus('正在准备 Python 依赖…');
-  log(`准备隔离 Python 环境（Frida ${FRIDA_VERSION} / Python ≥${minPythonLabel}）并安装依赖`);
+  log(
+    requireFrida
+      ? `准备隔离 Python 环境（Frida ${FRIDA_VERSION} / Python ≥${minPythonLabel}）并安装依赖`
+      : `准备隔离 Python 环境（cryptography / Python ≥${minPythonLabel}，纯协议）并安装依赖`
+  );
   // 旧 venv 可能装过 17.15.x 或错误架构的原生扩展；不 --clear 会 already satisfied 后继续失败。
   removeManagedVenv(managedVenv);
   fs.mkdirSync(path.dirname(managedVenv), { recursive: true });
@@ -1426,16 +1488,35 @@ async function ensurePythonRuntime(grabDir) {
   });
   if (isCanceled || r.signal === 'SIGTERM') throw new Error('__CANCELED__');
   if (r.code !== 0) throw new Error(`升级 pip 失败：${r.stderr.trim() || `退出码 ${r.code}`}`);
-  r = await runSetupProcess(pythonBin, ['-m', 'pip', 'install', '-r', path.join(grabDir, 'requirements.txt')], {
+  // App：完整 requirements。纯协议：cryptography 必装；顺带装 Frida，供 110001 自动签名回退。
+  const pipArgs = requireFrida
+    ? ['-m', 'pip', 'install', '-r', path.join(grabDir, 'requirements.txt')]
+    : ['-m', 'pip', 'install', 'cryptography>=41', `frida==${FRIDA_VERSION}`];
+  r = await runSetupProcess(pythonBin, pipArgs, {
     env: buildGrabEnv({ pythonBin }),
     showOutput: true,
   });
   if (isCanceled || r.signal === 'SIGTERM') throw new Error('__CANCELED__');
-  if (r.code !== 0) throw new Error(`安装 Python 依赖失败：${r.stderr.trim() || `退出码 ${r.code}`}`);
-  if (!await pythonRuntimeOk(pythonBin, buildGrabEnv({ pythonBin }))) {
+  if (r.code !== 0) {
+    // 纯协议允许 Frida 装失败，只要 cryptography 可用即可继续裸请求
+    if (requireFrida) {
+      throw new Error(`安装 Python 依赖失败：${r.stderr.trim() || `退出码 ${r.code}`}`);
+    }
+    log('完整依赖安装未成功，回退为仅 cryptography…', 'warn');
+    r = await runSetupProcess(
+      pythonBin,
+      ['-m', 'pip', 'install', 'cryptography>=41'],
+      { env: buildGrabEnv({ pythonBin }), showOutput: true }
+    );
+    if (isCanceled || r.signal === 'SIGTERM') throw new Error('__CANCELED__');
+    if (r.code !== 0) throw new Error(`安装 cryptography 失败：${r.stderr.trim() || `退出码 ${r.code}`}`);
+  }
+  if (!await pythonRuntimeOk(pythonBin, buildGrabEnv({ pythonBin }), { requireFrida })) {
     throw new Error(
-      `Python 依赖安装结束，但 Frida/cryptography 校验失败（需要 frida==${FRIDA_VERSION} 且可 import；` +
-        '详见上方「Python 依赖校验未通过」日志）'
+      requireFrida
+        ? `Python 依赖安装结束，但 Frida/cryptography 校验失败（需要 frida==${FRIDA_VERSION} 且可 import；` +
+          '详见上方「Python 依赖校验未通过」日志）'
+        : 'Python 依赖安装结束，但 cryptography 校验失败（需要 cryptography>=41；详见上方日志）'
     );
   }
   return pythonBin;
@@ -1595,6 +1676,31 @@ async function ensureAppGrabEnvironment(grabDir) {
 }
 
 /**
+ * 纯协议下载环境：Python + cryptography + ffmpeg，不需要安卓设备 / Frida。
+ * 与 App 模式可共用 venv；纯协议校验不强制 Frida。运行缓存写入 runtime/api。
+ */
+async function ensureApiGrabEnvironment(grabDir) {
+  log(`检测到运行系统：${platformLabel()}，准备纯协议下载环境（无需安卓）`);
+  const pythonBin = await ensurePythonRuntime(grabDir, { requireFrida: false });
+  if (!pythonBin) return null;
+  let env = buildGrabEnv({ pythonBin });
+  if (!await ensureSystemMediaTools(env, { purpose: '纯协议下载' })) return null;
+  env = buildGrabEnv({ pythonBin });
+  const runtimeDir = path.join(app.getPath('userData'), 'runtime', 'api');
+  fs.mkdirSync(runtimeDir, { recursive: true });
+  const keyCache = path.join(runtimeDir, 'key_cache.json');
+  env = buildGrabEnv({
+    pythonBin,
+    extra: {
+      HONGGUO_RUNTIME_DIR: runtimeDir,
+      SHORTDRAMA_KEY_CACHE: keyCache,
+    },
+  });
+  log('纯协议下载环境就绪', 'success');
+  return { pythonBin, env, keyCache };
+}
+
+/**
  * 只读探测红果 App 是否已安装、设备端 frida-server 状态；纯 adb shell，不装不改任何东西。
  * 版本不对/未运行时不在这里现场修——那是 python/hongguo_grab.py 的 main() 里
  * ensure_frida_server() 在真正开始抓取时才做的事，这里只报状态。
@@ -1645,27 +1751,50 @@ async function probeHongguoAndFrida(env, serial) {
  * interactive=true 是「修复缺失项」走的原有交互式安装流程。红果 App / Frida Server 两项
  * 永远是只读探测（没有对应的"修复"动作），不受 interactive 影响。
  */
-async function runEnvironmentCheck(grabDirConfigured, { interactive }) {
+/**
+ * @param {string|null|undefined} grabDirConfigured
+ * @param {{ interactive: boolean, grabMode?: 'app'|'api'|'none' }} opts
+ */
+async function runEnvironmentCheck(grabDirConfigured, { interactive, grabMode = 'api' }) {
   if (envCheckBusy) return;
   envCheckBusy = true;
   send('env:begin');
   try {
-    const grabDir = resolveGrabDir(grabDirConfigured);
+    const mode = grabMode === 'api' || grabMode === 'none' ? grabMode : 'app';
+    const needAndroid = mode === 'app';
+    const requireFrida = needAndroid;
+    const grabDir = needAndroid
+      ? (resolveGrabDir(grabDirConfigured) || resolveApiGrabDir(grabDirConfigured))
+      : (resolveApiGrabDir(grabDirConfigured) || resolveGrabDir(grabDirConfigured));
     if (!grabDir) {
-      const message = '未找到 App 抓取组件（python 目录），请检查安装或指定组件目录';
+      const message = '未找到 Python 组件目录（需含 hongguo_grab.py 或 api_grab.py）';
       for (const id of ['python', 'ffmpeg', 'android', 'hongguo_app', 'frida_server']) {
         send('env:item', { id, state: 'error', message });
       }
       return;
     }
 
+    if (mode === 'none') {
+      send('env:item', { id: 'python', state: 'ok', message: '仅封面模式不需要' });
+      send('env:item', { id: 'ffmpeg', state: 'ok', message: '仅封面模式不需要' });
+      send('env:item', { id: 'android', state: 'ok', message: '仅封面模式不需要' });
+      send('env:item', { id: 'hongguo_app', state: 'ok', message: '仅封面模式不需要' });
+      send('env:item', { id: 'frida_server', state: 'ok', message: '仅封面模式不需要' });
+      return;
+    }
+
     let pythonBin = null;
     try {
-      pythonBin = interactive ? await ensurePythonRuntime(grabDir) : await probeExistingPython(grabDir);
+      pythonBin = interactive
+        ? await ensurePythonRuntime(grabDir, { requireFrida })
+        : await probeExistingPython(grabDir, { requireFrida });
       send('env:item', {
         id: 'python',
         state: pythonBin ? 'ok' : 'missing',
-        message: pythonBin || '未找到可用的 Python（需 frida/cryptography 可用）',
+        message: pythonBin
+          || (requireFrida
+            ? '未找到可用的 Python（需 frida + cryptography）'
+            : '未找到可用的 Python（需 cryptography，纯协议）'),
       });
     } catch (e) {
       send('env:item', { id: 'python', state: 'error', message: e.message });
@@ -1673,8 +1802,9 @@ async function runEnvironmentCheck(grabDirConfigured, { interactive }) {
 
     try {
       const mediaEnv = buildGrabEnv({ pythonBin });
+      const purpose = needAndroid ? 'App 抓取' : '纯协议下载';
       const ffmpegOk = interactive
-        ? await ensureSystemMediaTools(mediaEnv)
+        ? await ensureSystemMediaTools(mediaEnv, { purpose })
         : (await commandSucceeds('ffmpeg', ['-version'], mediaEnv)
           && await commandSucceeds('ffprobe', ['-version'], mediaEnv));
       send('env:item', {
@@ -1684,6 +1814,13 @@ async function runEnvironmentCheck(grabDirConfigured, { interactive }) {
       });
     } catch (e) {
       send('env:item', { id: 'ffmpeg', state: 'error', message: e.message });
+    }
+
+    if (!needAndroid) {
+      send('env:item', { id: 'android', state: 'ok', message: '纯协议模式不需要' });
+      send('env:item', { id: 'hongguo_app', state: 'ok', message: '纯协议模式不需要' });
+      send('env:item', { id: 'frida_server', state: 'ok', message: '纯协议模式不需要' });
+      return;
     }
 
     let serial = null;
@@ -1846,6 +1983,149 @@ function grabWithApp({ seriesName, startEp, endEp, seriesDir, total, grabDir, py
   });
 }
 
+/**
+ * 调用纯协议工具 api_grab.py 抓取 [startEp, endEp]，写入 seriesDir。
+ * stdout JSON 事件协议与 hongguo_grab 子集一致，转发到同一 download:* 通道。
+ */
+function grabWithApi({
+  seriesId,
+  seriesName,
+  startEp,
+  endEp,
+  seriesDir,
+  total,
+  grabDir,
+  pythonBin,
+  grabEnv,
+  keyCache,
+}) {
+  return new Promise((resolve, reject) => {
+    setStatus('正在用纯协议下载全集…');
+    log(`调用纯协议下载：series_id=${seriesId}，第 ${startEp}–${endEp} 集`);
+
+    const args = [
+      API_GRAB_SCRIPT,
+      '--series-id', String(seriesId),
+      '--start-ep', String(startEp),
+      '--end-ep', String(endEp),
+      '--output-dir', seriesDir,
+      // 分集间隔，降低连打 video_model 触发 110001 的概率
+      '--interval', String(process.env.SHORTDRAMA_API_INTERVAL || '1.2'),
+      '--risk-cooldown', String(process.env.SHORTDRAMA_RISK_COOLDOWN || '45'),
+      // 遇 110001 自动尝试 Frida App 签名（模拟器有红果时）
+      '--device-sign-auto',
+    ];
+    if (seriesName) args.push('--series-name', seriesName);
+    if (keyCache) args.push('--key-cache', keyCache);
+    const adbDevice =
+      process.env.SHORTDRAMA_ADB_DEVICE ||
+      process.env.ANDROID_SERIAL ||
+      'emulator-5554';
+    args.push('--adb-device', String(adbDevice));
+
+    const child = spawn(pythonBin, args, { cwd: grabDir, env: grabEnv });
+    currentGrab = child;
+
+    let okCount = 0;
+    let failedEps = [];
+    let grabTotal = endEp - startEp + 1;
+    let stdoutBuf = '';
+
+    const handleEvent = (ev) => {
+      switch (ev.event) {
+        case 'init':
+          grabTotal = ev.total != null ? ev.total : grabTotal;
+          log(`纯协议就绪：本次待抓 ${grabTotal} 集`);
+          break;
+        case 'episode_start':
+          send('download:episode', { current: ev.ep, total });
+          setStatus(`纯协议 第 ${ev.ep}/${total} 集…`);
+          send('download:progress', { percent: 0, timemark: '', speed: '' });
+          break;
+        case 'progress':
+          send('download:progress', {
+            percent: Math.max(0, Math.min(100, Number(ev.percent) || 0)),
+            timemark: '',
+            speed: '',
+          });
+          break;
+        case 'episode_done':
+          okCount++;
+          send('download:progress', { percent: 100, timemark: '', speed: '' });
+          log(`纯协议 第 ${ev.ep} 集完成（${ev.file || ''}）`, 'success');
+          break;
+        case 'episode_failed':
+          log(`纯协议 第 ${ev.ep} 集失败：${ev.error || ''}`, 'error');
+          break;
+        case 'log':
+          log(`[API] ${ev.message || ''}`, ev.level || 'info');
+          break;
+        case 'done':
+          if (typeof ev.ok === 'number') okCount = ev.ok;
+          if (Array.isArray(ev.failed)) failedEps = ev.failed;
+          break;
+        default:
+          break;
+      }
+    };
+
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      stdoutBuf += chunk;
+      let nl;
+      while ((nl = stdoutBuf.indexOf('\n')) >= 0) {
+        const line = stdoutBuf.slice(0, nl).trim();
+        stdoutBuf = stdoutBuf.slice(nl + 1);
+        if (!line) continue;
+        let ev;
+        try {
+          ev = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        try {
+          handleEvent(ev);
+        } catch {
+          /* 单条事件处理异常不影响后续 */
+        }
+      }
+    });
+
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk) => {
+      for (const line of String(chunk).split('\n')) {
+        const t = line.trim();
+        if (t && /(error|exception|traceback|failed|refused|not found|110001)/i.test(t)) {
+          log(`[API-stderr] ${t}`, 'warn');
+        }
+      }
+    });
+
+    child.on('error', (err) => {
+      currentGrab = null;
+      log(`无法启动纯协议工具：${err.message}（请检查应用准备的 Python 环境）`, 'warn');
+      resolve({ code: 3, ok: 0, failed: [] });
+    });
+
+    child.on('close', (code, signal) => {
+      currentGrab = null;
+      if (code === 130 || isCanceled || signal === 'SIGTERM') {
+        reject(new Error('__CANCELED__'));
+        return;
+      }
+      if (code === 3) {
+        log('纯协议环境或参数不可用，本次只保存封面', 'warn');
+      } else if (code === 4) {
+        log(
+          '纯协议被业务 API 拒绝（常见 110001 风控/频控）。本地环境正常；请稍后重试或改用「App 抓取」',
+          'warn'
+        );
+      }
+      resolve({ code, ok: okCount, failed: failedEps });
+    });
+  });
+}
+
 /** 终止当前 App 抓取子进程（发 SIGTERM，Python 会清理半截文件并恢复网络） */
 function killGrab() {
   if (currentGrabSetup) {
@@ -1866,14 +2146,32 @@ function killGrab() {
   }
 }
 
+/** 毫秒转「1小时02分03秒 / 2分03秒 / 3.4秒」，用于单剧耗时日志。 */
+function formatElapsed(ms) {
+  const totalSec = Math.max(0, ms) / 1000;
+  // 用四舍五入后的秒数判边界，避免 59.99 秒被打成「60.0秒」
+  if (Math.round(totalSec * 10) < 600) return `${totalSec.toFixed(1)}秒`;
+  const s = Math.round(totalSec);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h ? `${h}小时${pad(m)}分${pad(sec)}秒` : `${m}分${pad(sec)}秒`;
+}
+
 /**
- * 整剧下载核心：网页只解析详情和保存封面，视频全部交给 App 从第 1 集抓取。
- * 不发送最终 done 事件、不打开文件夹——由 downloadSeries（单剧）或
- * downloadCategory（多剧批量）的收尾逻辑统一处理。
+ * 整剧下载核心：网页只解析详情和保存封面；视频由所选模式抓取：
+ *   grabMode=app  → hongguo_grab.py（安卓 App + Frida）
+ *   grabMode=api  → api_grab.py（纯协议，无需 App）
+ *   grabMode=none → 仅封面/简介
+ * 不发送最终 done 事件、不打开文件夹——由 downloadSeries / downloadCategory 收尾。
  * Python 会跳过已存在且非空的分集文件，因此中断后重跑仍可续传。
  */
 async function downloadSeriesCore(url, saveDir, opts = {}) {
-  const { appGrab = true, grabDir = null, introDetailed = false } = opts;
+  // 计时起点放在解析详情之前：耗时统计覆盖「这部剧开始处理 → 抓取收尾」的完整过程
+  const startedAt = Date.now();
+  const grabMode = opts.grabMode || (opts.appGrab === false ? 'none' : 'app');
+  const { grabDir = null, introDetailed = false } = opts;
   const info = await extractSeriesInfo(url);
   if (isCanceled) throw new Error('__CANCELED__');
 
@@ -1884,8 +2182,11 @@ async function downloadSeriesCore(url, saveDir, opts = {}) {
   const range = appGrabRange(totalCnt);
   if (!range) throw new Error('未能从详情页确定总集数');
 
+  const modeLabel =
+    grabMode === 'api' ? '纯协议下载' : grabMode === 'app' ? 'App 抓取' : '仅保存封面';
   log(
-    `剧名：《${info.seriesName}》，共 ${totalCnt} 集；网页仅保存封面，视频由 App 抓取第 1–${totalCnt} 集`,
+    `剧名：《${info.seriesName}》，共 ${totalCnt} 集；模式：${modeLabel}` +
+      (grabMode === 'none' ? '' : `，第 1–${totalCnt} 集`),
     'success'
   );
 
@@ -1902,46 +2203,86 @@ async function downloadSeriesCore(url, saveDir, opts = {}) {
   writeSeriesIntro(info, seriesDir, { detailed: introDetailed, sourceUrl: url });
 
   const beforeCount = countExistingEpisodes(seriesDir, totalCnt);
-  let appOk = 0;
-  let appAttempted = false;
-  const resolvedGrabDir = appGrab ? resolveGrabDir(grabDir) : null;
+  let grabOk = 0;
+  let grabAttempted = false;
+  let grabLabel = '';
 
   if (beforeCount >= totalCnt) {
-    log(`检测到本地已有完整 ${beforeCount}/${totalCnt} 集，跳过 App 抓取`, 'success');
-  } else if (appGrab && resolvedGrabDir && !isCanceled) {
-    try {
-      const runtime = await ensureAppGrabEnvironment(resolvedGrabDir);
-      if (!runtime) {
-        log('已取消 App 环境安装，本次只保存封面', 'warn');
-      } else {
-        appAttempted = true;
-        const r = await grabWithApp({
-          seriesName: info.seriesName,
-          startEp: range.startEp,
-          endEp: range.endEp,
-          seriesDir,
-          total: totalCnt,
-          grabDir: resolvedGrabDir,
-          pythonBin: runtime.pythonBin,
-          grabEnv: runtime.env,
-        });
-        appOk = r.ok || 0;
-        if (r.code === 0) {
-          log(`App 抓取完成：已处理第 ${range.startEp}–${range.endEp} 集`, 'success');
-        } else if (r.code === 2) {
-          const failedTxt = (r.failed || []).length ? `（缺 第 ${r.failed.join('、')} 集）` : '';
-          log(`App 抓取部分完成：成功 ${appOk} 集${failedTxt}`, 'warn');
+    log(`检测到本地已有完整 ${beforeCount}/${totalCnt} 集，跳过视频抓取`, 'success');
+  } else if (grabMode === 'api' && !isCanceled) {
+    grabLabel = '纯协议';
+    const resolvedApiDir = resolveApiGrabDir(grabDir);
+    if (!resolvedApiDir) {
+      log(`未找到纯协议组件（python/${API_GRAB_SCRIPT}），本次只保存封面；请配置工具目录`, 'warn');
+    } else {
+      try {
+        const runtime = await ensureApiGrabEnvironment(resolvedApiDir);
+        if (!runtime) {
+          log('已取消纯协议环境安装，本次只保存封面', 'warn');
+        } else {
+          grabAttempted = true;
+          const r = await grabWithApi({
+            seriesId,
+            seriesName: info.seriesName,
+            startEp: range.startEp,
+            endEp: range.endEp,
+            seriesDir,
+            total: totalCnt,
+            grabDir: resolvedApiDir,
+            pythonBin: runtime.pythonBin,
+            grabEnv: runtime.env,
+            keyCache: runtime.keyCache,
+          });
+          grabOk = r.ok || 0;
+          if (r.code === 0) {
+            log(`纯协议完成：已处理第 ${range.startEp}–${range.endEp} 集`, 'success');
+          } else if (r.code === 2) {
+            const failedTxt = (r.failed || []).length ? `（缺 第 ${r.failed.join('、')} 集）` : '';
+            log(`纯协议部分完成：成功 ${grabOk} 集${failedTxt}`, 'warn');
+          }
         }
+      } catch (err) {
+        if (err.message === '__CANCELED__') throw err;
+        log(`纯协议异常：${err.message}（本次只保存封面和已完成分集）`, 'warn');
       }
-      // code === 3 已在 grabWithApp 内部 warn，此处按未补全处理
-    } catch (err) {
-      if (err.message === '__CANCELED__') throw err;
-      log(`App 抓取异常：${err.message}（本次只保存封面和已完成分集）`, 'warn');
     }
-  } else if (appGrab && !resolvedGrabDir) {
-    log(`未找到 App 抓取组件（python/${GRAB_SCRIPT}），本次只保存封面；请配置工具目录`, 'warn');
-  } else if (!appGrab) {
-    log('App 抓取已关闭，本次只保存封面，不下载网页分集视频', 'warn');
+  } else if (grabMode === 'app' && !isCanceled) {
+    grabLabel = 'App';
+    const resolvedGrabDir = resolveGrabDir(grabDir);
+    if (!resolvedGrabDir) {
+      log(`未找到 App 抓取组件（python/${GRAB_SCRIPT}），本次只保存封面；请配置工具目录`, 'warn');
+    } else {
+      try {
+        const runtime = await ensureAppGrabEnvironment(resolvedGrabDir);
+        if (!runtime) {
+          log('已取消 App 环境安装，本次只保存封面', 'warn');
+        } else {
+          grabAttempted = true;
+          const r = await grabWithApp({
+            seriesName: info.seriesName,
+            startEp: range.startEp,
+            endEp: range.endEp,
+            seriesDir,
+            total: totalCnt,
+            grabDir: resolvedGrabDir,
+            pythonBin: runtime.pythonBin,
+            grabEnv: runtime.env,
+          });
+          grabOk = r.ok || 0;
+          if (r.code === 0) {
+            log(`App 抓取完成：已处理第 ${range.startEp}–${range.endEp} 集`, 'success');
+          } else if (r.code === 2) {
+            const failedTxt = (r.failed || []).length ? `（缺 第 ${r.failed.join('、')} 集）` : '';
+            log(`App 抓取部分完成：成功 ${grabOk} 集${failedTxt}`, 'warn');
+          }
+        }
+      } catch (err) {
+        if (err.message === '__CANCELED__') throw err;
+        log(`App 抓取异常：${err.message}（本次只保存封面和已完成分集）`, 'warn');
+      }
+    }
+  } else if (grabMode === 'none') {
+    log('未选择视频抓取方式，本次只保存封面，不下载分集', 'warn');
   }
 
   // Python 的 done.ok 只统计本轮新生成文件，断点续传跳过的文件不计入，因此必须按磁盘实数判定全集。
@@ -1949,26 +2290,32 @@ async function downloadSeriesCore(url, saveDir, opts = {}) {
   const fullyComplete = grabbedTotal >= totalCnt;
   syncCompleteMarker(seriesDir, grabbedTotal, totalCnt);
 
+  const elapsedMs = Date.now() - startedAt;
   log(
     `《${info.seriesName}》结束：网页视频 0 集，当前全集 ${grabbedTotal}/${totalCnt} 集` +
-      (appAttempted ? `（本轮 App 成功 ${appOk} 集）` : '') +
+      (grabAttempted ? `（本轮 ${grabLabel} 成功 ${grabOk} 集）` : '') +
+      `，耗时 ${formatElapsed(elapsedMs)}` +
       `，封面和视频目录：${seriesDir}`,
     fullyComplete ? 'success' : 'warn'
   );
   return {
     dir: seriesDir,
+    elapsed_ms: elapsedMs,
     seriesName: info.seriesName,
     ok_count: grabbedTotal,
     total: totalCnt,
     web_ok: 0,
     web_total: 0,
-    app_ok: appOk,
-    app_attempted: appAttempted,
+    app_ok: grabMode === 'app' ? grabOk : 0,
+    app_attempted: grabMode === 'app' && grabAttempted,
+    api_ok: grabMode === 'api' ? grabOk : 0,
+    api_attempted: grabMode === 'api' && grabAttempted,
+    grab_mode: grabMode,
     complete: fullyComplete,
   };
 }
 
-/** 整剧下载（详情页链接）：网页保存封面，App 从第 1 集抓取全集 */
+/** 整剧下载（详情页链接）：网页保存封面，按 grabMode 抓全集 */
 async function downloadSeries(url, saveDir, opts = {}) {
   const r = await downloadSeriesCore(url, saveDir, opts);
 
@@ -1990,12 +2337,14 @@ async function downloadSeries(url, saveDir, opts = {}) {
   return { ok: true, dir: r.dir, ok_count: r.ok_count, total: r.total, complete: r.complete };
 }
 
-/** 分类页批量下载：解析全部剧目，逐部保存封面并由 App 从第 1 集抓取全集 */
+/** 分类页批量下载：解析全部剧目，逐部保存封面并按 grabMode 抓全集 */
 async function downloadCategory(url, saveDir, opts = {}) {
   const list = await extractCategorySeries(url);
   if (isCanceled) throw new Error('__CANCELED__');
 
-  log(`分类页共解析到 ${list.length} 部剧；网页只保存封面，视频全部从 App 抓取…`, 'success');
+  const mode = opts.grabMode || (opts.appGrab === false ? 'none' : 'app');
+  const modeTxt = mode === 'api' ? '纯协议' : mode === 'app' ? 'App' : '仅封面';
+  log(`分类页共解析到 ${list.length} 部剧；模式：${modeTxt}…`, 'success');
 
   let okSeries = 0;
   let skipped = 0;
@@ -2245,9 +2594,15 @@ app.whenReady().then(() => {
   ipcMain.handle('shell:openFolder', handleOpenFolder);
   ipcMain.handle('app:getDefaultDir', () => app.getPath('downloads'));
   ipcMain.handle('env:check', (_e, payload) =>
-    runEnvironmentCheck(payload && payload.grabDir, { interactive: false }));
+    runEnvironmentCheck(payload && payload.grabDir, {
+      interactive: false,
+      grabMode: (payload && payload.grabMode) || 'api',
+    }));
   ipcMain.handle('env:fix', (_e, payload) =>
-    runEnvironmentCheck(payload && payload.grabDir, { interactive: true }));
+    runEnvironmentCheck(payload && payload.grabDir, {
+      interactive: true,
+      grabMode: (payload && payload.grabMode) || 'api',
+    }));
   ipcMain.handle('settings:load', () => loadUiSettings());
   ipcMain.handle('settings:save', (_e, partial) => saveUiSettings(partial));
 

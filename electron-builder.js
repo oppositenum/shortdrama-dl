@@ -56,6 +56,10 @@ module.exports = {
       to: 'python',
       filter: [
         'hongguo_grab.py',
+        'api_grab.py',
+        'api_client.py',
+        'spade_keys.py',
+        'ttnet_signer.py',
         'decrypt_mdl.py',
         'mp4parse.py',
         'capture_final.js',
