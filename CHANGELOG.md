@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/oppositenum/shortdrama-dl/compare/v1.2.0...v1.2.1) (2026-08-01)
+
+
+### Bug Fixes
+
+* locate a real JDK on macOS and stop advertising the wrong grab mode ([#6](https://github.com/oppositenum/shortdrama-dl/issues/6)) ([3b74448](https://github.com/oppositenum/shortdrama-dl/commit/3b74448ae7f1983b9e44003ddac53c84c7fbb42b))
+
 ## [1.2.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.1.0...v1.2.0) (2026-08-01)
 
 
