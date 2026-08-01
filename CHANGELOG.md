@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/oppositenum/shortdrama-dl/compare/v1.2.1...v1.2.2) (2026-08-01)
+
+
+### Bug Fixes
+
+* **api:** repair the 110001 signing fallback and stop the retry storm ([#8](https://github.com/oppositenum/shortdrama-dl/issues/8)) ([715e4f4](https://github.com/oppositenum/shortdrama-dl/commit/715e4f41171d54c7085335222d03defca7cd1a33))
+
 ## [1.2.1](https://github.com/oppositenum/shortdrama-dl/compare/v1.2.0...v1.2.1) (2026-08-01)
 
 
