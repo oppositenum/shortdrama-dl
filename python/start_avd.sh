@@ -36,6 +36,7 @@ Environment overrides:
   ANDROID_SERIAL, ANDROID_HOME, ANDROID_SDK_ROOT
   SHORTDRAMA_AVD_NAME, SHORTDRAMA_ANDROID_API, SHORTDRAMA_ANDROID_ARCH
   SHORTDRAMA_BOOT_TIMEOUT, SHORTDRAMA_SDK_ROOT
+  JAVA_HOME, SHORTDRAMA_JAVA_HOME (JDK 17+ used by sdkmanager/avdmanager)
 
 Canonical emulator hardware profile (forced on every managed AVD):
   SHORTDRAMA_SCREEN_W (1080), SHORTDRAMA_SCREEN_H (2400), SHORTDRAMA_SCREEN_DPI (420)
@@ -116,6 +117,103 @@ refresh_tools() {
   EMULATOR="$(find_tool emulator || true)"
   SDKMANAGER="$(find_tool sdkmanager || true)"
   AVDMANAGER="$(find_tool avdmanager || true)"
+}
+
+# --- Java --------------------------------------------------------------------
+# sdkmanager/avdmanager 是 Java 程序，只认 JAVA_HOME 或 PATH 上的 java。
+# macOS 自带的 /usr/bin/java 只是占位程序：没装 JDK 时它打印
+# "Unable to locate a Java Runtime" 并返回非零，sdkmanager 解析不出版本号，
+# 转头拿空字符串做整数比较，报出与 Java 无关的
+# "sdkmanager: line 173: test: : integer expression expected"。
+# 所以在碰 sdkmanager 之前先确认真有 JDK，并把 JAVA_HOME 指过去。
+
+java_works() {  # path-to-java
+  [[ -x "$1" ]] && "$1" -version >/dev/null 2>&1
+}
+
+find_java() {
+  local candidate root entry
+  local -a candidates=()
+
+  [[ -n "${SHORTDRAMA_JAVA_HOME:-}" ]] && candidates+=("${SHORTDRAMA_JAVA_HOME}/bin/java")
+  [[ -n "${JAVA_HOME:-}" ]] && candidates+=("${JAVA_HOME}/bin/java")
+
+  # Homebrew 的 openjdk 是 keg-only：不进 /usr/local/bin，也不注册到 java_home。
+  for root in /opt/homebrew/opt /usr/local/opt; do
+    for entry in openjdk openjdk@25 openjdk@21 openjdk@17; do
+      candidates+=("${root}/${entry}/libexec/openjdk.jdk/Contents/Home/bin/java")
+    done
+  done
+
+  for candidate in "${candidates[@]}"; do
+    if java_works "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  # /usr/libexec/java_home 覆盖 Temurin/Oracle 这类标准安装位置（仅 macOS 有）。
+  if [[ -x /usr/libexec/java_home ]]; then
+    candidate="$(/usr/libexec/java_home 2>/dev/null || true)"
+    if [[ -n "$candidate" ]] && java_works "${candidate}/bin/java"; then
+      printf '%s\n' "${candidate}/bin/java"
+      return 0
+    fi
+  fi
+
+  # 兜底：PATH 上的 java。放最后是因为 macOS 上它多半就是那个占位程序，
+  # java_works 会把这种情况挡掉。
+  candidate="$(command -v java || true)"
+  if java_works "$candidate"; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+  return 1
+}
+
+use_java() {  # path-to-java
+  local java_bin java_home
+  java_bin="$(cd "$(dirname "$1")" && pwd)"
+  java_home="$(dirname "$java_bin")"
+  export JAVA_HOME="$java_home"
+  case ":${PATH}:" in
+    *":${java_bin}:"*) ;;
+    *) export PATH="${java_bin}:${PATH}" ;;
+  esac
+}
+
+# 在调用 sdkmanager / avdmanager 之前调用。找不到 JDK 时：允许安装就用 Homebrew
+# 装 openjdk@17，否则带着能照做的提示退出，而不是把 sdkmanager 的乱码错误甩给用户。
+ensure_java() {
+  local java
+  [[ "${JAVA_READY:-0}" == "1" ]] && return 0
+  java="$(find_java || true)"
+  if [[ -n "$java" ]]; then
+    use_java "$java"
+    JAVA_READY=1
+    log "Using Java at ${JAVA_HOME}"
+    return 0
+  fi
+
+  if [[ "$INSTALL_MISSING" != "1" ]]; then
+    fail 12 missing_android_tools \
+      "Android command-line tools need a JDK 17 or newer; none was found (macOS /usr/bin/java is only a stub). Install one with: brew install openjdk@17"
+  fi
+  if ! command -v brew >/dev/null 2>&1; then
+    fail 12 missing_android_tools \
+      "A JDK 17 or newer is required and Homebrew is unavailable; install a JDK (for example Eclipse Temurin 17), then retry"
+  fi
+
+  log "Installing OpenJDK 17 with Homebrew (required by sdkmanager) ..."
+  brew install openjdk@17
+  java="$(find_java || true)"
+  if [[ -z "$java" ]]; then
+    fail 12 missing_android_tools \
+      "OpenJDK installation finished but no working java was found; set JAVA_HOME (or SHORTDRAMA_JAVA_HOME) to a JDK 17+ and retry"
+  fi
+  use_java "$java"
+  JAVA_READY=1
+  log "Using Java at ${JAVA_HOME}"
 }
 
 device_lines() {
@@ -280,6 +378,10 @@ if [[ -z "$READY_SERIAL" ]]; then
       fail 12 missing_android_tools "Android emulator packages are incomplete"
     fi
     mkdir -p "$SDK_ROOT"
+    # sdkmanager 是 Java 程序：必须先备好 JDK，否则接受许可证这一步就会以
+    # "Unable to locate a Java Runtime" 加一条读不懂的 shell 报错收场，
+    # 而且许可证和后面的包其实一个都没装上。
+    ensure_java
     log "Accepting Android SDK licenses for the requested packages ..."
     set +o pipefail
     yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses >/dev/null
@@ -303,6 +405,8 @@ if [[ -z "$READY_SERIAL" ]]; then
     if [[ "$INSTALL_MISSING" != "1" ]]; then
       fail 11 missing_avd "AVD ${AVD_NAME} is not installed"
     fi
+    # avdmanager 同样是 Java 程序；SDK 已装齐、只差 AVD 时不会走上面那段。
+    ensure_java
     log "Creating root-capable Google APIs AVD ${AVD_NAME} ..."
     printf 'no\n' | "$AVDMANAGER" create avd \
       --name "$AVD_NAME" \

@@ -54,7 +54,7 @@
 |---|---|---|
 | Python 3.11+ | Electron 启动正式入口；正式入口通过 `sys.executable` 启动 `decrypt_mdl.py` | 否；Electron 可按系统安装 Python、创建隔离 venv 并安装包依赖 |
 | `sdkmanager` / `avdmanager` / `emulator` | `start_avd.sh` / `start_avd.ps1` 安装 SDK 包、创建和启动 AVD | 否；macOS/Windows 首次使用可在确认后按系统准备 |
-| Java 17 | Windows `sdkmanager.bat` 运行时 | 否；Windows 缺少时经确认通过 WinGet 安装 Eclipse Temurin JDK 17 |
+| Java（JDK 17+） | `sdkmanager` / `avdmanager` 的运行时，**macOS 和 Windows 都需要** | 否；Windows 经确认用 WinGet 装 Eclipse Temurin JDK 17，macOS 用 Homebrew 装 `openjdk@17` |
 | `adb` | Python 设备、UI、文件、数据库和 Frida Server 操作 | 否 |
 | `ffmpeg` | `decrypt_mdl.py` 重封装 | 否 |
 | `ffprobe` | 解密脚本读取时长；正式入口做成片终检 | 否 |
