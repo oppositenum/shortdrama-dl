@@ -277,11 +277,13 @@ function loadMacJavaResolver({ fsImpl, homeDir, env }) {
   assert.notEqual(start, -1, 'main.js 里找不到 resolveMacJavaHome');
   const end = src.indexOf('\n/**', start);
   const body = src.slice(start, end);
-  const app = { getPath: (what) => (what === 'home' ? homeDir : homeDir) };
+  const app = { getPath: () => homeDir };
+  // 这段代码只在 macOS 上跑，路径一律用 POSIX 语义；Windows runner 上注入
+  // 原生的 path 会把分隔符换成反斜杠，测的就不是真实行为了。
   return new Function(
     'fs', 'path', 'app', 'process',
     `${body};return resolveMacJavaHome;`
-  )(fsImpl, path, app, { env });
+  )(fsImpl, path.posix, app, { env });
 }
 
 // 实测踩过：Homebrew 的 openjdk 是 keg-only，既不进 /usr/local/bin 也不注册到
@@ -293,7 +295,7 @@ test('macOS JDK lookup finds a keg-only Homebrew OpenJDK', () => {
     homeDir: '/Users/tester',
     env: {},
     fsImpl: {
-      existsSync: (p) => p === path.join(brewHome, 'bin', 'java'),
+      existsSync: (p) => p === path.posix.join(brewHome, 'bin', 'java'),
       readdirSync: () => { throw new Error('ENOENT'); },
     },
   });
@@ -306,14 +308,14 @@ test('macOS JDK lookup falls back to the standard JVM directory, newest first', 
     homeDir: '/Users/tester',
     env: {},
     fsImpl: {
-      existsSync: (p) => p.startsWith(jvmRoot) && p.endsWith(path.join('Contents', 'Home', 'bin', 'java')),
+      existsSync: (p) => p.startsWith(jvmRoot) && p.endsWith('/Contents/Home/bin/java'),
       readdirSync: (dir) => {
         if (dir !== jvmRoot) throw new Error('ENOENT');
         return ['temurin-17.jdk', 'temurin-21.jdk'];
       },
     },
   });
-  assert.equal(resolve(), path.join(jvmRoot, 'temurin-21.jdk', 'Contents', 'Home'));
+  assert.equal(resolve(), path.posix.join(jvmRoot, 'temurin-21.jdk', 'Contents', 'Home'));
 });
 
 test('macOS JDK lookup reports nothing rather than guessing when no JDK exists', () => {
