@@ -194,7 +194,11 @@ class HongguoApiClient:
                             body=data,
                         )
                         if code in (110001, "110001", 101001, "101001"):
+                            # 110001 是冲着这套身份来的业务风控，不是这台 host 的毛病。
+                            # 换 host 或原地重试只会用同一身份再挨几次拒绝，把风控拖得更久。
+                            # 立刻交回上层——只有上层的挂签名/冷却+轮换身份才可能改变结果。
                             saw_risk = True
+                            break
                         continue
                     return data
                 except ApiError as e:
@@ -203,12 +207,11 @@ class HongguoApiClient:
                 except Exception as e:
                     last_err = e
                     continue
+            if saw_risk:
+                break  # 风控不重试：本轮就到此为止，别再跑第二、三轮
             # 一轮所有 host 都失败后再退避，避免 3 host × 指数睡眠拖太久
             if rnd + 1 < rounds:
-                if saw_risk:
-                    time.sleep(min(8.0, 1.2 * (2 ** rnd)))
-                else:
-                    time.sleep(0.35 * (rnd + 1))
+                time.sleep(0.35 * (rnd + 1))
         hint = ""
         code = getattr(last_err, "code", None)
         if code in (110001, "110001"):
