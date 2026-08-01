@@ -1,0 +1,327 @@
+{
+  "tryAdd": {
+    "in": {
+      "x-ss-stub": [
+        "48398E4DDAB5136975B30EFAE5883F55"
+      ],
+      "x-ss-req-ticket": [
+        "1785552632151"
+      ]
+    },
+    "out": {
+      "X-Ladon": "Lgmzyg==",
+      "X-Khronos": "1785552632",
+      "X-Argus": "+F5tag==",
+      "X-Gorgon": "8404e06a04049cf65c048ca1fdfb3c344ad93c320648db6352dd",
+      "X-Helios": "rPn1alVXs8R4bOwEjR925eQ64fvaTZsBVGFrUNfQ9Dn5a5+r",
+      "X-Medusa": "/V5tatUVIqCxK2Apx+vDRtozoTzASwAB48o1ecNzgR4FWDPZdMO5thRQNfODLZwSDy3bCg7EAOjmg9UUQZTgIilxb8Hxrgvoky2+W6UseduyK5UddvRQoJpcrFl41mfsZmIjnfvyRnrlhyNyLvoPUjSK8OuOVEtn+56FyDsb8n0thyuF4PzDT94o7NlLdjZMrcJHgvaxtYmdIq6OP5u2/OPC/MVwNM7vZ5WBILb8p1G8OPuq+9TyR5g/eaZfaN3W7+x3DlwlCLQlpSKghXKHPn9bWfO9Umzc3AC3tB5U9fR/fBZOxwy68GZSve0pUd5EiHnkX7NMAAS9NXl6K14bIXvFAtflsCU60U1Bf03AIDjF+aGXHQqC8byO1GUgwRvLMHz7GpRVZ7HGd4Co/fX1JvryErj2v666W2UFppMmqygsxPyWj1SUI8r+ox8qq5OShDaYwc9kV2rXOazK4EQ9rxKZfvR8HMHJ60UnbKPT6Pf+lU4x5bEUDvJBR21TXejvhPj77uYrrm/xrwZfmwD190TGdtfnYZHeh6tTgpATVghogiBqRGFU3h6AYj09xTaXPlA9wFQPT0wO9YYKaUzeU5Se3DGoTczMLNQn195gQfzn/TZ+jCPJ6qXWqbF7e40TTQJPOo1/y7vuSvZefCspQxNysaSyJrMAoCeMbzvXjiPk/YYACTDVtu0g6DR/gk+3N8j2aLNKEShzdMAemlDloHFxcvfavTp2ExTLIs5uvg6AGN73aaoLgrL2eCLOtH6zOlRph55QaTE5WTiunAVA3rmn89qvT//YQ5sQrdSJOvGyUP+o3HRllRkRYaq35lIrw4yZ7BiqG214R6nqmMlTliMwbaUFHsBzFcu62ROcghXcD+wxvRXpiLo9XL4xR1I8NGACepUXYndwl8YdEg/DiN5zsCyJsatny5EubmTdi6yipS+2dTfg2nuuUYYyWf0oMAJTpBfMfJm1vhPLVs61dXgEF7LnJcTNpELJ+HMe9XMSzaxbdT4BH+Ly4XicdEJKmFRqDSmeVi8G1c+QfsQVl4H4OLxsj9XMJ5Y7Yo81cqrvr9zYqghV0Ncafdr2EM1Ch/UWFl2Pi0NFaYOIfrLA17scj8kPyvRrgobQlo+yl12l3jbsqCSGyTmg6SYYA5luIidVTjGdz2Q8sHrIsLbxAY+zRxrxJTpPIKjwh3UqRVfxB2d5A2Iaenhqs/USMMBUwDIn6sKUp8tCpigkKz2bbEpeuhOebZZDAsr//8fK//vDBzI="
+    },
+    "z4_handle": "undefined"
+  },
+  "events": [
+    {
+      "type": "log",
+      "m": "java ready"
+    },
+    {
+      "type": "log",
+      "m": "metasec base=0x73f6622000 size=5771264"
+    },
+    {
+      "type": "log",
+      "m": "found native Method public static native java.lang.Object ms.bd.c.f3.a(int,int,long,java.lang.String,java.lang.Object)"
+    },
+    {
+      "type": "art",
+      "res": {
+        "ok": true,
+        "artMethod": "0x750a41be98",
+        "probes": [
+          {
+            "off": 0,
+            "ptr": "0x10000109144c5a50",
+            "mod": null,
+            "in_metasec": false
+          },
+          {
+            "off": 8,
+            "ptr": "0x9f7900020000a555",
+            "mod": null,
+            "in_metasec": false
+          },
+          {
+            "off": 16,
+            "ptr": "0x73f68a3ad4",
+            "mod": "libmetasec_ml.so",
+            "in_metasec": true
+          },
+          {
+            "off": 24,
+            "ptr": "0x750ef76fa0",
+            "mod": "libart.so",
+            "in_metasec": false
+          },
+          {
+            "off": 32,
+            "ptr": "0x10080009144c5a50",
+            "mod": null,
+            "in_metasec": false
+          },
+          {
+            "off": 40,
+            "ptr": "0x9d3000030000a556",
+            "mod": null,
+            "in_metasec": false
+          },
+          {
+            "off": 48,
+            "ptr": "0x74904d6954",
+            "mod": "base.odex",
+            "in_metasec": false
+          },
+          {
+            "off": 56,
+            "ptr": "0x750ef77110",
+            "mod": "libart.so",
+            "in_metasec": false
+          },
+          {
+            "off": 64,
+            "ptr": "0x2",
+            "mod": null,
+            "in_metasec": false
+          }
+        ],
+        "candidate": {
+          "off": 16,
+          "ptr": "0x73f68a3ad4",
+          "mod": "libmetasec_ml.so",
+          "in_metasec": true
+        }
+      }
+    },
+    {
+      "type": "log",
+      "m": "hooked f3.a"
+    },
+    {
+      "type": "f3",
+      "a": 50331651,
+      "b": 0,
+      "c": "511428966800",
+      "d": null,
+      "e": null,
+      "ret": {
+        "t": "arr",
+        "v": [],
+        "cls": "java.lang.Long"
+      }
+    },
+    {
+      "type": "f3",
+      "a": 33554445,
+      "b": 3,
+      "c": "0",
+      "d": null,
+      "e": null,
+      "ret": {
+        "t": "arr",
+        "v": [],
+        "cls": "java.lang.Integer"
+      }
+    },
+    {
+      "type": "f3",
+      "a": 33554445,
+      "b": 2,
+      "c": "0",
+      "d": null,
+      "e": null,
+      "ret": {
+        "t": "arr",
+        "v": [],
+        "cls": "java.lang.Integer"
+      }
+    },
+    {
+      "type": "f3",
+      "a": 33554445,
+      "b": 1,
+      "c": "0",
+      "d": null,
+      "e": null,
+      "ret": {
+        "t": "arr",
+        "v": [],
+        "cls": "java.lang.Integer"
+      }
+    },
+    {
+      "type": "f3",
+      "a": 16777217,
+      "b": 0,
+      "c": "0",
+      "d": "99acaa",
+      "e": {
+        "t": "bytes",
+        "len": 6,
+        "hex": "2c34070e5778"
+      },
+      "ret": {
+        "t": "str",
+        "v": "douyin"
+      }
+    },
+    {
+      "type": "f3",
+      "a": 16777217,
+      "b": 0,
+      "c": "0",
+      "d": "b1e3db",
+      "e": {
+        "t": "bytes",
+        "len": 6,
+        "hex": "773c035e527b"
+      },
+      "ret": {
+        "t": "str",
+        "v": "douyin"
+      }
+    },
+    {
+      "type": "f3",
+      "a": 50331651,
+      "b": 0,
+      "c": "511428966800",
+      "d": null,
+      "e": null,
+      "ret": {
+        "t": "arr",
+        "v": [],
+        "cls": "java.lang.Long"
+      }
+    },
+    {
+      "type": "f3",
+      "a": 33554445,
+      "b": 3,
+      "c": "0",
+      "d": null,
+      "e": null,
+      "ret": {
+        "t": "arr",
+        "v": [],
+        "cls": "java.lang.Integer"
+      }
+    },
+    {
+      "type": "f3",
+      "a": 33554445,
+      "b": 2,
+      "c": "0",
+      "d": null,
+      "e": null,
+      "ret": {
+        "t": "arr",
+        "v": [],
+        "cls": "java.lang.Integer"
+      }
+    },
+    {
+      "type": "f3",
+      "a": 33554445,
+      "b": 1,
+      "c": "0",
+      "d": null,
+      "e": null,
+      "ret": {
+        "t": "arr",
+        "v": [],
+        "cls": "java.lang.Integer"
+      }
+    },
+    {
+      "type": "native_enter",
+      "a": 16777217,
+      "b": 0,
+      "c": "0x0",
+      "d": "0x73b8fb0808",
+      "e": "0x73b8fb080c"
+    },
+    {
+      "type": "native_leave",
+      "ret": "0x77a98fa809"
+    },
+    {
+      "type": "f3",
+      "a": 16777217,
+      "b": 0,
+      "c": "0",
+      "d": "8e890e",
+      "e": {
+        "t": "bytes",
+        "len": 4,
+        "hex": "21735f5d"
+      },
+      "ret": {
+        "t": "str",
+        "v": "http"
+      }
+    },
+    {
+      "type": "native_enter",
+      "a": 16777217,
+      "b": 0,
+      "c": "0x0",
+      "d": "0x73b8fb0808",
+      "e": "0x73b8fb080c"
+    },
+    {
+      "type": "native_leave",
+      "ret": "0x77a98fa809"
+    },
+    {
+      "type": "f3",
+      "a": 16777217,
+      "b": 0,
+      "c": "0",
+      "d": "e9a0e0",
+      "e": {
+        "t": "bytes",
+        "len": 4,
+        "hex": "7c2f0654"
+      },
+      "ret": {
+        "t": "str",
+        "v": "http"
+      }
+    },
+    {
+      "type": "native_enter",
+      "a": 50331649,
+      "b": 0,
+      "c": "0x77138ab990",
+      "d": "0x73b8fb0808",
+      "e": "0x73b8fb080c"
+    },
+    {
+      "type": "native_leave",
+      "ret": "0x77a98fa809"
+    },
+    {
+      "type": "f3",
+      "a": 50331649,
+      "b": 0,
+      "c": "511428966800",
+      "d": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?aid=8662&device_id=674438832718729&iid=674438832722825&_rticket=1785552632151",
+      "e": {
+        "t": "str[]",
+        "v": []
+      },
+      "ret": {
+        "t": "str[]",
+        "v": []
+      }
+    }
+  ]
+}

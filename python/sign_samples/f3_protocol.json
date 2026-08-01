@@ -1,0 +1,20 @@
+{
+  "native_entry": "ms.bd.c.f3.a(int opcode, int b, long handle, String s, Object data)",
+  "opcodes": {
+    "0x1000001": "string decrypt: data=byte[] ciphertext, s=string id, returns String",
+    "0x3000001": "HTTP sign: s=full url, data=String[] flat [k,v,k,v...], handle=z4.a, returns String[] flat headers",
+    "0x6000001": "alternate sign for non-http schemes"
+  },
+  "java_chain": [
+    "NetworkParams.tryAddSecurityFactor",
+    "ms.bd.c.y4.onCallToAddSecurityFactor",
+    "ms.bd.c.f3.a(0x3000001, 0, z4.handle, url, headerPairs)"
+  ],
+  "lib": "libmetasec_ml.so JNI_OnLoad only export, ~3.5MB .text stripped",
+  "sample": {
+    "stub": "48398E4DDAB5136975B30EFAE5883F55",
+    "ticket": "1785522438413",
+    "gorgon": "840490b204049cdc99e9acdafed4d600f7711c5ca8d5a436a640",
+    "khronos": "1785522439"
+  }
+}
