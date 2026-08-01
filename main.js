@@ -2146,6 +2146,19 @@ function killGrab() {
   }
 }
 
+/** 毫秒转「1小时02分03秒 / 2分03秒 / 3.4秒」，用于单剧耗时日志。 */
+function formatElapsed(ms) {
+  const totalSec = Math.max(0, ms) / 1000;
+  // 用四舍五入后的秒数判边界，避免 59.99 秒被打成「60.0秒」
+  if (Math.round(totalSec * 10) < 600) return `${totalSec.toFixed(1)}秒`;
+  const s = Math.round(totalSec);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h ? `${h}小时${pad(m)}分${pad(sec)}秒` : `${m}分${pad(sec)}秒`;
+}
+
 /**
  * 整剧下载核心：网页只解析详情和保存封面；视频由所选模式抓取：
  *   grabMode=app  → hongguo_grab.py（安卓 App + Frida）
@@ -2155,6 +2168,8 @@ function killGrab() {
  * Python 会跳过已存在且非空的分集文件，因此中断后重跑仍可续传。
  */
 async function downloadSeriesCore(url, saveDir, opts = {}) {
+  // 计时起点放在解析详情之前：耗时统计覆盖「这部剧开始处理 → 抓取收尾」的完整过程
+  const startedAt = Date.now();
   const grabMode = opts.grabMode || (opts.appGrab === false ? 'none' : 'app');
   const { grabDir = null, introDetailed = false } = opts;
   const info = await extractSeriesInfo(url);
@@ -2275,14 +2290,17 @@ async function downloadSeriesCore(url, saveDir, opts = {}) {
   const fullyComplete = grabbedTotal >= totalCnt;
   syncCompleteMarker(seriesDir, grabbedTotal, totalCnt);
 
+  const elapsedMs = Date.now() - startedAt;
   log(
     `《${info.seriesName}》结束：网页视频 0 集，当前全集 ${grabbedTotal}/${totalCnt} 集` +
       (grabAttempted ? `（本轮 ${grabLabel} 成功 ${grabOk} 集）` : '') +
+      `，耗时 ${formatElapsed(elapsedMs)}` +
       `，封面和视频目录：${seriesDir}`,
     fullyComplete ? 'success' : 'warn'
   );
   return {
     dir: seriesDir,
+    elapsed_ms: elapsedMs,
     seriesName: info.seriesName,
     ok_count: grabbedTotal,
     total: totalCnt,
