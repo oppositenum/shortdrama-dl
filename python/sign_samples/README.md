@@ -52,3 +52,14 @@ com.dragon.read.base.http.b
 - `f3_trace.json` — f3 调用轨迹
 - `offline_re_notes.json` — 可用的六神头样本
 - `f3_protocol.json` — 协议摘要
+- `ablation_report.json` — 消融实验输出（`metasec_ablation.py` 生成）
+- `gorgon_plaindump*.json*` — Gorgon/f3 dump（`frida_gorgon_plaindump.py` 生成）
+
+结论解读见 `docs/ABLATION_FINDINGS.md`（Khronos+Gorgon 最小集等）。
+
+### 实验脚本
+
+见仓库 `docs/sign_samples_tools.md`：
+
+- `../metasec_ablation.py` — 六神消融
+- `../frida_gorgon_plaindump.py` — f3/Gorgon dump

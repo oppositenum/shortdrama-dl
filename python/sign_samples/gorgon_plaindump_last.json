@@ -1,0 +1,184 @@
+{
+  "triggers": [
+    {
+      "i": 0,
+      "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832718729&ac=mobile&ch",
+      "result": {
+        "headers": {
+          "X-Ladon": "GmYt6g==",
+          "X-Khronos": "1785724442",
+          "X-Argus": "Gv5vag==",
+          "X-Gorgon": "8404c0630000cd5125f358958d901dd3c10ec923ffad6c46f760",
+          "X-Helios": "OBIvTO3I3N3gxOi0vcpOlXDcCtt7k712SWmYQJL68661dlu5",
+          "X-Medusa": "H/5vaje1IKBTi2IpJUvBRjiTozz9gwABlopnvV8ggeoMWOaed5z+9qiqIdWZJFASoBE7i9VuSULE6QlE1zjg3GI+zdc73clGei8Ah48isP44sTk9UOW8QMi10z6V3xhQYJ9D28Gh4JqT4+cKiX8TQQKHFKsTi1ooY235VUdk43yrxz3LBAp3KAB+Qhi54CmaNNuyzaD19pZXa530u+cc5bsKLFKovNOQ/J54a7un7Evq74iWME7N35xxbRdJCrf9hPo/xZ3fFEWsOHcaOSWalLUkfa9gBMfw9lGMDFLqXYG6PEPes6fIVxyWMRKbgKQ3Kz2nXNDDMakbd7vvqr9M/D+FMpwACf7qfADsQLJLu/Ka0sdVUuVdDZj9IWQtDwTeZajzWOZNBwrIPr6qOwHdjvyq8Hv+CzEdDlQr+aMGFDz2g9l8xO8ignnZtyahgKec1C0Ee6dHC1e4cj17cvPfaFF70KG29xok07q5dUnu0UNZBy2uVE0gCy7oyL4Hz3KTIeaspPqxrfk0AD4T6eXfr9sgILbCRamWJ1FJ2/F+lWmGrecyYt8layemjTmMUQ9Xe4qEEvDXSYjV/lro85VexaiO11xZ0OzhgLuEJDa0cJEh2oyefmj6+clQ2vuC+J5CXeMT+NRHrQSvQMLJscTZQe1G+Gx3n99Gs0/Ze4AiNSXh86VBzLvQ61BgLMDjf1T3JZYaqlFAfzpZdbJdjWymDqaDzbJKZMChIg/aWmXqyNSTZqr6uJ0Ys3A1qreo+sZybuKbAmkSenkRJgLi+8z/IPkjh5JyfBf+IpxjZ71B0AgEm7m66FapleYtSPcDGW4QWh6t7XdN4eosr/S4/NivvYQxEc/4XhvM22Dab4MPhTUcyl/fNL6J7D19gGrw8JfKdPcNpj40F3LLsEy3otWcT7O85j3LSL6rrFLpZYEKHu0z45QdPqOoYuRkNJ+y/9xm+JDywApKR0FOyGH0LsCNklShCByGW0fIahiutYa5TmUVnwHCebOjg4xqHhKwuiYynKjyoHWpQnAMUXX+x9GG89vZ3t+5jjexAW2TQb2vMwcwwOj3/J4BYz2Q6iIrhzAV3Swn2LUPR9PiDsCGvhymPUGoiLPCrVQEkunUNDDudoIHUlCWHCVOEKY0c3updJ7PhReC0npCoRa/ee8bO0+FXhcg9pDqdyqO7mJ6LmpcnZulRI7no1FQwmB8XRy5kfZWXx1/62Fio9T+9m4PIKqp2fzMJMEvNP/4LzT/+Po2"
+        },
+        "adapter": "com.dragon.read.base.http.b",
+        "gorgon_parse": {
+          "prefix": "8404",
+          "mid": "c063",
+          "pad": "0000",
+          "body20": "cd5125f358958d901dd3c10ec923ffad6c46f760",
+          "len_bytes": 26
+        }
+      }
+    },
+    {
+      "i": 1,
+      "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832718729&ac=mobile&ch",
+      "result": {
+        "headers": {
+          "X-Ladon": "A/jrAA==",
+          "X-Khronos": "1785724442",
+          "X-Argus": "Gv5vag==",
+          "X-Gorgon": "8404306a0000f533811d917934482304dff22afb4bf777a12aaa",
+          "X-Helios": "XV6FbJDC8IkSkXDP9O2xubXf/1zlGXPP/VAzOtj7E2YghSs6",
+          "X-Medusa": "H/5vaje1IKBTi2IpJUvBRjiTozz/2QABzcpwsvNZgcUBGLcWC98MOZV8frlJX41EZBGI1ODhmez6s2qAFSd7IndsS6Lm4+o6CRpn6uuJeFyiJ81mLjuGhJjR2tLJ+gVIYr1LDm9zZrcQHhYKcBDw7E+ay2MUlv9r4uM3vrbSKZMhirjD7xB1MTw8em2wUxyFD5ppamTNGr9ZF5vQwRNvNohxsswEAVb4eohALmNtTq1DoaHCqQ5GhBFoKi5HhXD9WDAJHQ3SpNZhHRMv9MzSms3pDOo7vJn/Mr6mA4a6VqAaeCdyInBsvHdk7LCL+bPpnjz0cqByYx1mPBSmE8VK87lW5skcBhNFJU1WA7SZpnV83QTx9voMOyBP9s7JMLlPAy7QXJd0wo7JWnwbHsul6s1ok2FhafD8kOiy8oD2Ch8eRkkhXgy6Rixzw2WrHTxuUxyavaEIGUvpCMVREw+tPjpMu3UDam/BcVaQI7QfUsnc6Wt9bMgk1Y3y/3GooiRHGs5OyS2sdYUF0MQ/MFK5KCtN6E9DvhtLOURMdQmSa1sAG4+xTls3ZtrjJJD4CWtfke0Bz+FH7SwN6A4EYtLYRYJHsQ0FHT7R58gR/xmUIkAViUK9v/vLcOzMNiqaqzLHwr54zm4Yf0adqHuHhhqe3M2+R/Oaja1ytdRnDYlUZ9rKuO20p+79fG+6dEY15LNw6YcvuAZ29pVNgs2xOXnM5+NcwwiNtrj5TwZKHtmAqs6Osyz2tEMLjgQCPkzZfVvVhGIrD0HExQElpfJxnYPlwK9SOyt/OysLp7VvxSj7ae4Cu3Dvc2WqPcyJrW5gaBxRu0zyFsHxvzv2hYE38XSHhyuX3lWFIm3AO0BosE3h0lpL87jw0HjK62pJDpYnhcQeOWG+2YK5et+LusCfaQ5W8cQhSU89Ca/RvAHF8D2UxjBVeAopPwI5OEGVVtasYKfpcaM4zMrndEZpo3GWzZnFOnN32a9kxCQPq/aCBqGYUe8W3TiKggfM9TSHH2WAKyTgxECjyW0OOlfiiReOcjxao6yvWAMzMw2XxpIlZje+aDz05WetWfT374AI1Xnkw0CTIvB0dOsmD8tKSAYroyNNTsUbFfXZ6jhjhGaQyYG45I0VbM8kIA5F0HvBO+YhTqFFBREq1WBKurdDbucMk5R1Ub4q19ivXsrnJXr9YSM3Qlk+u02V2O7FpPeYFhTdYltlldwXXXkjbhU5iPQDC95qzFbdkv7H8v/+x/L/Jys="
+        },
+        "adapter": "com.dragon.read.base.http.b",
+        "gorgon_parse": {
+          "prefix": "8404",
+          "mid": "306a",
+          "pad": "0000",
+          "body20": "f533811d917934482304dff22afb4bf777a12aaa",
+          "len_bytes": 26
+        }
+      }
+    },
+    {
+      "i": 2,
+      "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832718729&ac=mobile&ch",
+      "result": {
+        "headers": {
+          "X-Ladon": "Gpji+g==",
+          "X-Khronos": "1785724443",
+          "X-Argus": "G/5vag==",
+          "X-Gorgon": "8404c063000083361e1e58958d901dd3c10ec923ffad6c46771a",
+          "X-Helios": "DjrwC2W7ntXMrmD5tr9mgJEgOqi1OWQVAEfEKUNrwwJAPLxt",
+          "X-Medusa": "Hv5vaja1IKBSi2IpJEvBRjmTozwsBwABucqNqqEzgZQLWAt/b9G9Cxz6Z2zUnZXRy0vo5+Egp33JiJ0Q0OqBD3WdUV9lcB5ftHDOcwIMaEz9Jbqo+5vBDAsHRWuFNhZCxrLbBZXxoT/TBrHkGqUMDCp101q3WRHl8ViGnrpSdtkfpWbm6qkOzhAswToPNy0SwSLggHK7PDXwd7Syi3DvGXakGsohNuwOvNZC8ytSSML2T5MnQogdwYuB0bLu6IccsJBEgFgKlgqESpZIwrJ0lfKLSNkypOUlgnsHn2mrkr1EDEiGJ2g2a3OVf1kJfMyaSmFNxyovCYfpQNR2NRCjWeWcRFj+gnZOKnhQCTYeW5d2JG1LLLjXJPNtNYRuzwCno+3zsukRFvS6cWwARvJL+wmayNu3LxHa3E0+2ce1nFBEEEgxp00k24gjKuiqbiPLcQWsu3PGpEy6R+hdsrAyB1IqQZ5WEfMoAoIHIXHBkCq/J7qXTnGofnCxls1IJyf7zN2kYwTh15y/G/uvyU8zWHiS9gJlqPCpexz3KnZcQVGg2Nzcuh3yvoNot3OOo7sCEwIXZMw74J+fm4vP8xrqux29C4Sh/eUm6xnOgn3wRSRh74WnFv6IWBBf+R3qt5JPGw2OxBThKgT4RPs5e+nZUM5smMnAy95DtVbvAROKcRNjORXgqQohFsEtLx3SqMfcvl9ldNTki9QWy1BW8+YfQT2ws+1AU02qYCY3q9OnbLrJ5GT7qmzntWS7yESZJ4D+2WHyNkkn6+Zkmo53hf+QRxhrnpuP1jlx1/rZBTBVpwVDOl8hgDZYZqV4bcnkK3HZYroOVtXdOwJ7szz/IuDxuOSNwvFuR8TRnOh5I6bdIvD1YC9LfAzKL1D93faxwgnQ4ntBrjzLJG8Ij5bOR63ID620kAyWeXwPY2QD2QIYSOkHZrRgr+f7u3l72R5Lv59m+8pYrq03znN6M6S+RRmgofj9XK+9obdEovQYZsJ6TsVaPSvQdXNplMYXuYb3oOTXSav3xCslAPu3CUimNCrHnszy1zoDiCV/flgUmgr4V1flBvVANN2S+8fvryey+rwXfBt1NW4ENa8o354uP+iixmASNK3OJKppllIzdhnVHj4yoSQaxscm2xpUjp63b7saJWmC9lWv4eoilwJQGBPJqdfRhK37fpoWgKNVaaNlHUnZNTXWYcmcYYX3mlj4tBdDaqMPi+5+LtxnfCMCxf93OT0ibAxvhf/+b4X//jJJ"
+        },
+        "adapter": "com.dragon.read.base.http.b",
+        "gorgon_parse": {
+          "prefix": "8404",
+          "mid": "c063",
+          "pad": "0000",
+          "body20": "83361e1e58958d901dd3c10ec923ffad6c46771a",
+          "len_bytes": 26
+        }
+      }
+    },
+    {
+      "i": 3,
+      "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832718729&ac=mobile&ch",
+      "result": {
+        "headers": {
+          "X-Ladon": "AwYkAA==",
+          "X-Khronos": "1785724443",
+          "X-Argus": "G/5vag==",
+          "X-Gorgon": "8404805d00005c55f08e098a51bf32d7d2e849e6dbc4f92173c2",
+          "X-Helios": "ijiIDNAi5WHuL+zC9aSJySihTTAtprD7iCXYKfkqb4DIq/xS",
+          "X-Medusa": "Hv5vaja1IKBSi2IpJEvBRjmTozzhUgABi8pxB683geMGWAwUv99kc0C0tjnktngeiUpP+UE9K9lI4eCxY6ocyOgIjK8luEzfLzCaHXtaqwzxhadT0nLsjoWJNIQub/sKrRtViVlKTDcZgLGnOoTtZpFax7XRRktmIXqvtWp8R7aPirblPMTvaUWvpM2XSzKIYj0zRpAapwjNLl8iv9Y6tmwGOLFKPDPI8ReKe/MUmpV6b2Iw7W1yGrgJsz/iEnyylNnJ8rHuWCbSDBknBgTt5UyutbEb5Pbhrqau5KBylRzs2uHdKQWPidn8495wcAKiO8CZ6sYCpQfYdzcMWurM1ElE1H267sW9HcAPAwkcYkS7RK950wDBxNvZsXf1Fxn3oKMr6dsg3Ubl95AudygMTdLjETuIKUQM8jtukiA2o5jBAZrxRiGk+UFrTtCZtPLDmg8ex18lP220UNOOjHBejJZXlwB4YUpdy7/dtXPua5sWUaROwyL9sX+1Pw/nOsyze4GVMbcrVvwmkktuB2bd3KONOnDseROhFwP4crx6rpFfL3OvNT0Q7Q9ZlzqRdY65qG5qtkEhy5fkGEDxXyxfnIJalfVNJOvtwokKE0vvu67y11m6Xy61BbBNBtcB4Q0B8tw73ZIPt0bktsyL6J1n48WderBBpaiyOhw+CERChIC8DZJ3s091cxDw/ctKaA1S6ElMCNw9OaaWPWpqvr+avpTWVD22xTPB1yqHO4sTGQa1akNVjJ4iKJckJCFbQj287gJysokaljLMq66l44jJ4JQ0n0dxKtyOw/1Fab6m8j70rNrhiA1dl2hxRgjoYlPLyJkBa6Ikjzxvexa0zN668pZ+sr6hyhYIlRXQjW3bvXJJj0UeLQTDrRDo9Jfm5oOM03DDNOP7llA6NtRMKCtvzD03s98zTBILdJGiDhj8Ec1IISw4pdMoOw8uJEkegWGVS1YlfIZJGncLtRMOH+R1cJouVKeFfy1GWXBI4V920ZekVGOYtsyxz7lFl7Y6gdARjo8/fRhynU4zgAVQD/pWtibYSandkkeOjia1JG8XtWDoRQ+LfEua3VZ4X0rYIzz8770wZoZ4ubOIXpnaz4ThKmP2CyXpE0IXl7q2Y5qjVCTxMOkOLOtZBvhHIeEvH/RQYs9tDKJpAg91c+2EkXAtx2T+b1YAuYuXJkoRwX5Qe4XQzDjF1iNeIYwIRKFa2BwPtsstruB+2n/vwLFm30gX26If6/uXNf/7lzX/jUM="
+        },
+        "adapter": "com.dragon.read.base.http.b",
+        "gorgon_parse": {
+          "prefix": "8404",
+          "mid": "805d",
+          "pad": "0000",
+          "body20": "5c55f08e098a51bf32d7d2e849e6dbc4f92173c2",
+          "len_bytes": 26
+        }
+      }
+    },
+    {
+      "i": 4,
+      "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832718729&ac=mobile&ch",
+      "result": {
+        "headers": {
+          "X-Ladon": "Gqo0ig==",
+          "X-Khronos": "1785724444",
+          "X-Argus": "HP5vag==",
+          "X-Gorgon": "840490b4000018b54098eb88ae49db76c52e37bff644e55a7a06",
+          "X-Helios": "dGDHQvY39vay69Gjt4gxUvjK9W7Vr4WdxohwRrXGFs2NkPUY",
+          "X-Medusa": "Gf5vajG1IKBVi2IpI0vBRj6Tozy4CAABdMqG5gp/AdAPGAmWKuJbX3dNKUf6WiWuh6DCKwqvAyYQg7SHHh+1wBw3iPH4luFUYk3Ua8/b/I8S8xGJSl1gfzujSILMCMj0cPlUXeUyJ+LJq2/zhVzlIAGiJtmPiM2G9zFrEGzup/nDvY98BtpYFqJjom7NzfOCfe89GhxUlPHFRopl2MUFeS5jOK+R52/YG/gjmiLBOPZ0Oy8sr+gQxIwQlSw3PLfQV8sZEZLKmAgmfaW0JWdfozYrU0GCKKe/Cj0fogmxzQNJN43bEWJzgwfcihxvhr9X7FNDxCXYcSemqAJLHW6ecg/gHp/N0tT3pHGITqOW60h/q7cyuKEGYa06WoPywr7Ljlg8sgm8hD5T5MA6fJ+jYyaX1OItZrJiH0WWOBfWWRFZoWtoeWaYmVL9ozd04QDXUOyhYOcdmmglP69eGu4YdtPZOB3o9Qf/zysNFDeSv2/LbV9fOpaTVDAJNlWLXcUV1bmMJ+UGegF5+MHg1Exc6RfsadVJDANgRxr4fuIYZudQV9248+UecUG5uOJAiCY9cD74Ooj332mFl68DYDdj2CmhR56caPubX51Vn7u5Wu8m/kATPwlHj5A0B7z8sln4xar1+YW29OlJBJJzS6y3NbVCdzH/Rk7qllyFtR3Unhy+prsr9IXqdQdQwdK7qOWecOvrXQ4RB78a0G35ioCzVe7UWALFiOtDBQzcAppA87Dwt1q5zYH8CXyzHevYbGlqhqGyoe6ve6G5M3lJyGu87nULHd1fhHDfaRHY43GXHaDnICfSPuzhJ/vbpt/PYhPPdkI1nKGkN09al4/OYT+/K9EfDCyJIfreStSTDKjGdf3rBakNcbotOiTRnR1Hv6fanyr9J/V+p9pZajcHAUuqFgo6Ghcjub5Dnu1dPv4AsgKLh3zK2TDAnUb0ASobPegsq+DaTFcDH9nVXCkehsNGRoRPaA3X1d2TLVe3O86gdU7EsMSA4eIewnbul9UmbL1Li9u9bwlJ2sUsA4Ayn2ec6wKpckdWWAd0eOH720Z0+e3Pc//d51mHA7PeBaJ11pfo7lIkLyZJ3a+YSf91U0p0ZjLeqTA2ciHRnmKbyj3M2b2mBswd+ZOJCFqvqI+GVP3ruCwAvr6tOV4sh7EQYoW/vDs1JIY94LrjWqxeJMEX/9AkzVRfEGMwAvcSTCZ2Go49WaRfXYmPzzmif2ky46LPLXbCeRon0v/+J9L//jsX"
+        },
+        "adapter": "com.dragon.read.base.http.b",
+        "gorgon_parse": {
+          "prefix": "8404",
+          "mid": "90b4",
+          "pad": "0000",
+          "body20": "18b54098eb88ae49db76c52e37bff644e55a7a06",
+          "len_bytes": 26
+        }
+      }
+    }
+  ],
+  "stats": {
+    "f3Count": 21,
+    "gorgonStrings": 0,
+    "lastGorgon": "8404a0b800003765f153bb09e05764797888d02697f83ce31468"
+  },
+  "f3_events": 7,
+  "gorgon_string_events": 0,
+  "last_f3": {
+    "type": "f3",
+    "opcode": 50331649,
+    "b": 0,
+    "handle": "536075444752",
+    "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832718729&ac=mobile&channel=69310258a&aid=8662&app_name=novelread&version_code=72732&version_name=7.2.7.32&device_platform=android&os=android&ssmix=a&device_type=sdk_gphone64_arm64&device_brand=google&language=en&os_api=34&os_version=14&manifest_version_code=72732&resolution=1080*2209&dpi=420&update_version_code=72732&_rticket=1785724445472&normal_session_cnt_in_day=0&gender=2&cold_start_session_cnt_in_day=0&host_abi=arm64-v8a&dragon_device_type=phone&sys_mini_window=1&pv_player=72732&app_mini_window=0&normal_session_id=a8fe4962-84f5-44a3-ba4a-85510c7c4cb8%231&compliance_status=0&har_status=0&cold_start_session_id=5",
+    "data": {
+      "t": "str[]",
+      "len": 4,
+      "v": [
+        "x-ss-stub",
+        "751E332419E60CA8A62970C1C367632B",
+        "x-ss-req-ticket",
+        "1785724443950"
+      ]
+    },
+    "ret": {
+      "t": "str[]",
+      "len": 12,
+      "v": [
+        "X-Argus",
+        "Hv5vag==",
+        "X-Gorgon",
+        "8404a0b800003765f153bb09e05764797888d02697f83ce31468",
+        "X-Helios",
+        "geQRNjw3OBY9N2L99fJQhOeZPendLuo+JUmP97JGBnBX7Tq0",
+        "X-Khronos",
+        "1785724446",
+        "X-Ladon",
+        "AkzmIA==",
+        "X-Medusa",
+        "G/5vajO1IKBXi2IpIUvBRjyTozyaSAABhooy1mIHgccIWPxDzUxIRNinGeqDoLIpfZeX+m25+GI1xQkI8GzqSko4JB1W/VpvhWq1DkL2sAsETAxgPX9TMWgkEm4s8+YRpzk3iQGvSFMGPSIWznFl5l9P2ORZWXw3fmLGEgSW3f9j0v4pJsDWt+Tdwwe0S6TLshaO4x6vG+8gEr98sPWwFJuzCyQ3xcD9wv7rjzMXqaWxuoc0xqMX5t2VXh6c5wurFeA8Al1Z1uZJpk1ZUwqpMKW4mhg8lnH8Buqy72P7djt6MGP30IpYFc3CokV8z1vMn/XUuEfTuB9mx7uwdzCDEys+sPgGvYzVOylkiOh2aS2NbYtBwlN4YcV3aAdxoO/wrNzL38YVhD7FOZmgQGSK0IYHVcvSgCDTan9Ujf2+bTf8RAOmZvUqbAHW8ULENpF/ijiIHiyhzSu+/o36FFI8TDjUUEtfcBFph+pdGiLAIQrEAGhTXAOGjJeAAG39ZIcqpuWXm9hcSCKeBC5TIdokzpAxKxpkzAnni7UU0bIdlxwMCmaMez1BSnnzxxIhe1kkvT2Zvvy4U3GT8arbrm8VXgOK4iiCJoINul1Lp8Vv3yQENOQayZB4eHQ6jgYbKqcwaCRz54dVrO1vNzudpo+uYk5yBEY2ZKZUw2R2oLcKqQCf1wTrzkr3yzX0nywrUmHiuXFDXBsfYE/6JG8lr+ikadSX6XleqeuuopqQSTW0yf4Ist8DnraPxFvlGZmCfuI/X+9uX5S3DEQtQ6PVFzMoh0Q96Bm6ed++2zd1EJsFJq6ohJcVgK7IN1frfYtIDGeRYnKUNfsDA+z5vUc0z2jTVhwE1kHEAg+Rj6Omoh4JvgkrdG8CjkHMfTeQJylteA8LtYMPXcW34baMgJokZstl3UUiYj4TDvKnJ9qoTz/33dVs/1vHp2xRnokcIIs63jeZn6VswbzNn7oGh5GAz5+VBasdqNdU4WHj+jsJYLs61NpJ0LmkzEtcTGqH7c81+Neff7pnJOgtuCtHtW+eivskR7PmHUti41BU/ZmyqHYuhqfHTyPCPn4+aikTWCGNCsml6ivudJSV1YGogFRY6AxBwuzvz/Kv4MwPkedlXNYlLyDcJJrzcWM/7I1xpsdXHPc85AQpn5MnkMxJDnxDMMaoDMUGW/kABvnMqgr/8CVYgDfYeMbdhm6PsYex7cGa0GaBYqaDqERN3PkDNkUJLFjHONXnl/oPW//6D1v/vh8="
+      ]
+    },
+    "ts": 1785724445650,
+    "gorgon": "8404a0b800003765f153bb09e05764797888d02697f83ce31468",
+    "gorgon_parse": {
+      "prefix": "8404",
+      "mid": "a0b8",
+      "pad": "0000",
+      "body20": "3765f153bb09e05764797888d02697f83ce31468",
+      "len_bytes": 26
+    },
+    "headers": {
+      "X-Argus": "Hv5vag==",
+      "X-Gorgon": "8404a0b800003765f153bb09e05764797888d02697f83ce31468",
+      "X-Helios": "geQRNjw3OBY9N2L99fJQhOeZPendLuo+JUmP97JGBnBX7Tq0",
+      "X-Khronos": "1785724446",
+      "X-Ladon": "AkzmIA==",
+      "X-Medusa": "G/5vajO1IKBXi2IpIUvBRjyTozyaSAABhooy1mIHgccIWPxDzUxIRNinGeqDoLIpfZeX+m25+GI1xQkI8GzqSko4JB1W/VpvhWq1DkL2sAsETAxgPX9TMWgkEm4s8+YRpzk3iQGvSFMGPSIWznFl5l9P2ORZWXw3fmLGEgSW3f9j0v4pJsDWt+Tdwwe0S6TLshaO4x6vG+8gEr98sPWwFJuzCyQ3xcD9wv7rjzMXqaWxuoc0xqMX5t2VXh6c5wurFeA8Al1Z1uZJpk1ZUwqpMKW4mhg8lnH8Buqy72P7djt6MGP30IpYFc3CokV8z1vMn/XUuEfTuB9mx7uwdzCDEys+sPgGvYzVOylkiOh2aS2NbYtBwlN4YcV3aAdxoO/wrNzL38YVhD7FOZmgQGSK0IYHVcvSgCDTan9Ujf2+bTf8RAOmZvUqbAHW8ULENpF/ijiIHiyhzSu+/o36FFI8TDjUUEtfcBFph+pdGiLAIQrEAGhTXAOGjJeAAG39ZIcqpuWXm9hcSCKeBC5TIdokzpAxKxpkzAnni7UU0bIdlxwMCmaMez1BSnnzxxIhe1kkvT2Zvvy4U3GT8arbrm8VXgOK4iiCJoINul1Lp8Vv3yQENOQayZB4eHQ6jgYbKqcwaCRz54dVrO1vNzudpo+uYk5yBEY2ZKZUw2R2oLcKqQCf1wTrzkr3yzX0nywrUmHiuXFDXBsfYE/6JG8lr+ikadSX6XleqeuuopqQSTW0yf4Ist8DnraPxFvlGZmCfuI/X+9uX5S3DEQtQ6PVFzMoh0Q96Bm6ed++2zd1EJsFJq6ohJcVgK7IN1frfYtIDGeRYnKUNfsDA+z5vUc0z2jTVhwE1kHEAg+Rj6Omoh4JvgkrdG8CjkHMfTeQJylteA8LtYMPXcW34baMgJokZstl3UUiYj4TDvKnJ9qoTz/33dVs/1vHp2xRnokcIIs63jeZn6VswbzNn7oGh5GAz5+VBasdqNdU4WHj+jsJYLs61NpJ0LmkzEtcTGqH7c81+Neff7pnJOgtuCtHtW+eivskR7PmHUti41BU/ZmyqHYuhqfHTyPCPn4+aikTWCGNCsml6ivudJSV1YGogFRY6AxBwuzvz/Kv4MwPkedlXNYlLyDcJJrzcWM/7I1xpsdXHPc85AQpn5MnkMxJDnxDMMaoDMUGW/kABvnMqgr/8CVYgDfYeMbdhm6PsYex7cGa0GaBYqaDqERN3PkDNkUJLFjHONXnl/oPW//6D1v/vh8="
+    }
+  },
+  "analysis_hints": {
+    "gorgon": "8404a0b800003765f153bb09e05764797888d02697f83ce31468",
+    "gorgon_parse": {
+      "prefix": "8404",
+      "mid": "a0b8",
+      "pad": "0000",
+      "body20": "3765f153bb09e05764797888d02697f83ce31468",
+      "len_bytes": 26
+    },
+    "note": "body20 是密文。若 gorgon_string 事件带 stack，可从栈顶 Java 帧继续往 native 追；下一步对 libmetasec 写 20 字节缓冲的地址下读写断点。"
+  }
+}

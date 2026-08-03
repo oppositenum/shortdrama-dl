@@ -218,21 +218,19 @@ input[readonly] {
   color: var(--text);
 }
 
-/* ---------- 环境检查 ---------- */
-.env-card {
-  padding: 14px 18px;
-}
-.env-head {
+/* ---------- 可折叠面板（环境检查 / 链接与下载设置共用） ---------- */
+.pane-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-size: 13px;
   color: var(--text-dim);
 }
-.env-toggle {
+.pane-toggle {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0; /* 收起后摘要可以省略号，不把标题挤走 */
   background: transparent;
   border: none;
   color: var(--text-dim);
@@ -242,34 +240,51 @@ input[readonly] {
   margin: -4px -2px;
   cursor: pointer;
 }
-.env-toggle:hover {
+.pane-toggle:hover {
   color: var(--text);
 }
-.env-chevron {
+.pane-chevron {
   display: inline-block;
   transition: transform 0.15s ease;
   color: var(--text-faint);
 }
-.env-card.collapsed .env-chevron {
+.pane.collapsed .pane-chevron {
   transform: rotate(-90deg);
 }
-.env-summary {
+.pane-summary {
   display: none;
   color: var(--text-faint);
   font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.env-card.collapsed .env-summary {
+.pane.collapsed .pane-summary {
   display: inline;
+}
+.pane.collapsed .pane-body {
+  display: none;
+}
+
+/* ---------- 环境检查 ---------- */
+.env-card {
+  padding: 14px 18px;
 }
 .env-actions {
   display: flex;
   gap: 8px;
 }
-.env-body {
+.env-card .pane-body {
   margin-top: 10px;
 }
-.env-card.collapsed .env-body {
-  display: none;
+
+/* ---------- 链接与下载设置 ---------- */
+.input-card .pane-head {
+  margin-bottom: 4px;
+}
+/* 收起后只剩标题和操作按钮，别再留展开时的那段留白 */
+.input-card.collapsed .actions {
+  margin-top: 12px;
 }
 .env-row {
   display: flex;
@@ -402,6 +417,7 @@ input[readonly] {
   flex: 1;
   display: flex;
   flex-direction: column;
+  position: relative; /* 供「N 条新日志」浮标定位 */
   /* 卡片一多，窗口装不下时这里先按 flex:1 收缩，但绝不小于这个高度——低于此高度改由
      body 的 overflow-y:auto 整页滚动兜底(见上)，而不是把日志挤成看不见的一条缝。 */
   min-height: 160px;
@@ -440,6 +456,28 @@ input[readonly] {
 .log-line.success .log-msg { color: var(--success); }
 .log-line.warn .log-msg { color: var(--warn); }
 .log-line.error .log-msg { color: #ff8080; }
+
+/* 往上翻历史时不抢滚动位置，只在右下角浮一个提示，点了才回到底部 */
+.log-jump {
+  position: absolute;
+  right: 26px;
+  bottom: 22px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.log-jump:hover {
+  border-color: var(--accent);
+}
+.log-jump[hidden] {
+  display: none;
+}
 
 .log::-webkit-scrollbar { width: 8px; }
 .log::-webkit-scrollbar-thumb {

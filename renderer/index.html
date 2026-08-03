@@ -24,19 +24,19 @@
       </header>
 
       <!-- 环境检查 -->
-      <section class="card env-card" id="envCard">
-        <div class="env-head">
-          <button id="envToggle" class="env-toggle" type="button" aria-expanded="true">
-            <span class="env-chevron">▾</span>
+      <section class="card pane env-card" id="envCard">
+        <div class="pane-head">
+          <button id="envToggle" class="pane-toggle" type="button" aria-expanded="true" aria-controls="envBody">
+            <span class="pane-chevron">▾</span>
             <span>环境检查</span>
-            <span id="envSummary" class="env-summary"></span>
+            <span id="envSummary" class="pane-summary"></span>
           </button>
           <div class="env-actions">
             <button id="envRecheck" class="btn btn-mini">重新检查</button>
             <button id="envFix" class="btn btn-mini" disabled>修复缺失项</button>
           </div>
         </div>
-        <div class="env-body" id="envBody">
+        <div class="pane-body" id="envBody">
           <div class="env-row" data-env="python">
             <span class="env-dot checking"></span>
             <span class="env-label">Python 依赖</span>
@@ -66,7 +66,16 @@
       </section>
 
       <!-- 输入区 -->
-      <section class="card">
+      <section class="card pane input-card" id="inputCard">
+        <div class="pane-head">
+          <button id="inputToggle" class="pane-toggle" type="button" aria-expanded="true" aria-controls="inputBody">
+            <span class="pane-chevron">▾</span>
+            <span>链接与下载设置</span>
+            <span id="inputSummary" class="pane-summary"></span>
+          </button>
+        </div>
+        <!-- 折叠只收起表单；下面的操作按钮永远留在外面，收起后照样能开始/取消 -->
+        <div class="pane-body" id="inputBody">
         <label class="field-label" for="url">播放页 / 详情页链接</label>
         <div class="input-row">
           <input
@@ -114,6 +123,7 @@
           <input id="introDetailed" type="checkbox" />
           <span>简介.txt 写详细信息（默认只写剧名和剧情简介；勾选后另附集数、标签、来源和演职人员）</span>
         </label>
+        </div>
 
         <div class="actions">
           <button id="start" class="btn btn-primary">
@@ -151,6 +161,8 @@
           <button id="clearLog" class="btn btn-mini">清空</button>
         </div>
         <div id="log" class="log"></div>
+        <!-- 往上翻看历史时不打断视线：新日志照常写入，只在这里提示有多少条 -->
+        <button id="logJump" class="log-jump" type="button" hidden></button>
       </section>
     </div>
 

@@ -28,6 +28,10 @@ const envFixBtn = $('envFix');
 const envCard = $('envCard');
 const envToggle = $('envToggle');
 const envSummary = $('envSummary');
+const inputCard = $('inputCard');
+const inputToggle = $('inputToggle');
+const inputSummary = $('inputSummary');
+const logJumpBtn = $('logJump');
 
 const statusText = $('status');
 const statusDot = $('statusDot');
@@ -146,6 +150,29 @@ envToggle.addEventListener('click', () => {
   setEnvCollapsed(!envCard.classList.contains('collapsed'));
 });
 
+// ==========================================================================
+// 链接与下载设置：和环境检查一样可收起。收起的只有表单，操作按钮留在外面，
+// 所以收起状态下照样能开始/停止，腾出来的高度全给日志。
+// ==========================================================================
+function updateInputSummary() {
+  const url = urlInput.value.trim();
+  const label = GRAB_MODE_LABEL[getGrabMode()] || '';
+  const shortUrl = url.length > 46 ? `${url.slice(0, 44)}…` : url;
+  inputSummary.textContent = url ? `${shortUrl} · ${label}` : `未填链接 · ${label}`;
+}
+
+function setInputCollapsed(collapsed) {
+  inputCard.classList.toggle('collapsed', collapsed);
+  inputToggle.setAttribute('aria-expanded', String(!collapsed));
+  updateInputSummary();
+  window.api.saveSettings({ inputCollapsed: collapsed });
+}
+
+inputToggle.addEventListener('click', () => {
+  setInputCollapsed(!inputCard.classList.contains('collapsed'));
+});
+urlInput.addEventListener('input', updateInputSummary);
+
 window.api.onEnvBegin(() => {
   envRecheckBtn.disabled = true;
   envFixBtn.disabled = true;
@@ -180,7 +207,47 @@ envFixBtn.addEventListener('click', () => {
 // ==========================================================================
 // UI 辅助
 // ==========================================================================
+// ---------- 日志滚动 ----------
+// 只有视线本来就在底部时才自动跟到最新。用户往上翻历史的时候，新日志照常写进去，
+// 但绝不动他的滚动位置——被拽回底部会让人根本看不完一行。攒了多少条只在右下角提示，
+// 点一下（或自己滚回底部）才回到最新。
+const LOG_BOTTOM_SLACK_PX = 24; // 差这点距离仍算“在底部”，容忍行高取整和惯性滚动
+let logPinnedToBottom = true;
+let pendingLogCount = 0;
+
+function isLogAtBottom() {
+  return logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight <= LOG_BOTTOM_SLACK_PX;
+}
+
+function renderLogJump() {
+  if (pendingLogCount > 0) {
+    logJumpBtn.textContent = `↓ ${pendingLogCount} 条新日志`;
+    logJumpBtn.hidden = false;
+  } else {
+    logJumpBtn.hidden = true;
+  }
+}
+
+function scrollLogToBottom() {
+  logEl.scrollTop = logEl.scrollHeight;
+  logPinnedToBottom = true;
+  pendingLogCount = 0;
+  renderLogJump();
+}
+
+logEl.addEventListener('scroll', () => {
+  logPinnedToBottom = isLogAtBottom();
+  if (logPinnedToBottom && pendingLogCount) {
+    pendingLogCount = 0;
+    renderLogJump();
+  }
+});
+
+logJumpBtn.addEventListener('click', scrollLogToBottom);
+
 function appendLog({ time, level, message }) {
+  // 追加发生在可视区下方，浏览器不会改 scrollTop，所以停在半路的视线自然不受影响。
+  const wasPinned = logPinnedToBottom;
   const line = document.createElement('div');
   line.className = `log-line ${level || 'info'}`;
   line.innerHTML =
@@ -188,7 +255,12 @@ function appendLog({ time, level, message }) {
     `<span class="log-msg"></span>`;
   line.querySelector('.log-msg').textContent = message;
   logEl.appendChild(line);
-  logEl.scrollTop = logEl.scrollHeight;
+  if (wasPinned) {
+    logEl.scrollTop = logEl.scrollHeight;
+  } else {
+    pendingLogCount++;
+    renderLogJump();
+  }
 }
 
 function setDot(state) {
@@ -297,6 +369,7 @@ for (const el of [modeApp, modeApi, modeNone]) {
   if (!el) continue;
   el.addEventListener('change', () => {
     syncGrabDirRow();
+    updateInputSummary();
     saveFormState();
     // 切换抓取方式后重跑环境检查（纯协议不查安卓/Frida）
     if (!downloading) runEnvCheck();
@@ -367,6 +440,7 @@ openDirBtn.addEventListener('click', () => {
 
 clearLogBtn.addEventListener('click', () => {
   logEl.innerHTML = '';
+  scrollLogToBottom(); // 清空后没有历史可看了，重新跟随最新
 });
 
 urlInput.addEventListener('keydown', (e) => {
@@ -417,6 +491,7 @@ async function initSettings() {
   }
 
   setEnvCollapsed(saved.envCollapsed === true);
+  setInputCollapsed(saved.inputCollapsed === true);
   runEnvCheck();
 }
 initSettings();
