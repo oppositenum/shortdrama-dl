@@ -46,6 +46,7 @@ module.exports = {
     'runtime-platform.js',
     'series-workflow.js',
     'ffmpeg-runner.js',
+    'notify.js',
     'preload.js',
     'renderer/**/*',
     'package.json',
