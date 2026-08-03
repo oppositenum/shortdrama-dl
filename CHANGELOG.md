@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.2.2...v1.3.0) (2026-08-03)
+
+
+### Features
+
+* **ui:** collapse the settings card and stop the log from yanking to bottom ([c922e0b](https://github.com/oppositenum/shortdrama-dl/commit/c922e0be506fd3857197d54c3c939e873d918317))
+* **ui:** collapsible settings card and non-intrusive log scrolling ([bbe17b0](https://github.com/oppositenum/shortdrama-dl/commit/bbe17b02703db313276a2c12fec276857b79bfab))
+
 ## [1.2.2](https://github.com/oppositenum/shortdrama-dl/compare/v1.2.1...v1.2.2) (2026-08-01)
 
 
