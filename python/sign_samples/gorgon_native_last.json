@@ -1,0 +1,109 @@
+{
+  "triggers": [
+    {
+      "i": 0,
+      "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832718729&ac=mobile&ch",
+      "result_keys": [
+        "headers",
+        "adapter",
+        "gorgon_parse"
+      ],
+      "gorgon": "8404d0600000f5b0a7d5bf14c3360fe8ae614117603cea85e15b"
+    },
+    {
+      "i": 1,
+      "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832718729&ac=mobile&ch",
+      "result_keys": [
+        "headers",
+        "adapter",
+        "gorgon_parse"
+      ],
+      "gorgon": "840400c300002229b42e8ab2b63a1fb205e3058058d636ecdaa4"
+    },
+    {
+      "i": 2,
+      "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832718729&ac=mobile&ch",
+      "result_keys": [
+        "headers",
+        "adapter",
+        "gorgon_parse"
+      ],
+      "gorgon": "840410d8000000d4ee03d457335ca16745d92e21b75fb80d02a2"
+    }
+  ],
+  "last": {
+    "type": "f3_native",
+    "opcode": 50331649,
+    "handle": "536075444752",
+    "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832718729&ac=mobile&channel=69310258a&aid=8662&app_name=novelread&version_code=72732&version_name=7.2.7.32&device_platform=android&os=android&ssmix=a&device_type=sdk_gphone64_arm64&device_brand=google&language=en&os_api=34&os_version=14&manifest_version_code=72732&resolution=1080*2209&dpi=420&update_version_code=72732&_rticket=1785726796634&normal_session_cnt_in_day=0&gender=2&cold_start_session_cnt_in_day=0&host_abi=arm64-v8a&dragon_device_type=phone&sys_mini_window=1&pv_player=72732&app_mini_window=0&normal_session_id=a8fe4962-84f5-44a3-ba4a-85510c7c4cb8%231&compliance_status=0&har_status=0&cold_start_session_id=579b41e6-9252-41ba-982f-0c3bff624f40&cold_start_session_cnt_in_life=41&charging=0&normal_session_cnt_",
+    "gorgon": "840490a200003f16f41bc75b46c10221bfd82c4827dc59aeec68",
+    "gorgon_parse": {
+      "prefix": "8404",
+      "mid": "90a2",
+      "pad": "0000",
+      "body20": "3f16f41bc75b46c10221bfd82c4827dc59aeec68",
+      "raw26": "840490a200003f16f41bc75b46c10221bfd82c4827dc59aeec68"
+    },
+    "headers": {
+      "X-Argus": "TQdwag==",
+      "X-Gorgon": "840490a200003f16f41bc75b46c10221bfd82c4827dc59aeec68",
+      "X-Helios": "ZtYNKd1pSjrPA3+In2v86XB5cWWVDkYd+QquLQOmkr3OMKcc",
+      "X-Khronos": "1785726797",
+      "X-Ladon": "ANhYwA==",
+      "X-Medusa": "SAdwamBMP6AEcn0pcrLeRm9qvDxQEQABV4oIvtACgScLWF9so2Zfr+w89KbETJAkic5T5QYHt7+xpNFaHrqjp0QsegcpcNI1MW4O5CGV73G/mAcI1s4V9WujEHJLMnfDJhyaJ+QOvpYoVD1gFUc8T3AuPzk7Y8/B6F+D0Cj/tr72MhrFmB25rk62AxHPHuatZXnDlMy2Ep/UHSkicMCzXl/KqFv3WANVukkhAMLPeo+w7sesyV2Z1lgW67srJxTpdorAlJ9LNDavslOHwBxEYgAFfKKuImZT0s9DWLjYam/JRYQFpANoHL9RHEYfbb0QDXZhHvse730WjbvdE2IpkXvBCetrlcd4ZrkpTpRNm9KTI4Zw3W48Y6t772AoEQPHB1cMHmS1dApm6UxgZpOSnhJ4Nt12n9e2gJwayvS98C1ENg83PQhG+y9Uwjozs3xEZIEvTsJUWBOgGL5rCmVXfcAbVN2qzSUsjx7m0dhcBwVoQdBPQTNEVcHYmB5LCqLA4kgp4CZCUr0CfHNfwQWC9QXTBSo4CBow6gpg17O3ZzW/DjG5WCc6SPBId15MWlRolskyfLTC/3SF9o5EUxUYOzih+0pUpEim3+ynpzJkACzNow1rtozfUua1bKbh60sXTVywpKW3EWGp9Po6pZ4f3+ophrLeZV87AVIPQvqEounh/KsGk8ceiFDvnpjId/l62+N13L5kl1Jb64z22Tw0yBurX0qK1LcIzT5WA2gQvOCHEcGcB48VKLDPyyJalQ2WR3U0qCwJTcdw9Yu9I47B+GToYjapwO/bSnfxFBNvCQB2ydwbXzFTcZwfGbNxi8c+NdC/cFTBI5iIKydMP0FN6mG6Smf8WYVTFKTx/Paqm4YOjfn7PKnt3ZGoQqGXM/xaqmMPIvVlFDZXB4nkhg72ic7j3y/db39rUsChQ4MKQiXowgjCteXXcj4UzxLCZDJGyke3e+FpyxcxwgCTGx68TNKuyIF70mSFVo0fmYUWGgGDhu+UMJahc7QxAumy4ggYZoYL5+XwyMCyWmnrfC083t1TX8Vz/SZGsVCq6yqNZHPY5nk7cJEHnXktfa27O69mSJSJ23M6yeIpDDUcmB2EzKE24OiTMbOkT0lKkMBXyQTduevQ6l7tBg4+W873BgtSPYk5USZI/3HfdMj7fPgJeBtFFpRTD3JomEaUm3adrZLk5uT3qxvItwkeGn/3adTMKArWDMHLIw1t8NHP1aXivYz5yPuPW//7j1v/ji4="
+    },
+    "mem_match": [],
+    "mem_ascii": [],
+    "mem_other_sample": [
+      {
+        "addr": "0x7000e304",
+        "hex": "8404000000000000000000000800000008000000000002000000",
+        "mid": "0000",
+        "body20": "0000000000000800000008000000000002000000",
+        "tag": "post_prefix",
+        "range_base": "0x70003000",
+        "file": null
+      },
+      {
+        "addr": "0x70293adc",
+        "hex": "8404000000000000000000000800000008000000000002000000",
+        "mid": "0000",
+        "body20": "0000000000000800000008000000000002000000",
+        "tag": "post_prefix",
+        "range_base": "0x70042000",
+        "file": null
+      },
+      {
+        "addr": "0x703419fc",
+        "hex": "8404000000000000000000000800000008000000000002000000",
+        "mid": "0000",
+        "body20": "0000000000000800000008000000000002000000",
+        "tag": "post_prefix",
+        "range_base": "0x70042000",
+        "file": null
+      },
+      {
+        "addr": "0x70d5a5ec",
+        "hex": "8404000000000000000000000800000008000000000002000000",
+        "mid": "0000",
+        "body20": "0000000000000800000008000000000002000000",
+        "tag": "post_prefix",
+        "range_base": "0x70d32000",
+        "file": null
+      },
+      {
+        "addr": "0x70fa5599",
+        "hex": "84047100000000e84aee6f00000000084bee6f00000000284bee",
+        "mid": "7100",
+        "body20": "00e84aee6f00000000084bee6f00000000284bee",
+        "tag": "post_prefix",
+        "range_base": "0x70f68000",
+        "file": null
+      }
+    ],
+    "mem_hit_count": 53,
+    "ts": 1785726799221
+  },
+  "f3_count": 7,
+  "any_mem_match": false
+}

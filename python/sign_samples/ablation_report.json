@@ -1,0 +1,1064 @@
+{
+  "ts": 1785725186,
+  "series_id": "7668349899590618136",
+  "host": "api5-normal-sinfonlinea.fqnovel.com",
+  "from_corpus": false,
+  "signed_detail_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832718729&ac=mobile&channel=69310258a&aid=8662&app_name=novelr",
+  "vid": "7668352903446285336",
+  "controls": {
+    "unsigned_short": {
+      "ok": false,
+      "http": 200,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.59,
+      "has_data": false
+    },
+    "app_exec_detail": {
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "has_data": true
+    },
+    "host_full6_same_url": {
+      "ok": true,
+      "http": 200,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.722,
+      "has_data": true
+    },
+    "app_exec_model": {
+      "ok": true,
+      "code": 0
+    }
+  },
+  "rows": [
+    {
+      "tag": "detail",
+      "set": "none",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [],
+      "gods": [],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.556
+    },
+    {
+      "tag": "detail",
+      "set": "stub_ticket_only",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket"
+      ],
+      "gods": [],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.657
+    },
+    {
+      "tag": "detail",
+      "set": "Khronos",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Khronos"
+      ],
+      "gods": [
+        "X-Khronos"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.524
+    },
+    {
+      "tag": "detail",
+      "set": "Argus",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Argus"
+      ],
+      "gods": [
+        "X-Argus"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.69
+    },
+    {
+      "tag": "detail",
+      "set": "Gorgon",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon"
+      ],
+      "gods": [
+        "X-Gorgon"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.686
+    },
+    {
+      "tag": "detail",
+      "set": "Ladon",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Ladon"
+      ],
+      "gods": [
+        "X-Ladon"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.504
+    },
+    {
+      "tag": "detail",
+      "set": "Helios",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Helios"
+      ],
+      "gods": [
+        "X-Helios"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.565
+    },
+    {
+      "tag": "detail",
+      "set": "Medusa",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Medusa"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.479
+    },
+    {
+      "tag": "detail",
+      "set": "Khronos+Argus",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Khronos",
+        "X-Argus"
+      ],
+      "gods": [
+        "X-Khronos",
+        "X-Argus"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.69
+    },
+    {
+      "tag": "detail",
+      "set": "Khronos+Gorgon",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Khronos",
+        "X-Gorgon"
+      ],
+      "gods": [
+        "X-Khronos",
+        "X-Gorgon"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 1.973
+    },
+    {
+      "tag": "detail",
+      "set": "Gorgon+Medusa",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Medusa"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.601
+    },
+    {
+      "tag": "detail",
+      "set": "Khronos+Gorgon+Medusa",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Khronos",
+        "X-Gorgon",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Khronos",
+        "X-Gorgon",
+        "X-Medusa"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.548
+    },
+    {
+      "tag": "detail",
+      "set": "no_Medusa",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.847
+    },
+    {
+      "tag": "detail",
+      "set": "no_Gorgon",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.668
+    },
+    {
+      "tag": "detail",
+      "set": "no_Helios",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Medusa"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.676
+    },
+    {
+      "tag": "detail",
+      "set": "classic4",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.707
+    },
+    {
+      "tag": "detail",
+      "set": "full6",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.663
+    },
+    {
+      "tag": "detail",
+      "set": "full_minus_X-Gorgon",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.694
+    },
+    {
+      "tag": "detail",
+      "set": "full_minus_X-Argus",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.696
+    },
+    {
+      "tag": "detail",
+      "set": "full_minus_X-Ladon",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.678
+    },
+    {
+      "tag": "detail",
+      "set": "full_minus_X-Khronos",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.73
+    },
+    {
+      "tag": "detail",
+      "set": "full_minus_X-Helios",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Medusa"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.525
+    },
+    {
+      "tag": "detail",
+      "set": "full_minus_X-Medusa",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=67443883",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.526
+    },
+    {
+      "tag": "model",
+      "set": "none",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [],
+      "gods": [],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.556
+    },
+    {
+      "tag": "model",
+      "set": "stub_ticket_only",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket"
+      ],
+      "gods": [],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.863
+    },
+    {
+      "tag": "model",
+      "set": "Khronos",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Khronos"
+      ],
+      "gods": [
+        "X-Khronos"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.877
+    },
+    {
+      "tag": "model",
+      "set": "Argus",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Argus"
+      ],
+      "gods": [
+        "X-Argus"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.694
+    },
+    {
+      "tag": "model",
+      "set": "Gorgon",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon"
+      ],
+      "gods": [
+        "X-Gorgon"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.493
+    },
+    {
+      "tag": "model",
+      "set": "Ladon",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Ladon"
+      ],
+      "gods": [
+        "X-Ladon"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.526
+    },
+    {
+      "tag": "model",
+      "set": "Helios",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Helios"
+      ],
+      "gods": [
+        "X-Helios"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.53
+    },
+    {
+      "tag": "model",
+      "set": "Medusa",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Medusa"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.49
+    },
+    {
+      "tag": "model",
+      "set": "Khronos+Argus",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Khronos",
+        "X-Argus"
+      ],
+      "gods": [
+        "X-Khronos",
+        "X-Argus"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.539
+    },
+    {
+      "tag": "model",
+      "set": "Khronos+Gorgon",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Khronos",
+        "X-Gorgon"
+      ],
+      "gods": [
+        "X-Khronos",
+        "X-Gorgon"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.651
+    },
+    {
+      "tag": "model",
+      "set": "Gorgon+Medusa",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Medusa"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.518
+    },
+    {
+      "tag": "model",
+      "set": "Khronos+Gorgon+Medusa",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Khronos",
+        "X-Gorgon",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Khronos",
+        "X-Gorgon",
+        "X-Medusa"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.533
+    },
+    {
+      "tag": "model",
+      "set": "no_Medusa",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 2.065
+    },
+    {
+      "tag": "model",
+      "set": "no_Gorgon",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.704
+    },
+    {
+      "tag": "model",
+      "set": "no_Helios",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Medusa"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.55
+    },
+    {
+      "tag": "model",
+      "set": "classic4",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.667
+    },
+    {
+      "tag": "model",
+      "set": "full6",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.573
+    },
+    {
+      "tag": "model",
+      "set": "full_minus_X-Gorgon",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.926
+    },
+    {
+      "tag": "model",
+      "set": "full_minus_X-Argus",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.659
+    },
+    {
+      "tag": "model",
+      "set": "full_minus_X-Ladon",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Khronos",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.734
+    },
+    {
+      "tag": "model",
+      "set": "full_minus_X-Khronos",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Helios",
+        "X-Medusa"
+      ],
+      "ok": true,
+      "code": 0,
+      "message": "请求成功",
+      "elapsed": 0.661
+    },
+    {
+      "tag": "model",
+      "set": "full_minus_X-Helios",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Medusa"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Medusa"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.431
+    },
+    {
+      "tag": "model",
+      "set": "full_minus_X-Medusa",
+      "full_url_prefix": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832",
+      "headers": [
+        "x-ss-stub",
+        "x-ss-req-ticket",
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios"
+      ],
+      "gods": [
+        "X-Gorgon",
+        "X-Argus",
+        "X-Ladon",
+        "X-Khronos",
+        "X-Helios"
+      ],
+      "ok": false,
+      "code": 110001,
+      "message": "未知异常",
+      "elapsed": 0.653
+    }
+  ],
+  "ok_sets": [
+    {
+      "tag": "detail",
+      "set": "Khronos+Gorgon"
+    },
+    {
+      "tag": "detail",
+      "set": "no_Gorgon"
+    },
+    {
+      "tag": "detail",
+      "set": "full6"
+    },
+    {
+      "tag": "detail",
+      "set": "full_minus_X-Gorgon"
+    },
+    {
+      "tag": "detail",
+      "set": "full_minus_X-Argus"
+    },
+    {
+      "tag": "detail",
+      "set": "full_minus_X-Ladon"
+    },
+    {
+      "tag": "detail",
+      "set": "full_minus_X-Khronos"
+    },
+    {
+      "tag": "model",
+      "set": "Khronos+Gorgon"
+    },
+    {
+      "tag": "model",
+      "set": "no_Gorgon"
+    },
+    {
+      "tag": "model",
+      "set": "full6"
+    },
+    {
+      "tag": "model",
+      "set": "full_minus_X-Gorgon"
+    },
+    {
+      "tag": "model",
+      "set": "full_minus_X-Argus"
+    },
+    {
+      "tag": "model",
+      "set": "full_minus_X-Ladon"
+    },
+    {
+      "tag": "model",
+      "set": "full_minus_X-Khronos"
+    }
+  ],
+  "count_ok": 14,
+  "count_110001": 32,
+  "interpretation": {
+    "app_exec_ok_host_fail": "App 内 OK 但 host full6 失败 → 头不够（缺 cookie）或出站 IP 与 App 不同",
+    "both_fail": "两边都 110001 → 账号/剧/接口侧封锁，不单是缺头",
+    "host_full6_ok": "可用 urllib+完整 URL+六神；消融表有意义",
+    "short_query_fail": "短 query 必挂证明签名绑完整 URL（历史踩坑）"
+  }
+}

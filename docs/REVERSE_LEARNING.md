@@ -426,7 +426,29 @@ GET main_url ──► 加密 mp4 ──decrypt_mdl(key)──► 第XX集.mp4
 
 ---
 
-## 14. 一句话总结
+## 14. 完全破解六神：仓库内实验工具
+
+| 工具 | 作用 |
+|---|---|
+| `python/metasec_ablation.py` | 六神**消融表**：测 110001 时最少要哪些头 |
+| `python/frida_gorgon_plaindump.py` (+ `.js`) | **f3/Gorgon dump**：抓签名 I/O 与 8404 字符串 |
+
+用法说明见 **[sign_samples_tools.md](./sign_samples_tools.md)**。
+
+建议顺序：先消融缩目标 → 再 dump 对齐语料 → 再 VM/仿真。
+
+### 14.1 消融实测结论（2026-08-03）
+
+详见 **[ABLATION_FINDINGS.md](./ABLATION_FINDINGS.md)**。摘要：
+
+- 必须用 **App 完整 URL**；短 query + 六神也会挂。  
+- 本机 urllib + full_url + 正确头 → `code=0`。  
+- **最小够用：`X-Khronos` + `X-Gorgon`**。  
+- 另一条路：有 **Helios+Medusa 成对** 时可不带 Gorgon。  
+- Helios / Medusa **不能拆开**；Argus/Ladon 当前非硬依赖。  
+- 离线破解 **P0 = Gorgon**（Khronos 已完成）。
+
+## 15. 一句话总结
 
 > 我们逆向的不是「一个神秘下载按钮」，而是：**中台 JSON 协议 + 播放器侧 spade 密钥格式 +（可选）TTNet 请求签名。**  
 > 前两者已足够日常纯协议出片；签名摸清了入口与契约，完整 VM 仍可用 App 进程代替。

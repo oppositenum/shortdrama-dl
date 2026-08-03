@@ -183,6 +183,7 @@ def partial_headers(inp: SignInput) -> Dict[str, str]:
     """Headers we can produce offline without MetaSec VM.
 
     Enough for Khronos/Argus/stub/ticket. Not a substitute for full f3.a output.
+    Ablation: 110001 最小集是 Khronos+Gorgon；Gorgon 尚未离线。
     """
     ticket = inp.ticket
     kh = khronos_from_ticket(ticket)
@@ -191,6 +192,20 @@ def partial_headers(inp: SignInput) -> Dict[str, str]:
         "x-ss-req-ticket": ticket,
         "X-Khronos": str(kh),
         "X-Argus": encode_argus_short(kh),
+    }
+
+
+def parse_gorgon_hex(hex_str: str) -> Dict[str, object]:
+    """Parse 26-byte Gorgon 8404 layout."""
+    raw = bytes.fromhex(hex_str)
+    if len(raw) < 26:
+        raise ValueError(f"gorgon too short: {len(raw)}")
+    return {
+        "prefix": raw[:2].hex(),
+        "mid": raw[2:4].hex(),
+        "pad": raw[4:6].hex(),
+        "body20": raw[6:26].hex(),
+        "len": len(raw),
     }
 
 
