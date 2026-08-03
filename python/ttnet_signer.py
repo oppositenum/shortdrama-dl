@@ -130,74 +130,126 @@ function getAdapter() {
   return adapters.length ? adapters[0] : null;
 }
 
+/**
+ * 在 ART 就绪后同步执行 fn。
+ * 禁止在 VM 未起来时 Java.performNow —— 会 access violation @ 0x0。
+ */
+function withJavaSync(fn, timeoutMs) {
+  timeoutMs = timeoutMs || 15000;
+  try {
+    if (typeof Java === 'undefined') {
+      return { error: 'Java bridge undefined (loader not ready)' };
+    }
+  } catch (e0) {
+    return { error: 'Java check: ' + e0 };
+  }
+  var box = { done: false, value: null };
+  try {
+    Java.perform(function () {
+      try {
+        box.value = fn() || {};
+      } catch (e1) {
+        box.value = { error: String(e1) };
+      }
+      box.done = true;
+    });
+  } catch (e2) {
+    return { error: 'Java.perform: ' + e2 };
+  }
+  var t0 = Date.now();
+  while (!box.done && (Date.now() - t0) < timeoutMs) {
+    Thread.sleep(0.05);
+  }
+  if (!box.done) {
+    return { error: 'java_perform_timeout' };
+  }
+  return box.value || {};
+}
+
 rpc.exports = {
   ping: function () { return 'pong'; },
+  javaAvailable: function () {
+    try {
+      return { ok: typeof Java !== 'undefined' && !!Java.available, available: !!(typeof Java !== 'undefined' && Java.available) };
+    } catch (e) {
+      return { ok: false, error: String(e) };
+    }
+  },
   ready: function () {
-    var ok = false, err = null, cls = null;
-    Java.performNow(function () {
+    return withJavaSync(function () {
+      // 先确认 ART
+      try {
+        if (!Java.available) {
+          return { ok: false, error: 'Java.available=false' };
+        }
+      } catch (e) {
+        return { ok: false, error: 'Java.available: ' + e };
+      }
       try {
         Java.use('com.bytedance.frameworks.baselib.network.http.NetworkParams');
-        var a = getAdapter();
-        if (!a) { err = 'no_adapter'; return; }
-        cls = String(a.getClass().getName());
-        ok = true;
-      } catch (e) { err = String(e); }
-    });
-    return err ? { ok: false, error: err } : { ok: true, adapter: cls };
+      } catch (e) {
+        return { ok: false, error: 'NetworkParams missing: ' + e };
+      }
+      var a = getAdapter();
+      if (!a) {
+        return { ok: false, error: 'no_adapter (open 红果 App 并稍等 TTNet 初始化)' };
+      }
+      return { ok: true, adapter: String(a.getClass().getName()) };
+    }, 20000);
   },
   fullUrl: function (base) {
-    var out = null, err = null;
-    Java.performNow(function () {
+    return withJavaSync(function () {
       try {
         var NP = Java.use('com.bytedance.frameworks.baselib.network.http.NetworkParams');
-        out = String(NP.addCommonParams(String(base), true));
-      } catch (e) { err = String(e); }
+        return { url: String(NP.addCommonParams(String(base), true)) };
+      } catch (e) {
+        return { error: String(e) };
+      }
     });
-    return err ? { error: err } : { url: out };
   },
-  // App-identical security factor headers
   signHeaders: function (url, stub, ticket) {
-    var out = {};
-    Java.performNow(function () {
+    return withJavaSync(function () {
       try {
         var HashMap = Java.use('java.util.HashMap');
         var hm = HashMap.$new();
         if (stub) hm.put('x-ss-stub', String(stub));
         if (ticket) hm.put('x-ss-req-ticket', String(ticket));
         var a = getAdapter();
-        if (!a) { out.error = 'no_adapter'; return; }
+        if (!a) return { error: 'no_adapter' };
         var ret = a.onCallToAddSecurityFactor(String(url), hm);
-        out.headers = mapObj(ret);
-        out.adapter = String(a.getClass().getName());
+        return {
+          headers: mapObj(ret),
+          adapter: String(a.getClass().getName())
+        };
       } catch (e) {
-        out.error = String(e);
+        return { error: String(e) };
       }
-    });
-    return out;
+    }, 30000);
   },
-  // Fallback: full App stack POST (always works when App online)
   execPost: function (url, body, maxBytes) {
-    var out = {};
-    Java.performNow(function () {
+    return withJavaSync(function () {
       try {
         var NU = Java.use('com.ss.android.common.util.NetworkUtils');
         var CT = Java.use('com.bytedance.common.utility.NetworkUtils$CompressType');
         var bytes = Java.use('java.lang.String').$new(String(body)).getBytes('UTF-8');
         var lim = maxBytes | 0; if (lim <= 0) lim = 64 * 1024 * 1024;
         var resp = NU.executePost(lim, String(url), bytes, CT.NONE.value, 'application/json; charset=utf-8');
-        out.ok = true;
-        out.resp = String(resp);
+        return { ok: true, resp: String(resp) };
       } catch (e) {
-        out.ok = false;
-        out.error = String(e);
+        return { ok: false, error: String(e) };
       }
-    });
-    return out;
+    }, 60000);
   }
 };
 setTimeout(function () {
-  Java.perform(function () { send({ type: 'log', m: 'ttnet_signer ready' }); });
-}, 200);
+  try {
+    Java.perform(function () {
+      send({ type: 'log', m: 'ttnet_signer java_ok' });
+    });
+  } catch (e) {
+    send({ type: 'log', m: 'ttnet_signer java_defer: ' + e });
+  }
+}, 500);
 """
 
 
@@ -226,24 +278,59 @@ class TtnetDeviceSigner:
         self._session = None
         self._script = None
 
-    def _resolve_pid(self) -> int:
+    def _adb(self, *args: str, check: bool = False, timeout: float = 20.0) -> str:
+        cmd = ["adb", "-s", self.device_id, *args]
         try:
             out = subprocess.check_output(
-                ["adb", "-s", self.device_id, "shell", "pidof", self.package],
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).strip()
-            if out:
-                return int(out.split()[0])
+                cmd, text=True, stderr=subprocess.DEVNULL, timeout=timeout
+            )
+            return (out or "").strip()
         except Exception:
-            pass
+            if check:
+                raise
+            return ""
+
+    def _resolve_pid(self) -> int:
+        out = self._adb("shell", "pidof", self.package)
+        if out:
+            try:
+                return int(out.split()[0])
+            except ValueError:
+                return 0
         return 0
 
+    def ensure_frida_server(self) -> None:
+        """确保设备上 frida-server 在跑（不存在则尝试启动已推送的二进制）。"""
+        if self._adb("shell", "pidof", "frida-server"):
+            return
+        # 常见路径；失败不致命，attach 时再报错
+        self._adb("root")
+        time.sleep(0.8)
+        for path in (
+            "/data/local/tmp/frida-server",
+            "/data/local/tmp/frida-server-16",
+        ):
+            # 后台启动
+            subprocess.Popen(
+                [
+                    "adb",
+                    "-s",
+                    self.device_id,
+                    "shell",
+                    f"nohup {path} -D >/dev/null 2>&1 &",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            time.sleep(1.2)
+            if self._adb("shell", "pidof", "frida-server"):
+                return
+
     def ensure_app(self) -> int:
-        pid = self._resolve_pid()
-        if pid:
-            return pid
-        subprocess.check_call(
+        """启动/唤醒红果，并给 TTNet/MetaSec 一点初始化时间。"""
+        had_pid = self._resolve_pid() > 0
+        # 即使已在跑也 monkey 一下，避免进程僵死 / 未进前台导致 adapter 为空
+        subprocess.call(
             [
                 "adb",
                 "-s",
@@ -264,9 +351,30 @@ class TtnetDeviceSigner:
             time.sleep(1.0)
             pid = self._resolve_pid()
             if pid:
-                time.sleep(5.0)  # MetaSec / TTNet init
+                # 冷启动等久一点，热启动也至少 2s 让 Java/TTNet 稳定
+                time.sleep(2.0 if had_pid else 5.0)
                 return pid
-        raise TtnetSignerError(f"app {self.package} not running on {self.device_id}")
+        raise TtnetSignerError(
+            f"app {self.package} not running on {self.device_id}（请先打开红果）"
+        )
+
+    def _get_frida_device(self):
+        """按 device_id 解析 Frida device（兼容 emulator 序列号）。"""
+        try:
+            return frida.get_device(self.device_id, timeout=5)
+        except Exception:
+            pass
+        for d in frida.get_device_manager().enumerate_devices():
+            if d.id == self.device_id:
+                return d
+            if self.device_id in (d.id or "") or self.device_id in (d.name or ""):
+                return d
+        try:
+            return frida.get_usb_device(timeout=5)
+        except Exception as e:
+            raise TtnetSignerError(
+                f"找不到 Frida 设备 {self.device_id}（frida-server 未跑？）: {e}"
+            ) from e
 
     def attach(self, pid: Optional[int] = None) -> None:
         bridge_dir = resolve_bridge_dir()
@@ -275,35 +383,83 @@ class TtnetDeviceSigner:
                 "找不到 frida-tools 的 Java bridge（需要 pip install frida-tools，"
                 "或用 SHORTDRAMA_FRIDA_BRIDGES 指向 frida_tools/bridges 目录）"
             )
+        self.ensure_frida_server()
         if pid is None:
             pid = self.ensure_app()
-        self._device = frida.get_device(self.device_id)
-        self._session = self._device.attach(int(pid))
-        self._script = self._session.create_script(BOOT + "\n" + AGENT)
+        else:
+            # 调用方给了 pid 也稍等，避免 attach 过早
+            time.sleep(1.0)
 
-        def on_msg(msg, data):
-            if msg.get("type") != "send":
-                return
-            p = msg.get("payload")
-            if not isinstance(p, dict):
-                return
-            if p.get("type") == "frida:load-bridge":
-                stem = str(p.get("name", "")).lower()
-                bridge = next(bridge_dir.glob(stem + ".js"))
-                self._script.post(
-                    {
-                        "type": "frida:bridge-loaded",
-                        "filename": bridge.name,
-                        "source": bridge.read_text(encoding="utf-8"),
-                    }
-                )
+        last_err: Optional[Exception] = None
+        for attempt in range(1, 4):
+            try:
+                self.detach()
+                self._device = self._get_frida_device()
+                self._session = self._device.attach(int(pid))
+                self._script = self._session.create_script(BOOT + "\n" + AGENT)
+                bridge_dir_local = bridge_dir
 
-        self._script.on("message", on_msg)
-        self._script.load()
-        time.sleep(0.8)
-        st = self._script.exports_sync.ready()
-        if not st.get("ok"):
-            raise TtnetSignerError(f"signer not ready: {st}")
+                def on_msg(msg, data):
+                    if msg.get("type") != "send":
+                        return
+                    p = msg.get("payload")
+                    if not isinstance(p, dict):
+                        return
+                    if p.get("type") == "frida:load-bridge":
+                        stem = str(p.get("name", "")).lower()
+                        matches = list(bridge_dir_local.glob(stem + ".js"))
+                        if not matches:
+                            return
+                        bridge = matches[0]
+                        self._script.post(
+                            {
+                                "type": "frida:bridge-loaded",
+                                "filename": bridge.name,
+                                "source": bridge.read_text(encoding="utf-8"),
+                            }
+                        )
+
+                self._script.on("message", on_msg)
+                self._script.load()
+
+                # 等 Java bridge + ART：access violation 0x0 多半是 performNow 太早
+                st = None
+                for _ in range(20):
+                    time.sleep(0.5)
+                    try:
+                        # ping 先确认 RPC
+                        self._script.exports_sync.ping()
+                    except Exception as e:
+                        last_err = e
+                        continue
+                    try:
+                        ja = self._script.exports_sync.java_available()
+                        if not ja.get("ok") and not ja.get("available"):
+                            last_err = TtnetSignerError(f"java not ready: {ja}")
+                            continue
+                    except Exception as e:
+                        last_err = e
+                        continue
+                    try:
+                        st = self._script.exports_sync.ready()
+                    except Exception as e:
+                        # 典型：access violation accessing 0x0
+                        last_err = e
+                        st = {"ok": False, "error": str(e)}
+                        continue
+                    if st.get("ok"):
+                        return
+                    last_err = TtnetSignerError(f"signer not ready: {st}")
+                # 本轮失败：可能 pid 变了，刷新 app
+                pid = self.ensure_app()
+                last_err = last_err or TtnetSignerError("signer not ready")
+            except Exception as e:
+                last_err = e
+                time.sleep(1.0 * attempt)
+                pid = self._resolve_pid() or self.ensure_app()
+        raise TtnetSignerError(
+            f"挂载 App 签名失败（已重试）: {last_err}"
+        ) from last_err
 
     def detach(self) -> None:
         try:

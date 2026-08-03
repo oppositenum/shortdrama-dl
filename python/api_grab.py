@@ -154,17 +154,27 @@ def try_attach_device_signer(adb_device: str):
         signer.attach()
         return signer, ""
     except Exception as e:
-        return None, str(e)
+        # 压缩 Frida 长栈，日志里保留首行原因
+        msg = str(e).strip()
+        first = msg.splitlines()[0] if msg else "unknown"
+        if "access violation" in msg.lower() or "0x0" in msg:
+            first = (
+                f"{first}（Java/Frida 未就绪：已内置重试；请确认模拟器红果已打开且 "
+                f"frida-server 在跑）"
+            )
+        return None, first
 
 
-# 这些原因这一趟里不会自己好：缺包、没设备。再试也只是每集重复刷同样一行日志，
-# 白等一次挂载。判定为永久失败后本次运行就不再尝试签名，直接走冷却+轮换身份。
+# 这些原因这一趟里不会自己好：缺包、没设备。再试也只是每集重复刷同样一行日志。
+# access violation 在修复 attach 后多数可恢复，不列为永久失败。
 _PERMANENT_SIGN_FAILURES = (
     "无法 import ttnet_signer",
     "找不到 frida-tools",
+    "找不到 Frida 设备",
     "unable to find device",
     "device not found",
     "no device",
+    "not running",
 )
 
 

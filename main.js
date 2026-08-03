@@ -33,6 +33,7 @@ const {
   windowsRuntimeDirs,
   windowsSdkRoot,
 } = require('./runtime-platform');
+const { describeBarkTarget, normalizeBarkBase, sendBark } = require('./notify');
 
 // ---------------------------------------------------------------------------
 // 常量：红果短剧要求的请求头（防盗链）
@@ -318,6 +319,92 @@ function log(message, level = 'info') {
     message,
     time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
   });
+  if (level === 'error') notifyError(message);
+}
+
+// ===========================================================================
+// Bark 推送
+//
+// 只在用户配了地址时才推。两个场景：一部剧完整抓完、以及跑的过程中出错。
+// 推送失败一律吞掉——通知是附带功能，不该把下载带崩，也不该反过来刷屏日志。
+// ===========================================================================
+// 出错时不能一条一条推：一次分类批量几百部剧，风控起来错误是成串的。
+// 第一条立刻推，之后 5 分钟内的先攒着，等窗口过了或任务收尾时合并成一条。
+const ERROR_NOTIFY_WINDOW_MS = 5 * 60 * 1000;
+let lastErrorNotifyAt = 0;
+let suppressedErrorCount = 0;
+let lastSuppressedError = '';
+let notifyingError = false;
+
+/** 读当前配置的 Bark 地址；没配或不合法返回 null。 */
+function barkBase() {
+  try {
+    return normalizeBarkBase(loadUiSettings().barkUrl);
+  } catch {
+    return null;
+  }
+}
+
+/** 发一条推送，失败只在日志里留一行（且不带 key）。 */
+async function pushBark(title, body) {
+  const base = barkBase();
+  if (!base) return { ok: false, error: 'not_configured' };
+  const r = await sendBark(base, title, body);
+  if (!r.ok && r.error !== 'not_configured') {
+    // 用 send 而不是 log：log 里的 error 分支会再触发一次推送，直接绕回来。
+    send('download:log', {
+      level: 'warn',
+      message: `Bark 通知发送失败（${describeBarkTarget(base)}）：${r.error || r.status}`,
+      time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+    });
+  }
+  return r;
+}
+
+/** 一部剧完整抓完。 */
+function notifySeriesComplete({ seriesName, total, dir, elapsedText }) {
+  if (!barkBase()) return;
+  const parts = [`共 ${total} 集`];
+  if (elapsedText) parts.push(`耗时 ${elapsedText}`);
+  if (dir) parts.push(dir);
+  void pushBark(`《${seriesName}》已抓完`, parts.join(' · '));
+}
+
+/** 出错。窗口内的重复错误先攒着，避免一次风控刷出几十条推送。 */
+function notifyError(message) {
+  if (isCanceled) return;          // 用户自己按的取消，不算故障
+  if (notifyingError) return;      // 防止推送自身失败时递归
+  if (!barkBase()) return;
+
+  const now = Date.now();
+  if (lastErrorNotifyAt && now - lastErrorNotifyAt < ERROR_NOTIFY_WINDOW_MS) {
+    suppressedErrorCount++;
+    lastSuppressedError = message;
+    return;
+  }
+  lastErrorNotifyAt = now;
+  const extra = suppressedErrorCount ? `（另有 ${suppressedErrorCount} 条错误已合并）` : '';
+  suppressedErrorCount = 0;
+  lastSuppressedError = '';
+  notifyingError = true;
+  void pushBark('红果短剧下载器出错', `${message}${extra}`).finally(() => {
+    notifyingError = false;
+  });
+}
+
+/** 任务收尾时把攒下的错误补一条，别让它们烂在窗口里。 */
+function flushSuppressedErrors() {
+  if (!suppressedErrorCount || !barkBase()) {
+    suppressedErrorCount = 0;
+    lastSuppressedError = '';
+    return;
+  }
+  const count = suppressedErrorCount;
+  const last = lastSuppressedError;
+  suppressedErrorCount = 0;
+  lastSuppressedError = '';
+  lastErrorNotifyAt = Date.now();
+  void pushBark('红果短剧下载器出错', `本次另有 ${count} 条错误，最后一条：${last}`);
 }
 
 /** 发送状态文案 */
@@ -806,6 +893,7 @@ async function handleStartDownload(_event, payload) {
     return { ok: false, error: err.message };
   } finally {
     currentCommand = null;
+    flushSuppressedErrors(); // 攒在合并窗口里的错误别烂在这儿
   }
 }
 
@@ -2400,6 +2488,15 @@ async function downloadSeriesCore(url, saveDir, opts = {}) {
   syncCompleteMarker(seriesDir, grabbedTotal, totalCnt);
 
   const elapsedMs = Date.now() - startedAt;
+  // 只有真的凑齐全集才推：批量跑几百部时，这条通知就是"这部可以看了"的信号。
+  if (fullyComplete) {
+    notifySeriesComplete({
+      seriesName: info.seriesName,
+      total: totalCnt,
+      dir: seriesDir,
+      elapsedText: formatElapsed(elapsedMs),
+    });
+  }
   log(
     `《${info.seriesName}》结束：网页视频 0 集，当前全集 ${grabbedTotal}/${totalCnt} 集` +
       (grabAttempted ? `（本轮 ${grabLabel} 成功 ${grabOk} 集）` : '') +
@@ -2712,6 +2809,14 @@ app.whenReady().then(() => {
       interactive: true,
       grabMode: (payload && payload.grabMode) || 'api',
     }));
+  ipcMain.handle('notify:test', async (_e, payload) => {
+    // 用界面上当前填的值试，不必先保存；留空才回落到已保存的配置。
+    const raw = (payload && payload.barkUrl) || (loadUiSettings().barkUrl || '');
+    const base = normalizeBarkBase(raw);
+    if (!base) return { ok: false, error: 'invalid_bark_url' };
+    const r = await sendBark(base, '红果短剧下载器', '通知配置成功，抓完整部剧和出错时会推到这里');
+    return { ...r, target: describeBarkTarget(base) };
+  });
   ipcMain.handle('settings:load', () => loadUiSettings());
   ipcMain.handle('settings:save', (_e, partial) => saveUiSettings(partial));
 

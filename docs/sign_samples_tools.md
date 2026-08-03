@@ -69,8 +69,11 @@ python3 frida_gorgon_plaindump.py --device emulator-5554 --trigger 5
 | 差分语料 | `python3 gorgon_corpus_collect.py --device emulator-5554 --n 8` |
 | 算法探测 | `python3 gorgon_crack.py` |
 | native 内存扫 | `python3 frida_gorgon_native.py --device emulator-5554 --trigger 3` |
+| NewStringUTF / 站点 | `python3 frida_gorgon_stalker.py --device emulator-5554 --trigger 2` |
 
-进度说明：[GORGON_RE_STATUS.md](./GORGON_RE_STATUS.md)
+进度说明：[GORGON_RE_STATUS.md](./GORGON_RE_STATUS.md)  
+
+**路标：** Gorgon hex 从 `libmetasec_ml.so+0x283640` → `NewStringUTF` 进入 Java（见 stalker 日志）。
 
 ## 4. 建议实验顺序
 

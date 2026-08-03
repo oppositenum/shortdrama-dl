@@ -123,6 +123,18 @@
           <input id="introDetailed" type="checkbox" />
           <span>简介.txt 写详细信息（默认只写剧名和剧情简介；勾选后另附集数、标签、来源和演职人员）</span>
         </label>
+
+        <label class="field-label" for="barkUrl">Bark 通知（可选）</label>
+        <div class="input-row">
+          <input
+            id="barkUrl"
+            type="text"
+            placeholder="https://api.day.app/你的Key（留空不通知；每抓完一整部剧、以及出错时推送）"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button id="testNotify" class="btn btn-ghost">试发一条</button>
+        </div>
         </div>
 
         <div class="actions">

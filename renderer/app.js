@@ -18,6 +18,8 @@ const grabDirInput = $('grabDir');
 const chooseGrabDirBtn = $('chooseGrabDir');
 const grabDirRow = $('grabDirRow');
 const introDetailedCheckbox = $('introDetailed');
+const barkUrlInput = $('barkUrl');
+const testNotifyBtn = $('testNotify');
 const startBtn = $('start');
 const cancelBtn = $('cancel');
 const stopAfterSeriesBtn = $('stopAfterSeries');
@@ -109,6 +111,7 @@ function saveFormState() {
     appGrab: getGrabMode() === 'app', // 兼容旧设置字段
     grabDir: grabDirInput.value,
     introDetailed: introDetailedCheckbox.checked,
+    barkUrl: barkUrlInput.value.trim(),
   });
 }
 
@@ -287,6 +290,8 @@ function setDownloadingUI(on) {
   grabDirInput.disabled = on || getGrabMode() === 'none';
   chooseGrabDirBtn.disabled = on || getGrabMode() === 'none';
   introDetailedCheckbox.disabled = on;
+  barkUrlInput.disabled = on;
+  testNotifyBtn.disabled = on;
   startBtn.querySelector('.btn-text').textContent = on ? '下载中…' : '开始下载';
 }
 
@@ -388,6 +393,28 @@ chooseGrabDirBtn.addEventListener('click', async () => {
 urlInput.addEventListener('input', saveFormState);
 grabDirInput.addEventListener('input', saveFormState);
 introDetailedCheckbox.addEventListener('change', saveFormState);
+barkUrlInput.addEventListener('input', saveFormState);
+
+// 试发一条：配好之后能马上确认地址对不对，不用等一部剧抓完。
+testNotifyBtn.addEventListener('click', async () => {
+  const raw = barkUrlInput.value.trim();
+  if (!raw) {
+    appendLog({ time: now(), level: 'warn', message: '还没填 Bark 地址' });
+    return;
+  }
+  testNotifyBtn.disabled = true;
+  try {
+    const r = await window.api.testNotification(raw);
+    if (r && r.ok) {
+      appendLog({ time: now(), level: 'success', message: `测试通知已发送到 ${r.target || 'Bark'}` });
+    } else {
+      const why = r && r.error === 'invalid_bark_url' ? '地址格式不对' : (r && (r.error || r.status)) || '未知原因';
+      appendLog({ time: now(), level: 'error', message: `测试通知发送失败：${why}` });
+    }
+  } finally {
+    testNotifyBtn.disabled = false;
+  }
+});
 
 startBtn.addEventListener('click', async () => {
   const url = urlInput.value.trim();
@@ -477,6 +504,7 @@ async function initSettings() {
   }
   if (saved.grabDir) grabDirInput.value = saved.grabDir;
   if (typeof saved.introDetailed === 'boolean') introDetailedCheckbox.checked = saved.introDetailed;
+  if (saved.barkUrl) barkUrlInput.value = saved.barkUrl;
   syncGrabDirRow();
 
   if (saved.dir) {

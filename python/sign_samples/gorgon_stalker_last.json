@@ -1,0 +1,563 @@
+{
+  "triggers": [
+    {
+      "i": 0,
+      "sec": 1.07,
+      "headers": {
+        "X-Ladon": "AfUAwA==",
+        "X-Khronos": "1785728991",
+        "X-Argus": "3w9wag==",
+        "X-Gorgon": "840430f10000a997206285ca31e082545a7e34dac6e07c6d7f94",
+        "X-Helios": "t0lCXThZcmxPAyWdRxfVsBeLmyUtqxAIvvSdaqqo50dYQk+t",
+        "X-Medusa": "2g9wavJEP6CWen0p4LreRv1ivDzAGgABD8opgtF7gXsHGNW8qFAnLwolJPyHHNUFwXRjm9uJnehPJpkuAJUj9EkWwOuKu36u1g8iIFFaNJVO9mKvheE5v5pjDSv19GEJ1zT8fratE8Kjrwc3j1LVQXdtDgPAqrhqyqTusZIlpAtuV8kzMow229LYsRSroNQjmVLLcAw8G1LP0S6l//xXWZ19uCW3M9zgy2F6XOMAQhbkNZobhbrVYFz3VALkwKm0otcnjN27b6EhE9J2ghsYsO8Bo/JeE+VBEXy+Wi7UyxmbJcnUEWet9/WMg51XXvZGuC8CWZnA6+9pm+ge0FvFXYMe/oIUuxz4oc1OByE71tZr1RfNyw2YJqEJ1RFfxTBWbdu5BNdG7724g/iUc9PO1xiu507ygM4K6OxeWwcRwHBwoaiFQI/SXOeCH04ne1ctEwj3TM1Cv2ijnDag1dh9LjPZVm0nCfS7Lic3IzTtv844TH9CY1ub9rrryx98LMr+KpmG1BLp8FShoykfn2XNMvA4SmHvR9TuFN1HEDOMrVc1Q+wmtytnOlFNgYOzTiiKYzr3B9J8tS9m6TD2nk/OkvnOndBJMuvwVpVkhW4KVQXdoHI5EVXwAcO7Wn6rTULkBXq8jFakPLhuGeZ4lEckdEcrrN3RWOoj7wgm3TuPQ0IpSnmAzKkgDAJ41e++pfrFOuVtsIMTQr2lnOhYAlgcGmuQwdI3NS4a9ds8ag+eWDvMv6JyaeS15FpPyMKpxJZc8mvQL0oHknra+l5ipNXwWXmrGqXSIiIK9b2ABkm5enZ29WeR1YFLYOI0k858EEu6ribX/LFs4DzGPwiMuDEk9Uwqvhdh7d+EgoApWK3e+wSly0MDrEUBzpGERpMJ/1FKA8H8Z9tLMqVtugN/2ZXCwNQRxcdmRNSfzs0MblhhdHhSAcMS9Ks1+LhLAm7odRUZnx3DddeupYPjt7pYrdhP5wDE9G3KLVftjigzN71No2tJ7s8O8xTZRFEu/E+35m/1domKu+o+6MLDAj3GCDtiB2R4gmINJQNj8ERul8zW1UZgTquqNEpPzMg6Ga+EzEIJH0rbQT/p09l7I7N+DyXlQHQBKf6kiHwUHvYXu5poQ3gwh0qtbzVhwh69XD1JGvu75fnf7v6N4JdHW1BIo8mLI7w9x5WzC4j+sFrzN47OVt4pePPiywi1oCVTh4XTSiT+bXOv8x8sXANStPWd+XhlknYHGvuPEv/7jxL/jmc="
+      }
+    },
+    {
+      "i": 1,
+      "sec": 0.77,
+      "headers": {
+        "X-Ladon": "AfTgwA==",
+        "X-Khronos": "1785728992",
+        "X-Argus": "4A9wag==",
+        "X-Gorgon": "840430ad00007ba0753fbdfa0cf182131222f993a60678f0d013",
+        "X-Helios": "jL0LbuoMGqtrNSgNQt2lbEdPE3KICjPWGuDcxuhBQMP6rFYz",
+        "X-Medusa": "5Q9was1EP6Cpen0p37reRsJivDyqHgABI8rZBaRYgbYJWFA9qsdbHtdTSSbkG1T+wPltBqqDpsHr1NMJsvvcoRV/yunlaNf7a6elHEC4vH63gGerrGKzcOt7e8Dg+2oaZyzAtAFET/1WEw9DBTzqpn48tHT7uuMV5KTgnDh5noE+894Hp76OCHH+G3JBBOHLRq77mJtGi5KKhpkSnUB9wBUfGc44ukYfVKFOQ66cFVC2b+okPXV2syMFvnsSAG/Ua09QLQVuTZCWS9jWoJh6SzAqPpaCm3/au/59cdRCl9RAeo2SPN4T6lvAt8rZA/GenzOcM/6O/YdIDNgOSyo6qzKNIjlX2BQVCDsmutULxUzvbxMQ3hl/4NgwvtHxpv0Z9AKSVxWU4eWzNVT8pddYal1zUjl8qXUfz1Knr3/cUueoThB3yYNLhmIGkSRlefV+EwlvaqRBeE3BTPLbyE8izL8Lf2oBPmjbJyXsbuKLhoX7s3M+EFpacuHxgstYq0S8vMt7CV7EX3FxXslOpvV7lhv5EFDr9/1KNqocRuTi08iTH9gbeeyvncTPxKzxJ0nH7iGBSy9JpSr+OrTzd1M3JNeSuSs+TcjFan+dpeXIu9ndiYd40qabFrb+VZQ0pemMKOfZFRtXlVnGahfz/63c6BWTUwL3VMQ014CqrzVPcHZMFy19sxVS2jUbym4yfgJmEX2B19mM3OzHeI1afC89TR4KFwnfleGhrUBvCBhGW3erzH4MAWMF/lWfqhFn30j4Jm0ey75GgHgKupYy6+F3FOLtQDp+8Zpf6hIyh3k/GOoKsfuYvVpz5bIjkTU+T3y59VlNxf0jDF39yZ0HRBGub0pZooc0ZJuGUqL6ookhLv3gZ0y5pdwGKZedgbpJeO76sGObzuLMRZPzJJBLJ2RoGsl46l4CKjPDU+HO9YTLIkiSYYIcQcBmz3a4XJ5HRt+KVe4HB2UMVvb+F9EJf95h6+Q2Ph2iNCFpR+8bgE0ktcOJSBchKG1CGfMKKKnlzq8TEC+Z+Vif7YXy1Pevf6yiaWgnb0InvsPFtDc3KBPegb4kAoTv0p47TYqlOxp2kDk5Q83ExRdyEPjvzf8YHr7V9arZF6ywtgc6ofJ3ux8a9Re1MNaciMnoxAbn4je7v6nBYkxaHg11cC6KWZyvOqaVecfqUFH+Z0Y/3NYnG536AsTVO13Y1gj1yQnHPlpAGd08DkIXm3hwPQrH/iohpwXB/vhEFdUnBP/7JwT/+5tk"
+      }
+    }
+  ],
+  "f3_events": 3,
+  "string_events": 3,
+  "last_f3": {
+    "type": "f3_stalker",
+    "opcode": 50331649,
+    "gorgon": "840430ad00007ba0753fbdfa0cf182131222f993a60678f0d013",
+    "headers": {
+      "X-Argus": "4A9wag==",
+      "X-Gorgon": "840430ad00007ba0753fbdfa0cf182131222f993a60678f0d013",
+      "X-Helios": "jL0LbuoMGqtrNSgNQt2lbEdPE3KICjPWGuDcxuhBQMP6rFYz",
+      "X-Khronos": "1785728992",
+      "X-Ladon": "AfTgwA==",
+      "X-Medusa": "5Q9was1EP6Cpen0p37reRsJivDyqHgABI8rZBaRYgbYJWFA9qsdbHtdTSSbkG1T+wPltBqqDpsHr1NMJsvvcoRV/yunlaNf7a6elHEC4vH63gGerrGKzcOt7e8Dg+2oaZyzAtAFET/1WEw9DBTzqpn48tHT7uuMV5KTgnDh5noE+894Hp76OCHH+G3JBBOHLRq77mJtGi5KKhpkSnUB9wBUfGc44ukYfVKFOQ66cFVC2b+okPXV2syMFvnsSAG/Ua09QLQVuTZCWS9jWoJh6SzAqPpaCm3/au/59cdRCl9RAeo2SPN4T6lvAt8rZA/GenzOcM/6O/YdIDNgOSyo6qzKNIjlX2BQVCDsmutULxUzvbxMQ3hl/4NgwvtHxpv0Z9AKSVxWU4eWzNVT8pddYal1zUjl8qXUfz1Knr3/cUueoThB3yYNLhmIGkSRlefV+EwlvaqRBeE3BTPLbyE8izL8Lf2oBPmjbJyXsbuKLhoX7s3M+EFpacuHxgstYq0S8vMt7CV7EX3FxXslOpvV7lhv5EFDr9/1KNqocRuTi08iTH9gbeeyvncTPxKzxJ0nH7iGBSy9JpSr+OrTzd1M3JNeSuSs+TcjFan+dpeXIu9ndiYd40qabFrb+VZQ0pemMKOfZFRtXlVnGahfz/63c6BWTUwL3VMQ014CqrzVPcHZMFy19sxVS2jUbym4yfgJmEX2B19mM3OzHeI1afC89TR4KFwnfleGhrUBvCBhGW3erzH4MAWMF/lWfqhFn30j4Jm0ey75GgHgKupYy6+F3FOLtQDp+8Zpf6hIyh3k/GOoKsfuYvVpz5bIjkTU+T3y59VlNxf0jDF39yZ0HRBGub0pZooc0ZJuGUqL6ookhLv3gZ0y5pdwGKZedgbpJeO76sGObzuLMRZPzJJBLJ2RoGsl46l4CKjPDU+HO9YTLIkiSYYIcQcBmz3a4XJ5HRt+KVe4HB2UMVvb+F9EJf95h6+Q2Ph2iNCFpR+8bgE0ktcOJSBchKG1CGfMKKKnlzq8TEC+Z+Vif7YXy1Pevf6yiaWgnb0InvsPFtDc3KBPegb4kAoTv0p47TYqlOxp2kDk5Q83ExRdyEPjvzf8YHr7V9arZF6ywtgc6ofJ3ux8a9Re1MNaciMnoxAbn4je7v6nBYkxaHg11cC6KWZyvOqaVecfqUFH+Z0Y/3NYnG536AsTVO13Y1gj1yQnHPlpAGd08DkIXm3hwPQrH/iohpwXB/vhEFdUnBP/7JwT/+5tk"
+    },
+    "write_hits": [
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7bf11462d0",
+        "src": "0x7b90a0c5f0",
+        "hex": "1d6089ce7d00000090c594f27f000000216089ce7d00000098c594f27f000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x1421b9c4",
+        "src": "0x14219718",
+        "hex": "4131323235333331354432433835364136354638414437323233333639383146",
+        "bt": [
+          "0x7af9d6ee04 libart.so!_ZN3artL24CharsetUtils_toUtf8BytesEP7_JNIEnvP7_jclassP8_jstringii.__uniq.176477096229669308889990974855221008962+0x140",
+          "0x7af9d6ee04 libart.so!_ZN3artL24CharsetUtils_toUtf8BytesEP7_JNIEnvP7_jclassP8_jstringii.__uniq.176477096229669308889990974855221008962+0x140"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 20,
+        "dst": "0x7d9d93fb50",
+        "src": "0x7b70948d88",
+        "hex": "ba1a080069a70800e9ae0800205f0800c2990800",
+        "bt": [
+          "0x7d9d89aee4 libc.so!_ZN5scudo28SizeClassAllocatorLocalCacheINS_20SizeClassAllocator64INS_13AndroidConfigEEEE6refillEPNS4_8PerClassEm+0x58",
+          "0x7d9d89aee4 libc.so!_ZN5scudo28SizeClassAllocatorLocalCacheINS_20SizeClassAllocator64INS_13AndroidConfigEEEE6refillEPNS4_8PerClassEm+0x58"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x1421b9c4",
+        "src": "0x14219718",
+        "hex": "4131323235333331354432433835364136354638414437323233333639383146",
+        "bt": [
+          "0x7af9d6ee04 libart.so!_ZN3artL24CharsetUtils_toUtf8BytesEP7_JNIEnvP7_jclassP8_jstringii.__uniq.176477096229669308889990974855221008962+0x140",
+          "0x7af9d6ee04 libart.so!_ZN3artL24CharsetUtils_toUtf8BytesEP7_JNIEnvP7_jclassP8_jstringii.__uniq.176477096229669308889990974855221008962+0x140"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 20,
+        "dst": "0x7d9d93fb50",
+        "src": "0x7b70948d88",
+        "hex": "ba1a080069a70800e9ae0800205f0800c2990800",
+        "bt": [
+          "0x7d9d89aee4 libc.so!_ZN5scudo28SizeClassAllocatorLocalCacheINS_20SizeClassAllocator64INS_13AndroidConfigEEEE6refillEPNS4_8PerClassEm+0x58",
+          "0x7d9d89aee4 libc.so!_ZN5scudo28SizeClassAllocatorLocalCacheINS_20SizeClassAllocator64INS_13AndroidConfigEEEE6refillEPNS4_8PerClassEm+0x58"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7b90a21980",
+        "src": "0x1421b9c4",
+        "hex": "4131323235333331354432433835364136354638414437323233333639383146",
+        "bt": [
+          "0x7af9ec63d0 libart.so!_ZN3art3JNIILb0EE18GetByteArrayRegionEP7_JNIEnvP11_jbyteArrayiiPa+0x164",
+          "0x7af9ec63d0 libart.so!_ZN3art3JNIILb0EE18GetByteArrayRegionEP7_JNIEnvP11_jbyteArrayiiPa+0x164"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x7bf11462d0",
+        "src": "0x7b90a0c5f0",
+        "hex": "1d6089ce7d00000090c594f27f000000216089ce7d00000098c594f27f000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x7b90a21980",
+        "src": "0x1421b9c4",
+        "hex": "4131323235333331354432433835364136354638414437323233333639383146",
+        "bt": [
+          "0x7af9ec63d0 libart.so!_ZN3art3JNIILb0EE18GetByteArrayRegionEP7_JNIEnvP11_jbyteArrayiiPa+0x164",
+          "0x7af9ec63d0 libart.so!_ZN3art3JNIILb0EE18GetByteArrayRegionEP7_JNIEnvP11_jbyteArrayiiPa+0x164"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 26,
+        "dst": "0x7b90aa9580",
+        "src": "0x7b90ad51d0",
+        "hex": "7b226861726477617265223a22756e6b6e6f772d74797065227d",
+        "bt": [
+          "0x78adf102d8 libAndroidPitayaCore.so!_ZN6pitaya20GetStringFromJStringEP7_JNIEnvP8_jstring+0xd4",
+          "0x78adf102d8 libAndroidPitayaCore.so!_ZN6pitaya20GetStringFromJStringEP7_JNIEnvP8_jstring+0xd4"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7bf11462d0",
+        "src": "0x7b90a0c5f0",
+        "hex": "1d6089ce7d000000a0c594f27f000000216089ce7d000000a8c594f27f000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7cd0f0e250",
+        "src": "0x7b90a21980",
+        "hex": "4131323235333331354432433835364136354638414437323233333639383146",
+        "bt": [
+          "0x7a02cc0794 libmetasec_ml.so!0x259794",
+          "0x7a02cc0794 libmetasec_ml.so!0x259794"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 26,
+        "dst": "0x7b90aa9580",
+        "src": "0x7b90ad51d0",
+        "hex": "7b226861726477617265223a22756e6b6e6f772d74797065227d",
+        "bt": [
+          "0x78adf102d8 libAndroidPitayaCore.so!_ZN6pitaya20GetStringFromJStringEP7_JNIEnvP8_jstring+0xd4",
+          "0x78adf102d8 libAndroidPitayaCore.so!_ZN6pitaya20GetStringFromJStringEP7_JNIEnvP8_jstring+0xd4"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x7bf11462d0",
+        "src": "0x7b90a0c5f0",
+        "hex": "1d6089ce7d000000a0c594f27f000000216089ce7d000000a8c594f27f000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x7cd0f0e250",
+        "src": "0x7b90a21980",
+        "hex": "4131323235333331354432433835364136354638414437323233333639383146",
+        "bt": [
+          "0x7a02cc0794 libmetasec_ml.so!0x259794",
+          "0x7a02cc0794 libmetasec_ml.so!0x259794"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7bf09f4f90",
+        "src": "0x7b90a202d0",
+        "hex": "01a83fb77d000000c0641d317a00000005a83fb77d000000c8641d317a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 20,
+        "dst": "0x7a6d7e5b69",
+        "src": "0x7b20aef260",
+        "hex": "63616368655f736368656d615f66656174757265",
+        "bt": [
+          "0x79c926b028 libBDPythonVM.so!0x2b028",
+          "0x79c926b028 libBDPythonVM.so!0x2b028"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7bf11462d0",
+        "src": "0x7b90a0c5f0",
+        "hex": "1d6089ce7d000000f0c594f27f000000216089ce7d000000f8c594f27f000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7cd0e6d990",
+        "src": "0x7cd0f0e250",
+        "hex": "4131323235333331354432433835364136354638414437323233333639383146",
+        "bt": [
+          "0x7a02cc0970 libmetasec_ml.so!0x259970",
+          "0x7a02cc0970 libmetasec_ml.so!0x259970"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7bf112c4c0",
+        "src": "0x7b90a2fa80",
+        "hex": "0180a7b37d000000101657287a0000000580a7b37d000000181657287a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 20,
+        "dst": "0x14146050",
+        "src": "0x1bf39460",
+        "hex": "7472794164645365637572697479466163746f72",
+        "bt": [
+          "0x7af9d63e40 libart.so!_ZN3artL22String_fillBytesLatin1EP7_JNIEnvP8_jobjectP11_jbyteArrayi.__uniq.211321754789976184382062795672362477106+0x98",
+          "0x7af9d63e40 libart.so!_ZN3artL22String_fillBytesLatin1EP7_JNIEnvP8_jobjectP11_jbyteArrayi.__uniq.211321754789976184382062795672362477106+0x98"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7bf1238b20",
+        "src": "0x7b90a244a0",
+        "hex": "01a63fb77d000000c0042e317a00000005a63fb77d000000c8042e317a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x7bf09f4f90",
+        "src": "0x7b90a202d0",
+        "hex": "01a83fb77d000000c0641d317a00000005a83fb77d000000c8641d317a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x7bf112c4c0",
+        "src": "0x7b90a2fa80",
+        "hex": "0180a7b37d000000101657287a0000000580a7b37d000000181657287a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 20,
+        "dst": "0x14146050",
+        "src": "0x1bf39460",
+        "hex": "7472794164645365637572697479466163746f72",
+        "bt": [
+          "0x7af9d63e40 libart.so!_ZN3artL22String_fillBytesLatin1EP7_JNIEnvP8_jobjectP11_jbyteArrayi.__uniq.211321754789976184382062795672362477106+0x98",
+          "0x7af9d63e40 libart.so!_ZN3artL22String_fillBytesLatin1EP7_JNIEnvP8_jobjectP11_jbyteArrayi.__uniq.211321754789976184382062795672362477106+0x98"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x7bf1238b20",
+        "src": "0x7b90a244a0",
+        "hex": "01a63fb77d000000c0042e317a00000005a63fb77d000000c8042e317a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7bf09f4f90",
+        "src": "0x7b90a202d0",
+        "hex": "01a83fb77d00000050631d317a00000005a83fb77d00000058631d317a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7bf112c4c0",
+        "src": "0x7b90a2fa80",
+        "hex": "0180a7b37d000000a01457287a0000000580a7b37d000000a81457287a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x7bf11462d0",
+        "src": "0x7b90a0c5f0",
+        "hex": "1d6089ce7d000000f0c594f27f000000216089ce7d000000f8c594f27f000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7bf1238b20",
+        "src": "0x7b90a244a0",
+        "hex": "01a63fb77d00000050032e317a00000005a63fb77d00000058032e317a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x7bf112c4c0",
+        "src": "0x7b90a2fa80",
+        "hex": "0180a7b37d000000a01457287a0000000580a7b37d000000a81457287a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 20,
+        "dst": "0x7a6d7e5b69",
+        "src": "0x7b20aef260",
+        "hex": "63616368655f736368656d615f66656174757265",
+        "bt": [
+          "0x79c926b028 libBDPythonVM.so!0x2b028",
+          "0x79c926b028 libBDPythonVM.so!0x2b028"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x7bf09f4f90",
+        "src": "0x7b90a202d0",
+        "hex": "01a83fb77d00000050631d317a00000005a83fb77d00000058631d317a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7bf11462d0",
+        "src": "0x7b90a0c5f0",
+        "hex": "1d6089ce7d000000b0c694f27f000000216089ce7d000000b8c694f27f000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x7cd0e6d990",
+        "src": "0x7cd0f0e250",
+        "hex": "4131323235333331354432433835364136354638414437323233333639383146",
+        "bt": [
+          "0x7a02cc0970 libmetasec_ml.so!0x259970",
+          "0x7a02cc0970 libmetasec_ml.so!0x259970"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7bf112c4c0",
+        "src": "0x7b90a2fa80",
+        "hex": "0180a7b37d000000101657287a0000000580a7b37d000000181657287a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 32,
+        "dst": "0x7bf09f4f90",
+        "src": "0x7b90a202d0",
+        "hex": "01a83fb77d000000c0641d317a00000005a83fb77d000000c8641d317a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x7bf11462d0",
+        "src": "0x7b90a0c5f0",
+        "hex": "1d6089ce7d000000b0c694f27f000000216089ce7d000000b8c694f27f000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 20,
+        "dst": "0x7b90add510",
+        "src": "0x7a02fe4160",
+        "hex": "487474705265717565737443616c6c6261636b00",
+        "bt": [
+          "0x7a02bdda00 libmetasec_ml.so!0x176a00",
+          "0x7a02bdda00 libmetasec_ml.so!0x176a00"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memmove",
+        "n": 32,
+        "dst": "0x7bf112c4c0",
+        "src": "0x7b90a2fa80",
+        "hex": "0180a7b37d000000101657287a0000000580a7b37d000000181657287a000000",
+        "bt": [
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144",
+          "0x7af9b9cd30 libart.so!_ZN3art28RememberForGcArgumentVisitor5VisitEv+0x144"
+        ]
+      },
+      {
+        "kind": "memcpy",
+        "label": "memcpy",
+        "n": 20,
+        "dst": "0x12e120b0",
+        "src": "0x12e11a8e",
+        "hex": "3138343436373434303733373039353531363135",
+        "bt": [
+          "0x7af9cf25a8 libart.so!_ZN3art2gc4Heap24AllocObjectWithAllocatorILb1ELb1ENS_6mirror39SetStringCountAndValueVisitorFromStringEEEPNS3_6ObjectEPNS_6ThreadENS_6ObjPtrINS3_5ClassEEEmNS0_13AllocatorTypeERKT1_+0xec",
+          "0x7af9cf25a8 libart.so!_ZN3art2gc4Heap24AllocObjectWithAllocatorILb1ELb1ENS_6mirror39SetStringCountAndValueVisitorFromStringEEEPNS3_6ObjectEPNS_6ThreadENS_6ObjPtrINS3_5ClassEEEmNS0_13AllocatorTypeERKT1_+0xec"
+        ]
+      }
+    ],
+    "write_match": [],
+    "string_hits": [
+      {
+        "type": "newstring_utf",
+        "value": "840430f10000a997206285ca31e082545a7e34dac6e07c6d7f94",
+        "export": "_ZN3art3JNIILb0EE12NewStringUTFEP7_JNIEnvPKc",
+        "bt": [
+          "0x7a02cea640 libmetasec_ml.so!0x283640",
+          "0x7a02cea6bc libmetasec_ml.so!0x2836bc",
+          "0x7a02cea6bc libmetasec_ml.so!0x2836bc"
+        ]
+      },
+      {
+        "type": "newstring_utf",
+        "value": "8404502e0000cf3b481cbf9c6a52a1f06b1ee857dffab262ff4a",
+        "export": "_ZN3art3JNIILb0EE12NewStringUTFEP7_JNIEnvPKc",
+        "bt": [
+          "0x7a02cea640 libmetasec_ml.so!0x283640",
+          "0x7a02cea6bc libmetasec_ml.so!0x2836bc",
+          "0x7a02cea6bc libmetasec_ml.so!0x2836bc"
+        ]
+      },
+      {
+        "type": "newstring_utf",
+        "value": "840430ad00007ba0753fbdfa0cf182131222f993a60678f0d013",
+        "export": "_ZN3art3JNIILb0EE12NewStringUTFEP7_JNIEnvPKc",
+        "bt": [
+          "0x7a02cea640 libmetasec_ml.so!0x283640",
+          "0x7a02cea6bc libmetasec_ml.so!0x2836bc",
+          "0x7a02cea6bc libmetasec_ml.so!0x2836bc"
+        ]
+      }
+    ],
+    "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832718729&ac=mobile&channel=69310258a&aid=8662&app_name=novelread&version_code=72732&version_name=7.2.7.32&device_platform=android&os=android&ssmix=a&device_type=sdk_gphone64_arm64&device_brand=google&language=en&os_api=34",
+    "ts": 1785728992487
+  },
+  "unique_write_pcs": [
+    "0x7a02cea640"
+  ]
+}

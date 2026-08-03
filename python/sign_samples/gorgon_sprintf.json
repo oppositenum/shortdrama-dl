@@ -1,0 +1,20 @@
+[
+  {
+    "type": "newstr",
+    "s": "84043097000094a299d165cd155d58a6973a8adb0f26426ffeef",
+    "bt": [
+      "0x7a02cea640 libmetasec_ml.so!0x283640",
+      "0x7a02cea6bc libmetasec_ml.so!0x2836bc",
+      "0x7a02cea6bc libmetasec_ml.so!0x2836bc"
+    ]
+  },
+  {
+    "type": "newstr",
+    "s": "8404a0470000f3b68f21f2e51aac6b9bf4597e9b741aee5a538b",
+    "bt": [
+      "0x7a02cea640 libmetasec_ml.so!0x283640",
+      "0x7a02cea6bc libmetasec_ml.so!0x2836bc",
+      "0x7a02cea6bc libmetasec_ml.so!0x2836bc"
+    ]
+  }
+]

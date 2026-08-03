@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('api', {
   /** 修复缺失项：走既有的交互式安装确认流程 */
   fixEnvironment: (grabDir, grabMode) =>
     ipcRenderer.invoke('env:fix', { grabDir, grabMode }),
+  /** 试发一条 Bark 通知，验证填的地址能用；不传则用已保存的配置 */
+  testNotification: (barkUrl) => ipcRenderer.invoke('notify:test', { barkUrl }),
   /** 读取上次记住的界面设置（链接、目录等），返回已保存的字段对象 */
   loadSettings: () => ipcRenderer.invoke('settings:load'),
   /** 保存界面设置，只需传有变化的字段，主进程会和已保存内容合并 */
