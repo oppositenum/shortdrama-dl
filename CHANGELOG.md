@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.3.0...v1.4.0) (2026-08-03)
+
+
+### Features
+
+* **notify:** push a Bark notification per finished series and on errors ([a55d4ec](https://github.com/oppositenum/shortdrama-dl/commit/a55d4ec7a9efa0473ae5dc74048841a8450179db))
+
 ## [1.3.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.2.2...v1.3.0) (2026-08-03)
 
 
