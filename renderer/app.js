@@ -58,12 +58,12 @@ const envItemState = { python: 'checking', ffmpeg: 'checking', android: 'checkin
 // 设置结构版本：
 //   1（或缺失）= 只有「App 抓取」开关
 //   2 = 三选一 grabMode：api | app | none
-//   3 = 四选一：offline | api | app | none（新增离线六神纯协议）
+//   3 = 四选一：offline | api | app | none（offline=本机签名纯协议，内部 id 未改以免坏设置）
 // 旧设置里的 appGrab: true 是当年的默认值而不是用户的选择，迁移时不能直接当成
 // "用户要 App 抓取"，否则升级后仍会去装模拟器——见 GRAB_MODE_LABEL 下面的迁移逻辑。
 const SETTINGS_VERSION = 3;
 const GRAB_MODE_LABEL = {
-  offline: '离线六神纯协议（无需模拟器/Frida）',
+  offline: '本机签名纯协议（无需模拟器，下载需联网）',
   api: '纯协议下载（可借模拟器签名回退）',
   app: 'App 抓取（需 root 安卓 + Frida）',
   none: '仅保存封面与简介',
@@ -111,7 +111,7 @@ function resolveSavedGrabMode(saved = {}) {
   if (saved.grabMode === 'app' || saved.appGrab === true) {
     return { mode: 'api', migrated: true };
   }
-  // 头一次运行：新默认「离线六神纯协议」。
+  // 头一次运行：新默认「本机签名纯协议」。
   return { mode: 'offline', migrated: false };
 }
 
@@ -391,7 +391,7 @@ for (const el of [modeApp, modeApi, modeOffline, modeNone]) {
     syncGrabDirRow();
     updateInputSummary();
     saveFormState();
-    // 切换抓取方式后重跑环境检查（纯协议/离线六神不查安卓/Frida）
+    // 切换抓取方式后重跑环境检查（纯协议/本机签名不查安卓/Frida）
     if (!downloading) runEnvCheck();
   });
 }

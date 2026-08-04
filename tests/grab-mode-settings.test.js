@@ -62,12 +62,14 @@ test('v2 用户已选的 api/app/none 升级到 v3 不改动', () => {
   );
 });
 
-test('没有任何设置时用新默认「离线六神」，且不当成迁移', () => {
+test('没有任何设置时用新默认「本机签名纯协议」，且不当成迁移', () => {
   assert.deepEqual(resolveSavedGrabMode({}), { mode: 'offline', migrated: false });
   assert.deepEqual(resolveSavedGrabMode({ settingsVersion: SETTINGS_VERSION }), {
     mode: 'offline',
     migrated: false,
   });
+  assert.match(GRAB_MODE_LABEL.offline, /本机签名/);
+  assert.equal(GRAB_MODE_LABEL.offline.includes('离线六神'), false);
 });
 
 // 就绪提示必须报本次真正生效的模式：写死一句"默认纯协议"正是误导的来源。

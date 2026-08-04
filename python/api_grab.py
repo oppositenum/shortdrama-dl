@@ -286,12 +286,12 @@ def main() -> int:
         "--offline-sign",
         action="store_true",
         default=None,
-        help="使用纯 Python 离线 Khronos+Gorgon（无需模拟器；默认开启）",
+        help="本机 Python 生成 Khronos+Gorgon（无需模拟器；下载仍需联网；默认开启）",
     )
     ap.add_argument(
         "--no-offline-sign",
         action="store_true",
-        help="关闭离线签名（仅裸 HTTP，易 110001）",
+        help="关闭本机签名（仅裸 HTTP，易 110001）",
     )
     ap.add_argument(
         "--device-sign",
@@ -301,7 +301,7 @@ def main() -> int:
     ap.add_argument(
         "--device-sign-auto",
         action="store_true",
-        help="离线签名仍 110001 时自动尝试挂载 App 签名（需模拟器/真机 + frida-server）",
+        help="本机签名仍 110001 时自动尝试挂载 App 签名（需模拟器/真机 + frida-server）",
     )
     ap.add_argument(
         "--adb-device",
@@ -327,7 +327,7 @@ def main() -> int:
         args.device_sign
         or os.environ.get("SHORTDRAMA_DEVICE_SIGN", "").strip() in ("1", "true", "yes")
     )
-    # 离线签名默认开；--no-offline-sign 或 SHORTDRAMA_OFFLINE_SIGN=0 关闭
+    # 本机签名默认开；--no-offline-sign 或 SHORTDRAMA_OFFLINE_SIGN=0 关闭
     use_offline = not args.no_offline_sign
     if os.environ.get("SHORTDRAMA_OFFLINE_SIGN", "").strip() in ("0", "false", "no"):
         use_offline = False
@@ -348,9 +348,9 @@ def main() -> int:
             from metasec_offline import OfflineSigner  # noqa: WPS433
 
             signer = OfflineSigner()
-            logev("info", "已启用纯协议离线签名（Khronos+Gorgon，无需模拟器）")
+            logev("info", "已启用本机签名（Khronos+Gorgon，无需模拟器；下载需联网）")
         except Exception as e:
-            logev("warn", f"离线签名初始化失败，将裸请求: {e}")
+            logev("warn", f"本机签名初始化失败，将裸请求: {e}")
             signer = None
 
     client = HongguoApiClient(
@@ -363,8 +363,8 @@ def main() -> int:
     def ensure_signed_or_recover(reason: str) -> bool:
         """110001 恢复策略（优先快路径）：
 
-        1. 已挂签名（离线或设备）→ 直接继续
-        2. 尝试切换/启用离线 OfflineSigner
+        1. 已挂签名（本机或设备）→ 直接继续
+        2. 尝试切换/启用本机 OfflineSigner
         3. 允许 auto_sign → 挂载 App 设备签名
         4. 冷却 + 轮换 device_id
         """
@@ -372,23 +372,23 @@ def main() -> int:
         logev("warn", f"触发风控恢复（{reason}）")
 
         if client.signer is not None:
-            # 若当前是离线仍失败，再尝试设备签名
+            # 若当前是本机签仍失败，再尝试设备签名
             is_offline = type(client.signer).__name__ == "OfflineSigner"
             if not is_offline:
                 logev("info", "已在设备签名路径，跳过冷却，直接重试")
                 return True
-            logev("info", "离线签名仍遇风控，尝试其它恢复…")
+            logev("info", "本机签名仍遇风控，尝试其它恢复…")
         else:
-            # 先上离线签名
+            # 先上本机签名
             try:
                 from metasec_offline import OfflineSigner  # noqa: WPS433
 
                 signer = OfflineSigner()
                 client.set_signer(signer)
-                logev("info", "已切换纯协议离线签名（Khronos+Gorgon）")
+                logev("info", "已切换本机签名（Khronos+Gorgon）")
                 return True
             except Exception as e:
-                logev("warn", f"离线签名不可用: {e}")
+                logev("warn", f"本机签名不可用: {e}")
 
         # 有设备就挂 App 签名
         if auto_sign:
