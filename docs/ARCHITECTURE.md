@@ -132,6 +132,14 @@ arguments (纯协议模式):
 
 纯协议子进程环境额外设置 `HONGGUO_RUNTIME_DIR` / `SHORTDRAMA_KEY_CACHE` 指向 `runtime/api`，**不**设置 `ANDROID_SERIAL`。
 
+#### CDN 下载重试
+
+分集下载走 `download_cdn_with_retry()`：一轮 = main + backup 各一次，整对最多重试 `SHORTDRAMA_CDN_ROUNDS`（默认 3）轮，轮间退避 2s / 6s / 15s。以前是一趟循环走完两个地址就把这一集判死，一次偶发超时要等到几分钟后整部剧重跑的补漏轮才有下文。
+
+`http_download()` 支持断点续传：分片文件按 URL 的哈希分开存（`<dest>.<hash>.part`），失败时保留，重试带 `Range` 接着下；服务端返回 200 而不是 206 就从头写。**不能**拿一半 main 的字节接 backup 的后半段——两边真有一字节不同，`expect_size` 校验照样过，坏掉的是解密后的成片。分片名保留 `ep<NNNN>_` 前缀，整集收尾时和其他临时文件一起清掉。
+
+`timeout`（`SHORTDRAMA_CDN_TIMEOUT`，默认 40s）是 socket 级的，只管建连和单次 read；`deadline_s`（`SHORTDRAMA_CDN_DEADLINE`，默认 240s）才是单次尝试的总时限。读取用 `read1()` 而不是 `read()`：`read(n)` 会阻塞到攒够 n 字节或对端结束，一条持续小口吐数据的连接能让单次 read 耗光整个下载时间而一次都不返回，循环里怎么检查时限都执行不到（从别的线程 `close()` 响应也叫不醒阻塞中的 `recv`）。
+
 Electron 没有向 App 正式调用传 `--series-id`、`--dwell`、`--keep-download` 或 `--prefer-1080p`，但 Python CLI 继续接受这些兼容参数：
 
 | 参数 | 必填 | 当前语义 |
