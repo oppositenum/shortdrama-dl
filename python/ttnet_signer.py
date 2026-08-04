@@ -257,6 +257,27 @@ class TtnetSignerError(RuntimeError):
     pass
 
 
+def is_frida_session_dead(err: BaseException) -> bool:
+    """Frida 会话/脚本已死，需要 reattach。"""
+    s = str(err).lower()
+    markers = (
+        "script has been destroyed",
+        "script is destroyed",
+        "session is destroyed",
+        "session is gone",
+        "connection closed",
+        "connection is closed",
+        "detached",
+        "device lost",
+        "process not found",
+        "unable to find process",
+        "the connection is closed",
+        "has been destroyed",
+        "invalid operation",
+    )
+    return any(m in s for m in markers)
+
+
 class TtnetDeviceSigner:
     """Frida-backed signer: produces App-identical TTNet security headers."""
 
@@ -277,6 +298,7 @@ class TtnetDeviceSigner:
         self._device = None
         self._session = None
         self._script = None
+        self._dead = False
 
     def _adb(self, *args: str, check: bool = False, timeout: float = 20.0) -> str:
         cmd = ["adb", "-s", self.device_id, *args]
@@ -396,6 +418,18 @@ class TtnetDeviceSigner:
                 self.detach()
                 self._device = self._get_frida_device()
                 self._session = self._device.attach(int(pid))
+                self._dead = False
+
+                def on_detached(reason, crash):
+                    # App 崩溃 / 被杀 / frida-server 掉线
+                    self._dead = True
+                    self._script = None
+
+                try:
+                    self._session.on("detached", on_detached)
+                except Exception:
+                    pass
+
                 self._script = self._session.create_script(BOOT + "\n" + AGENT)
                 bridge_dir_local = bridge_dir
 
@@ -411,13 +445,16 @@ class TtnetDeviceSigner:
                         if not matches:
                             return
                         bridge = matches[0]
-                        self._script.post(
-                            {
-                                "type": "frida:bridge-loaded",
-                                "filename": bridge.name,
-                                "source": bridge.read_text(encoding="utf-8"),
-                            }
-                        )
+                        try:
+                            self._script.post(
+                                {
+                                    "type": "frida:bridge-loaded",
+                                    "filename": bridge.name,
+                                    "source": bridge.read_text(encoding="utf-8"),
+                                }
+                            )
+                        except Exception:
+                            self._dead = True
 
                 self._script.on("message", on_msg)
                 self._script.load()
@@ -448,6 +485,7 @@ class TtnetDeviceSigner:
                         st = {"ok": False, "error": str(e)}
                         continue
                     if st.get("ok"):
+                        self._dead = False
                         return
                     last_err = TtnetSignerError(f"signer not ready: {st}")
                 # 本轮失败：可能 pid 变了，刷新 app
@@ -470,6 +508,23 @@ class TtnetDeviceSigner:
         self._session = None
         self._script = None
         self._device = None
+        self._dead = True
+
+    def is_alive(self) -> bool:
+        if self._dead or not self._script or not self._session:
+            return False
+        try:
+            self._script.exports_sync.ping()
+            return True
+        except Exception:
+            self._dead = True
+            return False
+
+    def ensure_alive(self) -> None:
+        """会话还在就继续；已死则自动 reattach（App 崩溃 / script destroyed）。"""
+        if self.is_alive():
+            return
+        self.attach()
 
     def __enter__(self) -> "TtnetDeviceSigner":
         self.attach()
@@ -478,24 +533,38 @@ class TtnetDeviceSigner:
     def __exit__(self, *exc) -> None:
         self.detach()
 
+    def _call_rpc(self, name: str, *args):
+        """RPC 包装：会话死后自动重连一次。"""
+        last: Optional[Exception] = None
+        for attempt in range(2):
+            try:
+                self.ensure_alive()
+                fn = getattr(self._script.exports_sync, name)
+                return fn(*args)
+            except Exception as e:
+                last = e
+                if attempt == 0 and is_frida_session_dead(e):
+                    self._dead = True
+                    self.detach()
+                    time.sleep(0.8)
+                    continue
+                raise
+        raise TtnetSignerError(f"rpc {name} failed: {last}") from last
+
     def full_url(self, base: str) -> str:
-        if not self._script:
-            raise TtnetSignerError("not attached")
         # strip existing query then re-expand for consistency
         if "?" in base:
             base = base.split("?", 1)[0]
-        r = self._script.exports_sync.full_url(base)
+        r = self._call_rpc("full_url", base)
         if r.get("error"):
             raise TtnetSignerError(r["error"])
         return str(r["url"])
 
     def sign_headers(self, url: str, body: bytes) -> Dict[str, str]:
         """Return security headers for a POST body (App-identical)."""
-        if not self._script:
-            raise TtnetSignerError("not attached")
         stub = hashlib.md5(body).hexdigest().upper()
         ticket = str(int(time.time() * 1000))
-        r = self._script.exports_sync.sign_headers(url, stub, ticket)
+        r = self._call_rpc("sign_headers", url, stub, ticket)
         if r.get("error"):
             raise TtnetSignerError(r["error"])
         headers = {
@@ -513,32 +582,54 @@ class TtnetDeviceSigner:
     def post_json(
         self, base_url: str, payload: Dict[str, Any], *, max_bytes: int = 64 << 20
     ) -> Dict[str, Any]:
-        if not self._script:
-            raise TtnetSignerError("not attached")
         if "://" not in base_url:
             base_url = "https://api5-normal-sinfonlinea.fqnovel.com" + base_url
         bare = base_url.split("?", 1)[0]
-        url = self.full_url(bare)
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
-        if self.prefer_headers:
+        last_err: Optional[Exception] = None
+        for attempt in range(3):
             try:
-                headers = self.sign_headers(url, body)
-                req = urllib.request.Request(url, data=body, method="POST", headers=headers)
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                    raw = resp.read().decode("utf-8", "replace")
-                return json.loads(raw)
-            except Exception:
-                # fall through to execPost
-                pass
+                self.ensure_alive()
+                url = self.full_url(bare)
+                if self.prefer_headers:
+                    try:
+                        headers = self.sign_headers(url, body)
+                        req = urllib.request.Request(
+                            url, data=body, method="POST", headers=headers
+                        )
+                        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                            raw = resp.read().decode("utf-8", "replace")
+                        return json.loads(raw)
+                    except Exception as e:
+                        # 会话死了就重连；业务/网络错误再走 execPost
+                        if is_frida_session_dead(e):
+                            last_err = e
+                            self._dead = True
+                            self.detach()
+                            time.sleep(0.8)
+                            continue
+                        # fall through to execPost
+                        pass
 
-        r = self._script.exports_sync.exec_post(url, body.decode("utf-8"), max_bytes)
-        if not r.get("ok"):
-            raise TtnetSignerError(r.get("error") or "exec_post failed")
-        try:
-            return json.loads(r.get("resp") or "")
-        except Exception as e:
-            raise TtnetSignerError(f"non-json: {e}: {(r.get('resp') or '')[:300]}") from e
+                r = self._call_rpc("exec_post", url, body.decode("utf-8"), max_bytes)
+                if not r.get("ok"):
+                    raise TtnetSignerError(r.get("error") or "exec_post failed")
+                try:
+                    return json.loads(r.get("resp") or "")
+                except Exception as e:
+                    raise TtnetSignerError(
+                        f"non-json: {e}: {(r.get('resp') or '')[:300]}"
+                    ) from e
+            except Exception as e:
+                last_err = e
+                if attempt < 2 and is_frida_session_dead(e):
+                    self._dead = True
+                    self.detach()
+                    time.sleep(1.0)
+                    continue
+                raise
+        raise TtnetSignerError(f"post_json failed: {last_err}") from last_err
 
 
 def main() -> int:

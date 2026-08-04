@@ -1,0 +1,47 @@
+{
+  "mid": "901a",
+  "key": "42c2b44a958ec8b28eb4d6a4c889b556b24bd952",
+  "param": "f5e1f579a12253310000000000060b1c6a718ac3",
+  "eor": "b723413334ac9b838eb4d6a4c88fbe4ad83a5391",
+  "body20": "f1250f0b1c61b786d15278aa2b896ed506e4cefc",
+  "g": "8404901a0000f1250f0b1c61b786d15278aa2b896ed506e4cefc",
+  "kh": 1785825987,
+  "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_detail/v1/?klink_egdi=AAIKJdnpJVD6R5zhcVW8LS4uoafZTlfGJVcxFjadVdQG29rzrMrrtiZP&iid=674438832722825&device_id=674438832718729&ac=mobile&channel=69310258a&aid=8662&app_name=novelread&version_code=72732&version_name=7.2.7.32&device_platform=android&os=android&ssmix=a&device_type=sdk_gphone64_arm64&device_brand=google&language=en&os_api=34&os_version=14&manifest_version_code=72732&resolution=1080*2209&dpi=420&update_version_code=72732&_rticket=1785825986636&normal_session_cnt_in_day=7&gender=2&cold_start_session_cnt_in_day=3&host_abi=arm64-v8a&dragon_device_type=phone&sys_mini_window=1&pv_player=72732&app_mini_window=0&normal_session_id=6c529fa9-4fbe-4cd0-85fd-50627c88ca6c%231&compliance_status=0&har_status=0&cold_start_session_id=1c5f9a83-d5da-4675-b998-991eaeebe2dc&cold_start_session_cnt_in_life=49&charging=0&normal_session_cnt_in_life=154&is_power_save_mode=0&app_dark_mode=0&screen_brightness=102&battery_pct=100&down_speed=4300&sys_dark_mode=0&need_personal_recommend=1&player_so_load=1&font_scale=100&is_android_pad_screen=0&network_type=1&rom_version=sdk_gphone64_arm64-userdebug%2014%20UE1A.230829.050%2012077443%20dev-keys&current_volume=0&cdid=5b742c78-1e4d-49be-8068-337ed908a4bf",
+  "stub": "A12253315D2C856A65F8AD722336981F",
+  "results": {
+    "param20": [],
+    "eor20": [],
+    "key20": [],
+    "body20": [],
+    "param8": [],
+    "key8": [
+      {
+        "addr": "0x75fa909a70",
+        "around": "08000000000000000045004c00490042b2c88e954ab4c242420049004c00450042c2b44a958ec8b2205069f6750000000000000000000000420000000000000040722d8675000000080000000000000000000000000000000100000000000000",
+        "size": 32768,
+        "base": "0x75fa903000"
+      },
+      {
+        "addr": "0x75fa909f08",
+        "around": "08000000000000000045004c00490042b2c88e954ab4c242420049004c00450042c2b44a958ec8b2205069f6750000000000000000000000420000000000000040722d8675000000080000000000000000000000000000000100000000000000",
+        "size": 32768,
+        "base": "0x75fa903000"
+      }
+    ],
+    "eor8": [],
+    "const_ts": [
+      {
+        "addr": "0x75fa909a70",
+        "around": "08000000000000000000000000000000c38a716a1c0b0600000000000000000000060b1c6a718ac3016069f675000000a84b7a87750000000000000000000000307e288675000000080000000000000000000000000000000100000000000000",
+        "size": 32768,
+        "base": "0x75fa903000"
+      },
+      {
+        "addr": "0x75fa909f08",
+        "around": "08000000000000000000000000000000c38a716a1c0b0600000000000000000000060b1c6a718ac3016069f675000000a84b7a87750000000000000000000000307e288675000000080000000000000000000000000000000100000000000000",
+        "size": 32768,
+        "base": "0x75fa903000"
+      }
+    ]
+  }
+}

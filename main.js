@@ -822,13 +822,20 @@ async function downloadOne(media, outputPath) {
 // ===========================================================================
 // IPC：开始下载（整体流程编排）
 // ===========================================================================
-/** 归一化抓取方式：'app' | 'api' | 'none'。兼容旧字段 appGrab。 */
+/** 归一化抓取方式：'offline' | 'app' | 'api' | 'none'。兼容旧字段 appGrab。 */
 function normalizeGrabMode(payload = {}) {
   const mode = payload.grabMode;
-  if (mode === 'app' || mode === 'api' || mode === 'none') return mode;
+  if (mode === 'offline' || mode === 'app' || mode === 'api' || mode === 'none') return mode;
   // 旧版只传 appGrab 布尔值
   if (payload.appGrab === false) return 'none';
   return 'app';
+}
+
+function grabModeLabel(mode) {
+  if (mode === 'offline') return '离线六神纯协议';
+  if (mode === 'api') return '纯协议下载';
+  if (mode === 'app') return 'App 抓取';
+  return '仅保存封面';
 }
 
 async function handleStartDownload(_event, payload) {
@@ -836,7 +843,7 @@ async function handleStartDownload(_event, payload) {
   isCanceled = false;
   stopAfterSeries = false;
   activeOutputPath = null;
-  // grabMode: app（默认/兼容）| api（纯协议）| none（仅封面）
+  // grabMode: offline（离线六神）| api（纯协议+可设备回退）| app | none
   // 简介默认走简洁模式（只有剧名和简介），显式传 true 才写详细版
   const grabMode = normalizeGrabMode(payload);
   const opts = {
@@ -1939,14 +1946,15 @@ async function probeHongguoAndFrida(env, serial) {
  */
 /**
  * @param {string|null|undefined} grabDirConfigured
- * @param {{ interactive: boolean, grabMode?: 'app'|'api'|'none' }} opts
+ * @param {{ interactive: boolean, grabMode?: 'offline'|'app'|'api'|'none' }} opts
  */
-async function runEnvironmentCheck(grabDirConfigured, { interactive, grabMode = 'api' }) {
+async function runEnvironmentCheck(grabDirConfigured, { interactive, grabMode = 'offline' }) {
   if (envCheckBusy) return;
   envCheckBusy = true;
   send('env:begin');
   try {
-    const mode = grabMode === 'api' || grabMode === 'none' ? grabMode : 'app';
+    const mode =
+      grabMode === 'offline' || grabMode === 'api' || grabMode === 'none' ? grabMode : 'app';
     const needAndroid = mode === 'app';
     const requireFrida = needAndroid;
     const grabDir = needAndroid
@@ -1980,7 +1988,7 @@ async function runEnvironmentCheck(grabDirConfigured, { interactive, grabMode = 
         message: pythonBin
           || (requireFrida
             ? '未找到可用的 Python（需 frida + cryptography）'
-            : '未找到可用的 Python（需 cryptography，纯协议）'),
+            : '未找到可用的 Python（需 cryptography，纯协议/离线六神）'),
       });
     } catch (e) {
       send('env:item', { id: 'python', state: 'error', message: e.message });
@@ -1988,7 +1996,11 @@ async function runEnvironmentCheck(grabDirConfigured, { interactive, grabMode = 
 
     try {
       const mediaEnv = buildGrabEnv({ pythonBin });
-      const purpose = needAndroid ? 'App 抓取' : '纯协议下载';
+      const purpose = needAndroid
+        ? 'App 抓取'
+        : mode === 'offline'
+          ? '离线六神纯协议'
+          : '纯协议下载';
       const ffmpegOk = interactive
         ? await ensureSystemMediaTools(mediaEnv, { purpose })
         : (await commandSucceeds('ffmpeg', ['-version'], mediaEnv)
@@ -2003,9 +2015,22 @@ async function runEnvironmentCheck(grabDirConfigured, { interactive, grabMode = 
     }
 
     if (!needAndroid) {
-      send('env:item', { id: 'android', state: 'ok', message: '纯协议模式不需要' });
-      send('env:item', { id: 'hongguo_app', state: 'ok', message: '纯协议模式不需要' });
-      send('env:item', { id: 'frida_server', state: 'ok', message: '纯协议模式不需要' });
+      const skipMsg =
+        mode === 'offline' ? '离线六神模式不需要' : '纯协议模式不需要';
+      send('env:item', { id: 'android', state: 'ok', message: skipMsg });
+      send('env:item', { id: 'hongguo_app', state: 'ok', message: skipMsg });
+      send('env:item', { id: 'frida_server', state: 'ok', message: skipMsg });
+      // 离线模式额外确认 metasec_offline 是否在组件目录
+      if (mode === 'offline' && grabDir) {
+        const offlinePy = path.join(grabDir, 'metasec_offline.py');
+        if (!fs.existsSync(offlinePy)) {
+          send('env:item', {
+            id: 'python',
+            state: 'missing',
+            message: '缺少 metasec_offline.py（离线六神签名组件）',
+          });
+        }
+      }
       return;
     }
 
@@ -2172,6 +2197,10 @@ function grabWithApp({ seriesName, startEp, endEp, seriesDir, total, grabDir, py
 /**
  * 调用纯协议工具 api_grab.py 抓取 [startEp, endEp]，写入 seriesDir。
  * stdout JSON 事件协议与 hongguo_grab 子集一致，转发到同一 download:* 通道。
+ *
+ * @param {'offline'|'api'} signMode
+ *   - offline：强制纯 Python 离线六神（Khronos+Gorgon），不挂设备签名
+ *   - api：纯协议；默认可借已运行的模拟器做 device-sign-auto 回退
  */
 function grabWithApi({
   seriesId,
@@ -2184,10 +2213,13 @@ function grabWithApi({
   pythonBin,
   grabEnv,
   keyCache,
+  signMode = 'api',
 }) {
   return new Promise((resolve, reject) => {
-    setStatus('正在用纯协议下载全集…');
-    log(`调用纯协议下载：series_id=${seriesId}，第 ${startEp}–${endEp} 集`);
+    const offlineOnly = signMode === 'offline';
+    const modeTag = offlineOnly ? '离线六神' : '纯协议';
+    setStatus(`正在用${modeTag}下载全集…`);
+    log(`调用${modeTag}下载：series_id=${seriesId}，第 ${startEp}–${endEp} 集`);
 
     const args = [
       API_GRAB_SCRIPT,
@@ -2199,27 +2231,43 @@ function grabWithApi({
       '--interval', String(process.env.SHORTDRAMA_API_INTERVAL || '1.2'),
       '--risk-cooldown', String(process.env.SHORTDRAMA_RISK_COOLDOWN || '45'),
     ];
-    // 纯协议本身不需要模拟器，也永远不会为了下载去启动一个。但如果本机恰好已经
-    // 有模拟器在跑，遇 110001 时借它的 App 签名比干等冷却有效得多。默认开启，
-    // SHORTDRAMA_API_DEVICE_SIGN=0 可以关掉，保持完全不碰安卓。
-    const deviceSignAuto = process.env.SHORTDRAMA_API_DEVICE_SIGN !== '0';
-    if (deviceSignAuto) {
-      args.push('--device-sign-auto');
+
+    // 签名策略：
+    // - offline：--offline-sign，关闭 device-sign-auto（绝不碰模拟器）
+    // - api：允许离线签（Python 默认）+ 可选 device-sign-auto（旧行为保留）
+    let deviceSignAuto = false;
+    if (offlineOnly) {
+      args.push('--offline-sign');
+      log('签名：纯 Python 离线 Khronos+Gorgon（不使用模拟器/Frida）');
     } else {
-      log('已关闭纯协议的模拟器签名回退（SHORTDRAMA_API_DEVICE_SIGN=0），遇风控只冷却重试');
+      // 纯协议模式仍可用离线签；遇风控再借设备（SHORTDRAMA_API_DEVICE_SIGN=0 关闭）
+      deviceSignAuto = process.env.SHORTDRAMA_API_DEVICE_SIGN !== '0';
+      if (deviceSignAuto) {
+        args.push('--device-sign-auto');
+      } else {
+        log('已关闭纯协议的模拟器签名回退（SHORTDRAMA_API_DEVICE_SIGN=0），遇风控只冷却重试');
+      }
     }
+
     if (seriesName) args.push('--series-name', seriesName);
     if (keyCache) args.push('--key-cache', keyCache);
     const adbDevice =
       process.env.SHORTDRAMA_ADB_DEVICE ||
       process.env.ANDROID_SERIAL ||
       'emulator-5554';
-    args.push('--adb-device', String(adbDevice));
+    if (!offlineOnly) {
+      args.push('--adb-device', String(adbDevice));
+    }
 
     // api_grab.py 自己也默认开启签名回退，只靠不传参数关不掉，必须把环境变量也带上。
-    const childEnv = deviceSignAuto
-      ? grabEnv
-      : { ...grabEnv, SHORTDRAMA_DEVICE_SIGN_AUTO: '0' };
+    const childEnv = {
+      ...grabEnv,
+      SHORTDRAMA_DEVICE_SIGN_AUTO: deviceSignAuto ? (grabEnv.SHORTDRAMA_DEVICE_SIGN_AUTO || '1') : '0',
+      SHORTDRAMA_OFFLINE_SIGN: offlineOnly ? '1' : (grabEnv.SHORTDRAMA_OFFLINE_SIGN || '1'),
+    };
+    if (offlineOnly) {
+      childEnv.SHORTDRAMA_DEVICE_SIGN = '0';
+    }
     const child = spawn(pythonBin, args, { cwd: grabDir, env: childEnv });
     currentGrab = child;
 
@@ -2232,11 +2280,11 @@ function grabWithApi({
       switch (ev.event) {
         case 'init':
           grabTotal = ev.total != null ? ev.total : grabTotal;
-          log(`纯协议就绪：本次待抓 ${grabTotal} 集`);
+          log(`${modeTag}就绪：本次待抓 ${grabTotal} 集`);
           break;
         case 'episode_start':
           send('download:episode', { current: ev.ep, total });
-          setStatus(`纯协议 第 ${ev.ep}/${total} 集…`);
+          setStatus(`${modeTag} 第 ${ev.ep}/${total} 集…`);
           send('download:progress', { percent: 0, timemark: '', speed: '' });
           break;
         case 'progress':
@@ -2249,10 +2297,10 @@ function grabWithApi({
         case 'episode_done':
           okCount++;
           send('download:progress', { percent: 100, timemark: '', speed: '' });
-          log(`纯协议 第 ${ev.ep} 集完成（${ev.file || ''}）`, 'success');
+          log(`${modeTag} 第 ${ev.ep} 集完成（${ev.file || ''}）`, 'success');
           break;
         case 'episode_failed':
-          log(`纯协议 第 ${ev.ep} 集失败：${ev.error || ''}`, 'error');
+          log(`${modeTag} 第 ${ev.ep} 集失败：${ev.error || ''}`, 'error');
           break;
         case 'log':
           log(`[API] ${ev.message || ''}`, ev.level || 'info');
@@ -2300,7 +2348,7 @@ function grabWithApi({
 
     child.on('error', (err) => {
       currentGrab = null;
-      log(`无法启动纯协议工具：${err.message}（请检查应用准备的 Python 环境）`, 'warn');
+      log(`无法启动${modeTag}工具：${err.message}（请检查应用准备的 Python 环境）`, 'warn');
       resolve({ code: 3, ok: 0, failed: [] });
     });
 
@@ -2311,10 +2359,12 @@ function grabWithApi({
         return;
       }
       if (code === 3) {
-        log('纯协议环境或参数不可用，本次只保存封面', 'warn');
+        log(`${modeTag}环境或参数不可用，本次只保存封面`, 'warn');
       } else if (code === 4) {
         log(
-          '纯协议被业务 API 拒绝（常见 110001 风控/频控）。本地环境正常；请稍后重试或改用「App 抓取」',
+          offlineOnly
+            ? '离线六神仍被业务 API 拒绝（110001）。可稍后重试，或改用「纯协议下载 / App 抓取」'
+            : '纯协议被业务 API 拒绝（常见 110001 风控/频控）。本地环境正常；请稍后重试或改用「App 抓取」',
           'warn'
         );
       }
@@ -2358,9 +2408,10 @@ function formatElapsed(ms) {
 
 /**
  * 整剧下载核心：网页只解析详情和保存封面；视频由所选模式抓取：
- *   grabMode=app  → hongguo_grab.py（安卓 App + Frida）
- *   grabMode=api  → api_grab.py（纯协议，无需 App）
- *   grabMode=none → 仅封面/简介
+ *   grabMode=offline → api_grab.py + 离线六神（无模拟器/Frida）
+ *   grabMode=api     → api_grab.py（纯协议，可 device-sign-auto 回退）
+ *   grabMode=app     → hongguo_grab.py（安卓 App + Frida）
+ *   grabMode=none    → 仅封面/简介
  * 不发送最终 done 事件、不打开文件夹——由 downloadSeries / downloadCategory 收尾。
  * Python 会跳过已存在且非空的分集文件，因此中断后重跑仍可续传。
  */
@@ -2379,8 +2430,7 @@ async function downloadSeriesCore(url, saveDir, opts = {}) {
   const range = appGrabRange(totalCnt);
   if (!range) throw new Error('未能从详情页确定总集数');
 
-  const modeLabel =
-    grabMode === 'api' ? '纯协议下载' : grabMode === 'app' ? 'App 抓取' : '仅保存封面';
+  const modeLabel = grabModeLabel(grabMode);
   log(
     `剧名：《${info.seriesName}》，共 ${totalCnt} 集；模式：${modeLabel}` +
       (grabMode === 'none' ? '' : `，第 1–${totalCnt} 集`),
@@ -2406,16 +2456,19 @@ async function downloadSeriesCore(url, saveDir, opts = {}) {
 
   if (beforeCount >= totalCnt) {
     log(`检测到本地已有完整 ${beforeCount}/${totalCnt} 集，跳过视频抓取`, 'success');
-  } else if (grabMode === 'api' && !isCanceled) {
-    grabLabel = '纯协议';
+  } else if ((grabMode === 'api' || grabMode === 'offline') && !isCanceled) {
+    const signMode = grabMode === 'offline' ? 'offline' : 'api';
+    grabLabel = grabMode === 'offline' ? '离线六神' : '纯协议';
     const resolvedApiDir = resolveApiGrabDir(grabDir);
     if (!resolvedApiDir) {
-      log(`未找到纯协议组件（python/${API_GRAB_SCRIPT}），本次只保存封面；请配置工具目录`, 'warn');
+      log(`未找到${grabLabel}组件（python/${API_GRAB_SCRIPT}），本次只保存封面；请配置工具目录`, 'warn');
+    } else if (signMode === 'offline' && !fs.existsSync(path.join(resolvedApiDir, 'metasec_offline.py'))) {
+      log('未找到 metasec_offline.py（离线六神签名），本次只保存封面', 'warn');
     } else {
       try {
         const runtime = await ensureApiGrabEnvironment(resolvedApiDir);
         if (!runtime) {
-          log('已取消纯协议环境安装，本次只保存封面', 'warn');
+          log(`已取消${grabLabel}环境安装，本次只保存封面`, 'warn');
         } else {
           grabAttempted = true;
           const r = await grabWithApi({
@@ -2429,18 +2482,19 @@ async function downloadSeriesCore(url, saveDir, opts = {}) {
             pythonBin: runtime.pythonBin,
             grabEnv: runtime.env,
             keyCache: runtime.keyCache,
+            signMode,
           });
           grabOk = r.ok || 0;
           if (r.code === 0) {
-            log(`纯协议完成：已处理第 ${range.startEp}–${range.endEp} 集`, 'success');
+            log(`${grabLabel}完成：已处理第 ${range.startEp}–${range.endEp} 集`, 'success');
           } else if (r.code === 2) {
             const failedTxt = (r.failed || []).length ? `（缺 第 ${r.failed.join('、')} 集）` : '';
-            log(`纯协议部分完成：成功 ${grabOk} 集${failedTxt}`, 'warn');
+            log(`${grabLabel}部分完成：成功 ${grabOk} 集${failedTxt}`, 'warn');
           }
         }
       } catch (err) {
         if (err.message === '__CANCELED__') throw err;
-        log(`纯协议异常：${err.message}（本次只保存封面和已完成分集）`, 'warn');
+        log(`${grabLabel}异常：${err.message}（本次只保存封面和已完成分集）`, 'warn');
       }
     }
   } else if (grabMode === 'app' && !isCanceled) {
@@ -2514,8 +2568,8 @@ async function downloadSeriesCore(url, saveDir, opts = {}) {
     web_total: 0,
     app_ok: grabMode === 'app' ? grabOk : 0,
     app_attempted: grabMode === 'app' && grabAttempted,
-    api_ok: grabMode === 'api' ? grabOk : 0,
-    api_attempted: grabMode === 'api' && grabAttempted,
+    api_ok: grabMode === 'api' || grabMode === 'offline' ? grabOk : 0,
+    api_attempted: (grabMode === 'api' || grabMode === 'offline') && grabAttempted,
     grab_mode: grabMode,
     complete: fullyComplete,
   };
@@ -2549,7 +2603,8 @@ async function downloadCategory(url, saveDir, opts = {}) {
   if (isCanceled) throw new Error('__CANCELED__');
 
   const mode = opts.grabMode || (opts.appGrab === false ? 'none' : 'app');
-  const modeTxt = mode === 'api' ? '纯协议' : mode === 'app' ? 'App' : '仅封面';
+  const modeTxt =
+    mode === 'offline' ? '离线六神' : mode === 'api' ? '纯协议' : mode === 'app' ? 'App' : '仅封面';
   log(`分类页共解析到 ${list.length} 部剧；模式：${modeTxt}…`, 'success');
 
   let okSeries = 0;
@@ -2802,12 +2857,12 @@ app.whenReady().then(() => {
   ipcMain.handle('env:check', (_e, payload) =>
     runEnvironmentCheck(payload && payload.grabDir, {
       interactive: false,
-      grabMode: (payload && payload.grabMode) || 'api',
+      grabMode: (payload && payload.grabMode) || 'offline',
     }));
   ipcMain.handle('env:fix', (_e, payload) =>
     runEnvironmentCheck(payload && payload.grabDir, {
       interactive: true,
-      grabMode: (payload && payload.grabMode) || 'api',
+      grabMode: (payload && payload.grabMode) || 'offline',
     }));
   ipcMain.handle('notify:test', async (_e, payload) => {
     // 用界面上当前填的值试，不必先保存；留空才回落到已保存的配置。

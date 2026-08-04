@@ -96,12 +96,16 @@
         <div class="field-label">整剧抓取方式</div>
         <div class="mode-group" id="grabModeGroup" role="radiogroup" aria-label="整剧抓取方式">
           <label class="checkbox-row">
-            <input type="radio" name="grabMode" id="modeApi" value="api" checked />
-            <span>纯协议下载（推荐：无需 App/模拟器，仅网络 + Python + ffmpeg；遇风控时若本机已有模拟器在跑，会借它的 App 签名）</span>
+            <input type="radio" name="grabMode" id="modeOffline" value="offline" checked />
+            <span>离线六神纯协议（推荐：纯 Python 签 Khronos+Gorgon，无需 App/模拟器/Frida）</span>
+          </label>
+          <label class="checkbox-row">
+            <input type="radio" name="grabMode" id="modeApi" value="api" />
+            <span>纯协议下载（网络 + Python + ffmpeg；遇 110001 时若本机已有模拟器在跑，可借 App 签名回退）</span>
           </label>
           <label class="checkbox-row">
             <input type="radio" name="grabMode" id="modeApp" value="app" />
-            <span>App 抓取（需 root 安卓 + Frida；风控 110001 时的备用路径）</span>
+            <span>App 抓取（需 root 安卓 + Frida；风控备用路径）</span>
           </label>
           <label class="checkbox-row">
             <input type="radio" name="grabMode" id="modeNone" value="none" />

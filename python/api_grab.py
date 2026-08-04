@@ -209,6 +209,17 @@ def main() -> int:
         help="命中 110001 后的冷却秒数（默认 45）",
     )
     ap.add_argument(
+        "--offline-sign",
+        action="store_true",
+        default=None,
+        help="使用纯 Python 离线 Khronos+Gorgon（无需模拟器；默认开启）",
+    )
+    ap.add_argument(
+        "--no-offline-sign",
+        action="store_true",
+        help="关闭离线签名（仅裸 HTTP，易 110001）",
+    )
+    ap.add_argument(
         "--device-sign",
         action="store_true",
         help="经 Frida 调用模拟器内红果 App 的 TTNet 签名发请求（与 App 自身一致）",
@@ -216,7 +227,7 @@ def main() -> int:
     ap.add_argument(
         "--device-sign-auto",
         action="store_true",
-        help="裸请求遇 110001 时自动尝试挂载 App 签名继续（需模拟器/真机 + frida-server）",
+        help="离线签名仍 110001 时自动尝试挂载 App 签名（需模拟器/真机 + frida-server）",
     )
     ap.add_argument(
         "--adb-device",
@@ -233,7 +244,7 @@ def main() -> int:
         args.device_sign_auto
         or os.environ.get("SHORTDRAMA_DEVICE_SIGN_AUTO", "").strip() in ("1", "true", "yes")
     )
-    # 默认开启自动签名回退（可 SHORTDRAMA_DEVICE_SIGN_AUTO=0 关闭）
+    # 默认开启设备签名自动回退（可 SHORTDRAMA_DEVICE_SIGN_AUTO=0 关闭）
     if os.environ.get("SHORTDRAMA_DEVICE_SIGN_AUTO", "").strip() not in ("0", "false", "no"):
         if not args.device_sign:
             auto_sign = True
@@ -242,6 +253,13 @@ def main() -> int:
         args.device_sign
         or os.environ.get("SHORTDRAMA_DEVICE_SIGN", "").strip() in ("1", "true", "yes")
     )
+    # 离线签名默认开；--no-offline-sign 或 SHORTDRAMA_OFFLINE_SIGN=0 关闭
+    use_offline = not args.no_offline_sign
+    if os.environ.get("SHORTDRAMA_OFFLINE_SIGN", "").strip() in ("0", "false", "no"):
+        use_offline = False
+    if args.offline_sign:
+        use_offline = True
+
     signer = None
     sign_failures = 0
     if use_device_sign:
@@ -250,36 +268,63 @@ def main() -> int:
             logev("error", f"挂载 App 签名失败: {err}")
             return 3
         logev("info", f"已挂载 App TTNet 签名（device={args.adb_device}）")
+        use_offline = False  # 设备签名优先
+    elif use_offline:
+        try:
+            from metasec_offline import OfflineSigner  # noqa: WPS433
+
+            signer = OfflineSigner()
+            logev("info", "已启用纯协议离线签名（Khronos+Gorgon，无需模拟器）")
+        except Exception as e:
+            logev("warn", f"离线签名初始化失败，将裸请求: {e}")
+            signer = None
 
     client = HongguoApiClient(
         device_id=args.device_id or None,
         install_id=args.install_id or None,
         signer=signer,
+        offline_sign=False,  # 已在上方显式注入 signer
     )
 
     def ensure_signed_or_recover(reason: str) -> bool:
         """110001 恢复策略（优先快路径）：
 
-        1. 已挂签名 → 直接继续（不再干等）
-        2. 允许 auto_sign → **立刻**挂载 App 签名，成功则马上用
-        3. 挂不上 / 未开 auto_sign → 才冷却 + 轮换 device_id（裸请求兜底）
+        1. 已挂签名（离线或设备）→ 直接继续
+        2. 尝试切换/启用离线 OfflineSigner
+        3. 允许 auto_sign → 挂载 App 设备签名
+        4. 冷却 + 轮换 device_id
         """
         nonlocal signer, auto_sign, sign_failures
         logev("warn", f"触发风控恢复（{reason}）")
 
         if client.signer is not None:
-            logev("info", "已在签名路径，跳过冷却，直接重试")
-            return True
+            # 若当前是离线仍失败，再尝试设备签名
+            is_offline = type(client.signer).__name__ == "OfflineSigner"
+            if not is_offline:
+                logev("info", "已在设备签名路径，跳过冷却，直接重试")
+                return True
+            logev("info", "离线签名仍遇风控，尝试其它恢复…")
+        else:
+            # 先上离线签名
+            try:
+                from metasec_offline import OfflineSigner  # noqa: WPS433
 
-        # 有设备就先挂签名，别先干等 45s
+                signer = OfflineSigner()
+                client.set_signer(signer)
+                logev("info", "已切换纯协议离线签名（Khronos+Gorgon）")
+                return True
+            except Exception as e:
+                logev("warn", f"离线签名不可用: {e}")
+
+        # 有设备就挂 App 签名
         if auto_sign:
-            logev("info", f"优先挂载 App 签名（device={args.adb_device}），不先冷却…")
+            logev("info", f"尝试挂载 App 签名（device={args.adb_device}）…")
             s, err = try_attach_device_signer(args.adb_device)
             if s is not None:
                 signer = s
                 client.set_signer(s)
                 sign_failures = 0
-                logev("info", "已挂载 App TTNet 签名，后续请求走签名路径")
+                logev("info", "已挂载 App TTNet 签名，后续请求走设备签名路径")
                 return True
             sign_failures += 1
             logev(
@@ -389,6 +434,38 @@ def main() -> int:
                     break
                 except Exception as e:
                     last_model_err = e
+                    emsg = str(e).lower()
+                    # Frida 会话中途被毁（App 被杀 / 脚本崩）：重挂再试，不当成永久失败
+                    if any(
+                        x in emsg
+                        for x in (
+                            "script has been destroyed",
+                            "session is destroyed",
+                            "detached",
+                            "connection closed",
+                        )
+                    ):
+                        logev(
+                            "warn",
+                            f"第{ep}集 Frida 签名会话断开（attempt {attempt + 1}/3），重新挂载…",
+                        )
+                        if client.signer is not None:
+                            try:
+                                client.signer.detach()
+                            except Exception:
+                                pass
+                        s, err = try_attach_device_signer(args.adb_device)
+                        if s is not None:
+                            signer = s
+                            client.set_signer(s)
+                            logev("info", "已重新挂载 App 签名，重试本集")
+                            time.sleep(0.5)
+                            continue
+                        logev("warn", f"重挂失败: {err}")
+                        if attempt < 2:
+                            time.sleep(1.5)
+                            continue
+                        raise
                     if not _is_risk_err(e):
                         raise
                     consecutive_risk += 1
