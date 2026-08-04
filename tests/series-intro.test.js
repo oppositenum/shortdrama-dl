@@ -7,22 +7,18 @@ const os = require('node:os');
 const path = require('node:path');
 
 const projectRoot = path.resolve(__dirname, '..');
-const {normalizeEpisodeCount} = require(path.join(projectRoot, 'series-workflow.js'));
+const { createSeriesFiles } = require(path.join(projectRoot, 'series-files.js'));
 
 /**
- * 这几个函数住在 main.js 里，而 main.js 一 require 就会拉起 Electron。
- * 这里把它们的源码摘出来单独求值，只喂真正用到的外部依赖。
+ * 简介生成以前住在 main.js 里，而 main.js 一 require 就会拉起 Electron，
+ * 所以这里曾经要把源码抠出来用 new Function 求值。搬进 series-files.js 之后
+ * 直接 require 就行——测的是真模块，不是一段被复制出来的源码。
  */
 function loadIntroWriters(logs) {
-  const src = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
-  const start = src.indexOf('/** 简洁模式的正文');
-  assert.notEqual(start, -1, 'main.js 里找不到简介生成函数');
-  const body = src.slice(start, src.indexOf('// ====', start));
-  const log = (message, level) => logs.push([level || 'info', message]);
-  return new Function(
-    'fs', 'path', 'log', 'normalizeEpisodeCount',
-    `${body};return writeSeriesIntro;`
-  )(fs, path, log, normalizeEpisodeCount);
+  const { writeSeriesIntro } = createSeriesFiles({
+    log: (message, level) => logs.push([level || 'info', message]),
+  });
+  return writeSeriesIntro;
 }
 
 const INFO = {
@@ -120,4 +116,6 @@ test('界面选项一路传到写文件，且默认简洁', () => {
   assert.match(main, /const grabMode = opts\.grabMode/);
   assert.match(main, /const \{ grabDir = null, introDetailed = false \} = opts/);
   assert.match(main, /writeSeriesIntro\(info, seriesDir, \{ detailed: introDetailed/);
+  // 简介生成本身已经搬进 series-files.js，main.js 只负责把选项传过去
+  assert.equal(main.includes('function buildIntroDetailed'), false);
 });

@@ -18,31 +18,51 @@
 >
 > 详见 [安全与合规](#安全与合规)。
 
-`shortdrama-dl` 是一个由 Electron 桌面应用和 Python Android 抓取/解密组件组成的短剧下载工具，提供两种链接处理路径：
+`shortdrama-dl` 是一个由 Electron 桌面应用和 Python 抓取/解密组件组成的短剧下载工具，处理两类链接：
 
 - **单播放页**：Electron 用 Playwright 捕获该播放页的媒体请求，用 Node.js 或 ffmpeg 下载这一集。
-- **整剧详情页/分类页**：网页只解析剧名、总集数并保存封面，随后由 Android App 从第 1 集开始抓取全集。
+- **整剧详情页/分类页**：网页只解析剧名、总集数并保存封面，分集由你选的抓取方式负责。
+
+整剧抓取有四种方式，默认那种只要 Python 和 ffmpeg：
+
+| 抓取方式 | 需要什么 | 说明 |
+|---|---|---|
+| **本机签名纯协议**（默认） | Python + `cryptography` + ffmpeg | 在自己电脑上给 API 请求签名，不用 App、模拟器和 Frida。**下载本身仍需联网**。 |
+| 纯协议下载 | 同上 | 同一条请求路径；被服务端拒绝时，如果本机恰好有模拟器在跑，会借用它的签名。`SHORTDRAMA_API_DEVICE_SIGN=0` 可以让它完全不碰安卓。 |
+| App 抓取 | 已 root 的安卓 + Frida + Python | 最初的路径：驱动设备上的 App。作为协议路径被风控时的备用。 |
+| 仅保存封面 | 无 | 只存封面和简介，不下载视频。 |
 
 Electron 与 Python 通过稳定的命令行和 JSON Lines 协议协作；运行边界、参数和打包资源见 [架构文档](docs/ARCHITECTURE.md)。
 
 ## 功能
 
-- Electron 图形界面、下载任务状态管理，以及「环境检查」面板（一打开就只读探测 Python/ffmpeg/模拟器/App/Frida Server 状态，不装不下载不弹窗）
-- 记住上次填写的链接、保存目录和各项开关
+- Electron 图形界面、下载任务状态管理，以及「环境检查」面板（一打开就只读探测，不装不下载不弹窗；探测哪几项随所选抓取方式变化）
+- 整剧四种抓取方式，默认那种完全不需要安卓
+- 记住上次填写的链接、保存目录和各项开关；设置卡片和日志都能收起来腾地方
 - 单个播放页视频下载，MP4 直连或 HLS/DASH 走 ffmpeg
 - 详情页/分类页元数据解析、封面下载、多剧批量处理及失败补漏
-- 已有分集跳过、断点续传、`.complete` 完成状态记录
+- 已有分集跳过、断点续传、`.complete` 完成状态记录，日志里带每部剧的耗时
+- CDN 下载失败会整对地址重试并退避，重试时从已下的字节接着下
+- 可选的 [Bark](https://bark.day.app) 推送：每抓完一整部剧推一条，出错也推（会合并，不会刷屏）
 - Android App 从第 1 集开始的全集抓取：Frida 采集解密上下文、`.mdl` 逐样本解密、ffmpeg 重封装、ffprobe 时长终检
 - 多 ADB 设备环境下的目标设备选择，单设备任务锁防止并发抓取互相干扰
 - 通过 `SIGTERM` 安全取消 Python 任务
 
-Android 链路依赖已 root 的受控设备和特定 App 运行环境，不是通用 Android 下载方案；App 升级、UI 改版或 Frida Hook 符号变化都可能使该链路失效。
+Android 链路依赖已 root 的受控设备和特定 App 运行环境，不是通用 Android 下载方案；App 升级、UI 改版或 Frida Hook 符号变化都可能使该链路失效。协议路径依赖的则是服务端的请求签名规则，对方随时可以改。
 
 ## 项目结构
 
 ```text
 shortdrama-dl/
-├── main.js                 # Electron 主进程、网页下载和 Python 编排
+├── main.js                   # Electron 主进程：窗口、IPC、流程编排、取消语义
+├── web-capture.js            # 分类页列表、详情页元数据、单播放页捕获；浏览器实例归它管
+├── url-utils.js              # 链接判别、文件名清洗、媒体类型识别、请求头整理
+├── series-files.js           # 完成标记、已有分集清点、封面与简介落盘
+├── grab-protocol.js          # 两个 Python 入口共用的 JSON Lines 事件协议
+├── ffmpeg-runner.js          # ffmpeg 调用与进度解析
+├── runtime-platform.js       # macOS/Windows 路径、安装器、安卓引导
+├── series-workflow.js        # 总集数、抓取区间、完成标记规则
+├── notify.js                 # Bark 推送（地址整理与发送）
 ├── preload.js               # contextBridge 白名单 IPC
 ├── renderer/                 # Electron UI
 ├── electron-builder.js       # 打包、签名及 Python 资源清单
@@ -99,7 +119,9 @@ winget install --exact --id Gyan.FFmpeg --source winget # Windows
 
 ## Android 设备准备
 
-勾选「用 App 抓取全集」后，应用会自动检查/启动模拟器（`hongguo` AVD 已装但未启动会自动开机；完全没有时征得确认后安装 Android SDK、Emulator 和系统镜像）。也可以在终端手动检查：
+这一节只对 **App 抓取** 有用——用默认的本机签名纯协议可以整节跳过。
+
+选择 App 抓取后，应用会自动检查/启动模拟器（`hongguo` AVD 已装但未启动会自动开机；完全没有时征得确认后安装 Android SDK、Emulator 和系统镜像）。也可以在终端手动检查：
 
 ```bash
 ./python/start_avd.sh --check                 # macOS
@@ -115,7 +137,8 @@ powershell -File .\python\start_avd.ps1 -Ensure -InstallMissing
 
 - **开发启动**：`npm start`（`npm run dev` 额外开启 Electron 调试日志）。
 - **单播放页**：粘贴 `/player/...` 链接，选择保存目录，点「开始下载」。
-- **整剧**：粘贴 `/detail?series_id=...` 或 `/category?...` 链接；网页只解析剧名/总集数/封面，取消勾选「用 App 抓取全集」则只保存封面。勾选时 Python 自动搜索目标剧、跳过已存在的分集、抓取全集并解密输出到同名目录。
+- **整剧**：粘贴 `/detail?series_id=...` 或 `/category?...` 链接，然后选抓取方式；网页只解析剧名/总集数/封面，分集由所选方式负责。已存在的分集会跳过，所以中断后直接重跑就是续传。
+- **通知**（可选）：填 Bark 地址（形如 `https://api.day.app/你的Key`），点「试发一条」验证。照官方示例把标题和内容一起粘进来也行，只会保留 key。
 - 已有分集跳过和 `.complete` 完成标记见 [架构文档](docs/ARCHITECTURE.md)。
 
 ## 开发与打包
@@ -123,7 +146,8 @@ powershell -File .\python\start_avd.ps1 -Ensure -InstallMissing
 | 命令 | 作用 |
 |---|---|
 | `npm start` / `npm run dev` | 启动应用（后者带调试日志） |
-| `npm test` | 运行不连接真实设备的 mock 测试 |
+| `npm run lint` | 对仓库里所有 JavaScript 跑 ESLint |
+| `npm test` | 运行测试（不连真实设备、不联网） |
 | `npm run pack` | 生成当前平台的未安装目录包 |
 | `npm run dist` | 生成当前平台分发包 |
 | `npm run dist:mac` / `:mac:arm64` / `:mac:x64` | macOS ad-hoc 签名 DMG（universal / arm64 / x64） |

@@ -49,19 +49,35 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev
 
+      - name: Lint JavaScript
+        run: npm run lint
+
+      # 语法检查是 lint 之外的第二道：ESLint 只看配置覆盖到的文件，
+      # 这里按仓库里实际存在的 .js 逐个 node --check，新增文件不会被漏掉。
       - name: Check JavaScript syntax
+        shell: bash
         run: |
-          node --check main.js
-          node --check preload.js
-          node --check runtime-platform.js
-          node --check ffmpeg-runner.js
-          node --check electron-builder.js
-          node --check scripts/verify-release-version.js
+          set -euo pipefail
+          # xargs 在任何一次 node --check 失败时返回非零，整步就挂——用 while read
+          # 循环反而会被最后一次迭代的状态盖住，静默放过中间的语法错误。
+          git ls-files -z '*.js' | xargs -0 -n1 node --check
+          echo "checked $(git ls-files '*.js' | wc -l) files"
 
       - name: Check Python and shell syntax
         if: runner.os == 'macOS'
         run: |
-          python3 -m py_compile python/hongguo_grab.py python/decrypt_mdl.py python/mp4parse.py
+          # 打包白名单里的 Python 全都要过编译。以前只查三个文件，
+          # api_grab.py / api_client.py / metasec_offline.py 这些同样随包分发的
+          # 反而没人管——它们出语法错，用户点「开始下载」才会知道。
+          python3 -m py_compile \
+            python/hongguo_grab.py \
+            python/api_grab.py \
+            python/api_client.py \
+            python/metasec_offline.py \
+            python/spade_keys.py \
+            python/ttnet_signer.py \
+            python/decrypt_mdl.py \
+            python/mp4parse.py
           bash -n python/start_avd.sh scripts/setup-python.sh
 
       - name: Check PowerShell syntax

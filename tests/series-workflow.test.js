@@ -46,10 +46,12 @@ test('whole-series core has no web episode capture loop', () => {
 });
 
 test('detail metadata parsing does not require any web episode entry', () => {
-  const source = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  // 详情页解析住在 web-capture.js（原来在 main.js）。这条守的是历史上真踩过的坑：
+  // 详情页里那个"网页免费可看集数"通常只有 5，误当成总集数会让 70 集的剧只抓 5 集。
+  const source = fs.readFileSync(path.join(__dirname, '..', 'web-capture.js'), 'utf8');
   const start = source.indexOf('async function extractSeriesInfo');
-  const end = source.indexOf('// 核心一：', start);
-  assert.ok(start >= 0 && end > start);
+  const end = source.indexOf('async function captureVideoSource', start);
+  assert.ok(start >= 0 && end > start, 'web-capture.js 里找不到详情页解析');
   const extractor = source.slice(start, end);
 
   assert.match(extractor, /sd\?\.series_name/);
