@@ -115,8 +115,8 @@ test('packaging includes both platform scripts and the runtime router', () => {
   assert.ok(pythonResource.filter.includes('api_grab.py'));
   assert.ok(pythonResource.filter.includes('spade_keys.py'));
   assert.ok(pythonResource.filter.includes('api_client.py'));
-  assert.ok(pythonResource.filter.includes('api_client.py'));
-  assert.ok(pythonResource.filter.includes('spade_keys.py'));
+  assert.ok(pythonResource.filter.includes('metasec_offline.py'));
+  assert.ok(pythonResource.filter.includes('sign_samples/gorgon_mid_key_oracle.json'));
   assert.ok(pythonResource.filter.includes('hongguo_grab.py'));
 });
 
@@ -164,15 +164,28 @@ test('ad-hoc signing skips universal slices and signs only the merged app', () =
 test('packaging removes runtime data from reused Python resource directories', (t) => {
   const root = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'shortdrama-pack-test-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  for (const name of PYTHON_RESOURCE_FILES) fs.writeFileSync(path.join(root, name), name);
+  for (const name of PYTHON_RESOURCE_FILES) {
+    const dest = path.join(root, name);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, name);
+  }
   fs.mkdirSync(path.join(root, 'allmdl'));
   fs.writeFileSync(path.join(root, 'allmdl', 'private.mdl'), 'private');
   fs.mkdirSync(path.join(root, '.appdb'));
   fs.writeFileSync(path.join(root, 'captured_grab.jsonl'), '{"key":"private"}');
+  // 白名单目录里的垃圾也要清掉
+  fs.writeFileSync(path.join(root, 'sign_samples', 'junk.json'), '{}');
 
   const removed = cleanPythonResources(root).sort();
-  assert.deepEqual(removed, ['.appdb', 'allmdl', 'captured_grab.jsonl']);
-  assert.deepEqual(fs.readdirSync(root).sort(), [...PYTHON_RESOURCE_FILES].sort());
+  assert.ok(removed.includes('allmdl'));
+  assert.ok(removed.includes('.appdb'));
+  assert.ok(removed.includes('captured_grab.jsonl'));
+  assert.ok(removed.includes('sign_samples/junk.json'));
+  for (const name of PYTHON_RESOURCE_FILES) {
+    assert.ok(fs.existsSync(path.join(root, name)), `应保留 ${name}`);
+  }
+  assert.equal(fs.existsSync(path.join(root, 'sign_samples', 'junk.json')), false);
+  assert.equal(fs.existsSync(path.join(root, 'allmdl')), false);
 });
 
 test('package scripts expose universal, Intel, Apple Silicon and Windows builds', () => {

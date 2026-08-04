@@ -20,6 +20,7 @@ const PYTHON_RESOURCE_FILES = Object.freeze([
   'hongguo_grab.py',
   'api_grab.py',
   'api_client.py',
+  'metasec_offline.py',
   'spade_keys.py',
   'ttnet_signer.py',
   'decrypt_mdl.py',
@@ -28,6 +29,7 @@ const PYTHON_RESOURCE_FILES = Object.freeze([
   'start_avd.sh',
   'start_avd.ps1',
   'requirements.txt',
+  'sign_samples/gorgon_mid_key_oracle.json',
 ]);
 
 function isUniversalTemp(appOutDir) {
@@ -45,16 +47,59 @@ function pythonResourcesDir(context) {
 }
 
 function cleanPythonResources(pythonDir) {
-  const allowed = new Set(PYTHON_RESOURCE_FILES);
+  // 允许顶层文件，以及嵌套相对路径（如 sign_samples/gorgon_mid_key_oracle.json）
+  const allowedTop = new Set();
+  const allowedNested = new Set();
+  for (const name of PYTHON_RESOURCE_FILES) {
+    if (name.includes('/') || name.includes('\\')) allowedNested.add(name.replace(/\\/g, '/'));
+    else allowedTop.add(name);
+  }
+  // 嵌套文件的顶层目录也要保留
+  for (const rel of allowedNested) {
+    allowedTop.add(rel.split('/')[0]);
+  }
+
   const removed = [];
   if (!fs.existsSync(pythonDir)) {
     throw new Error(`打包后的 Python 资源目录不存在: ${pythonDir}`);
   }
 
   for (const entry of fs.readdirSync(pythonDir, { withFileTypes: true })) {
-    if (allowed.has(entry.name) && entry.isFile()) continue;
-    fs.rmSync(path.join(pythonDir, entry.name), { recursive: true, force: true });
-    removed.push(entry.name);
+    const full = path.join(pythonDir, entry.name);
+    if (entry.isFile()) {
+      if (allowedTop.has(entry.name)) continue;
+      fs.rmSync(full, { recursive: true, force: true });
+      removed.push(entry.name);
+      continue;
+    }
+    if (entry.isDirectory()) {
+      if (!allowedTop.has(entry.name)) {
+        fs.rmSync(full, { recursive: true, force: true });
+        removed.push(entry.name);
+        continue;
+      }
+      // 白名单目录：只保留声明过的嵌套文件
+      const keepUnder = [...allowedNested].filter((r) => r.startsWith(`${entry.name}/`));
+      const walk = (dir, relBase) => {
+        for (const child of fs.readdirSync(dir, { withFileTypes: true })) {
+          const childFull = path.join(dir, child.name);
+          const rel = `${relBase}/${child.name}`.replace(/\\/g, '/');
+          if (child.isDirectory()) {
+            const hasKeep = keepUnder.some((k) => k === rel || k.startsWith(`${rel}/`));
+            if (!hasKeep) {
+              fs.rmSync(childFull, { recursive: true, force: true });
+              removed.push(rel);
+            } else {
+              walk(childFull, rel);
+            }
+          } else if (!allowedNested.has(rel)) {
+            fs.rmSync(childFull, { force: true });
+            removed.push(rel);
+          }
+        }
+      };
+      walk(full, entry.name);
+    }
   }
 
   const missing = PYTHON_RESOURCE_FILES.filter((name) => {

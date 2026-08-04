@@ -10,14 +10,13 @@
   POST /novel/player/album_detail/v1/   body: {"album_id": "<id>", "need_video_detail_info": true}
       → 剧元信息（封面/简介/热度），不含分集列表
 
-播放类接口默认可用裸 HTTP（公共 query 即可，2026-08-01 复测 code=0）。
-风控时可能返回 Code=110001，此时需要 App 同款 TTNet 签名头。
+播放类接口在强风控下会返回 Code=110001，需要 TTNet 安全头。
 
-签名路径：
-  - 默认：裸 HTTP（无签名，纯协议主路径）
-  - ttnet_signer.TtnetDeviceSigner：Frida 调 App NetworkUtils.executePost
-    （110001 兜底；--device-sign / SHORTDRAMA_DEVICE_SIGN=1）
-  - metasec_offline：已还原短 Argus/Khronos；完整六神头仍依赖 MetaSec VM
+签名路径（按优先级）：
+  1. signer 显式注入（TtnetDeviceSigner / OfflineSigner）
+  2. offline_sign=True → metasec_offline.OfflineSigner
+     （纯 Python X-Khronos+X-Gorgon，**无需模拟器/Frida**，2026-08-04 验收）
+  3. 裸 HTTP（无签名；宽松时段可能仍 code=0）
 
 CDN 直链可匿名 HTTP GET；内容为 cenc-aes-ctr，需 AES-128 key 解密。
 key 来源见 spade_keys.py（spade_a 解包 / 缓存）。
@@ -31,10 +30,11 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from ttnet_signer import TtnetDeviceSigner
+    from metasec_offline import OfflineSigner
 
 DEFAULT_HOSTS = (
     "api5-normal-sinfonlinea.fqnovel.com",
@@ -86,7 +86,8 @@ class HongguoApiClient:
         host: Optional[str] = None,
         timeout: float = 30.0,
         extra_query: Optional[Dict[str, str]] = None,
-        signer: Optional["TtnetDeviceSigner"] = None,
+        signer: Optional[Any] = None,
+        offline_sign: Optional[bool] = None,
     ):
         self.device_id = (
             device_id
@@ -105,8 +106,20 @@ class HongguoApiClient:
         self.query["iid"] = self.install_id
         if extra_query:
             self.query.update({k: str(v) for k, v in extra_query.items()})
-        # App-identical TTNet signer (Frida → NetworkUtils.executePost)
+        # TTNet signer：Frida 设备签名 或 纯 Python OfflineSigner
         self.signer = signer
+        # offline_sign: None → 看环境变量 SHORTDRAMA_OFFLINE_SIGN（默认 1）
+        if offline_sign is None:
+            env = os.environ.get("SHORTDRAMA_OFFLINE_SIGN", "1").strip().lower()
+            offline_sign = env not in ("0", "false", "no", "off")
+        self.offline_sign = bool(offline_sign)
+        if self.signer is None and self.offline_sign:
+            try:
+                from metasec_offline import OfflineSigner  # noqa: WPS433
+
+                self.signer = OfflineSigner()
+            except Exception:
+                self.signer = None
 
     def _url(self, host: str, path: str) -> str:
         return f"https://{host}{path}?{urllib.parse.urlencode(self.query)}"
@@ -130,16 +143,62 @@ class HongguoApiClient:
             return True, 0, str(msg)
         return False, code, str(msg)
 
+    def set_signer(self, signer: Any) -> None:
+        self.signer = signer
+
+    def _is_offline_signer(self) -> bool:
+        if self.signer is None:
+            return False
+        cls = type(self.signer).__name__
+        return cls == "OfflineSigner" or (
+            hasattr(self.signer, "sign_headers")
+            and not hasattr(self.signer, "ensure_frida_server")
+        )
+
     def post_json(self, path: str, payload: Dict[str, Any], *, retries: int = 3) -> Dict[str, Any]:
-        # 1) App-identical path: TTNet via Frida signer
+        # 1) Signed path: OfflineSigner（纯 Python）或 TtnetDeviceSigner（Frida）
         if self.signer is not None:
             last_err: Optional[Exception] = None
             hosts = list(self.hosts)
+            body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            offline = self._is_offline_signer()
             for rnd in range(max(1, retries)):
                 for host in hosts:
-                    base = f"https://{host}{path}"
                     try:
-                        data = self.signer.post_json(base, payload)
+                        if offline:
+                            # 离线签名：本机拼 DEFAULT_DEVICE query + Khronos/Gorgon
+                            q = dict(self.query)
+                            q["_rticket"] = str(int(time.time() * 1000))
+                            url = f"https://{host}{path}?{urllib.parse.urlencode(q)}"
+                            if hasattr(self.signer, "post_json"):
+                                # OfflineSigner.post_json 会再签一次；直接走 sign_headers 更可控
+                                sec = self.signer.sign_headers(url, body)
+                                headers = {
+                                    "Content-Type": "application/json; charset=utf-8",
+                                    "Accept": "application/json",
+                                    "User-Agent": USER_AGENT,
+                                }
+                                headers.update(sec)
+                                req = urllib.request.Request(
+                                    url, data=body, method="POST", headers=headers
+                                )
+                                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                                    data = json.loads(
+                                        resp.read().decode("utf-8", "replace")
+                                    )
+                            else:
+                                raise ApiError("offline signer missing sign_headers")
+                        else:
+                            base = f"https://{host}{path}"
+                            # 长任务中 Frida 会话可能被 App 杀进程弄死；signer 内部会 reattach
+                            if hasattr(self.signer, "ensure_alive"):
+                                try:
+                                    self.signer.ensure_alive()
+                                except Exception as e:
+                                    last_err = e
+                                    time.sleep(0.5 * (rnd + 1))
+                                    continue
+                            data = self.signer.post_json(base, payload)
                         ok, code, msg = self._response_ok(data)
                         if not ok:
                             last_err = ApiError(
@@ -152,7 +211,25 @@ class HongguoApiClient:
                         return data
                     except Exception as e:
                         last_err = e
-                        time.sleep(0.3 * (rnd + 1))
+                        # script destroyed / session dead：清掉再让 ensure_alive 重建
+                        msg = str(e).lower()
+                        if any(
+                            x in msg
+                            for x in (
+                                "script has been destroyed",
+                                "session is destroyed",
+                                "detached",
+                                "connection closed",
+                            )
+                        ):
+                            try:
+                                if hasattr(self.signer, "detach"):
+                                    self.signer.detach()
+                            except Exception:
+                                pass
+                            time.sleep(1.0 * (rnd + 1))
+                        else:
+                            time.sleep(0.3 * (rnd + 1))
                         continue
             raise ApiError(
                 f"{path} signed post failed: {last_err}",
@@ -216,17 +293,14 @@ class HongguoApiClient:
         code = getattr(last_err, "code", None)
         if code in (110001, "110001"):
             hint = (
-                "（业务侧 110001：播放接口被风控。可稍后重试、加 --interval 降速，"
-                "或用 --device-sign / 纯协议自动回退挂模拟器 App 签名。）"
+                "（业务侧 110001：播放接口被风控。默认会走离线 Khronos+Gorgon；"
+                "仍失败可加 --interval，或 --device-sign 挂模拟器 App 签名。）"
             )
         raise ApiError(
             f"{path} failed on all hosts: {last_err}{hint}",
             code=code,
             body=getattr(last_err, "body", None),
         )
-
-    def set_signer(self, signer: Optional["TtnetDeviceSigner"]) -> None:
-        self.signer = signer
 
     def rotate_device_identity(self) -> None:
         """换一组随机 device_id/iid，缓解单身份被频控。"""

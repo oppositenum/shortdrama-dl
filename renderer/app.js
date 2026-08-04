@@ -13,6 +13,7 @@ const dirInput = $('dir');
 const chooseDirBtn = $('chooseDir');
 const modeApp = $('modeApp');
 const modeApi = $('modeApi');
+const modeOffline = $('modeOffline');
 const modeNone = $('modeNone');
 const grabDirInput = $('grabDir');
 const chooseGrabDirBtn = $('chooseGrabDir');
@@ -54,24 +55,30 @@ const envItemState = { python: 'checking', ffmpeg: 'checking', android: 'checkin
   hongguo_app: 'checking', frida_server: 'checking' };
 
 // ---------- 抓取方式 ----------
-// 设置结构版本。1（或缺失）= 只有「App 抓取」开关的旧版本；2 = 三选一的 grabMode。
+// 设置结构版本：
+//   1（或缺失）= 只有「App 抓取」开关
+//   2 = 三选一 grabMode：api | app | none
+//   3 = 四选一：offline | api | app | none（新增离线六神纯协议）
 // 旧设置里的 appGrab: true 是当年的默认值而不是用户的选择，迁移时不能直接当成
 // "用户要 App 抓取"，否则升级后仍会去装模拟器——见 GRAB_MODE_LABEL 下面的迁移逻辑。
-const SETTINGS_VERSION = 2;
+const SETTINGS_VERSION = 3;
 const GRAB_MODE_LABEL = {
-  api: '纯协议下载（无需模拟器）',
+  offline: '离线六神纯协议（无需模拟器/Frida）',
+  api: '纯协议下载（可借模拟器签名回退）',
   app: 'App 抓取（需 root 安卓 + Frida）',
   none: '仅保存封面与简介',
 };
 
 function getGrabMode() {
+  if (modeOffline && modeOffline.checked) return 'offline';
   if (modeApi && modeApi.checked) return 'api';
   if (modeNone && modeNone.checked) return 'none';
   return 'app';
 }
 
 function setGrabMode(mode) {
-  if (mode === 'api' && modeApi) modeApi.checked = true;
+  if (mode === 'offline' && modeOffline) modeOffline.checked = true;
+  else if (mode === 'api' && modeApi) modeApi.checked = true;
   else if (mode === 'none' && modeNone) modeNone.checked = true;
   else if (modeApp) modeApp.checked = true;
   syncGrabDirRow();
@@ -83,22 +90,29 @@ function setGrabMode(mode) {
  * 调用方需要提示用户，并把新的 settingsVersion 落盘，避免下次又迁一遍。
  */
 function resolveSavedGrabMode(saved = {}) {
-  const known = (m) => m === 'app' || m === 'api' || m === 'none';
+  const known = (m) => m === 'offline' || m === 'app' || m === 'api' || m === 'none';
 
-  // 新版设置：用户选过什么就是什么，选 App 抓取也不再动它。
+  // v3+：用户选过什么就是什么（含 offline / api / app / none）。
   if (saved.settingsVersion >= SETTINGS_VERSION) {
-    return { mode: known(saved.grabMode) ? saved.grabMode : 'api', migrated: false };
+    return { mode: known(saved.grabMode) ? saved.grabMode : 'offline', migrated: false };
+  }
+  // v2：三选一已选定的模式照搬，并升到 v3 时不改用户选择。
+  if (saved.settingsVersion >= 2 && known(saved.grabMode) && saved.grabMode !== 'offline') {
+    return { mode: saved.grabMode, migrated: false };
+  }
+  if (saved.settingsVersion >= 2 && saved.grabMode === 'offline') {
+    return { mode: 'offline', migrated: false };
   }
   // 旧版设置：关掉过抓取是用户的主动选择，尊重它。
   if (saved.grabMode === 'none' || saved.appGrab === false) {
     return { mode: 'none', migrated: false };
   }
-  // grabMode:'app' / appGrab:true 都只是旧版默认值，不是选择，迁到新默认「纯协议」。
+  // grabMode:'app' / appGrab:true 都只是旧版默认值，不是选择，迁到「纯协议」。
   if (saved.grabMode === 'app' || saved.appGrab === true) {
     return { mode: 'api', migrated: true };
   }
-  // 头一次运行，或旧设置里本来就是纯协议：直接用新默认，没什么可提示的。
-  return { mode: 'api', migrated: false };
+  // 头一次运行：新默认「离线六神纯协议」。
+  return { mode: 'offline', migrated: false };
 }
 
 // ---------- 记忆：保存上次填写的内容 ----------
@@ -286,6 +300,7 @@ function setDownloadingUI(on) {
   chooseDirBtn.disabled = on;
   if (modeApp) modeApp.disabled = on;
   if (modeApi) modeApi.disabled = on;
+  if (modeOffline) modeOffline.disabled = on;
   if (modeNone) modeNone.disabled = on;
   grabDirInput.disabled = on || getGrabMode() === 'none';
   chooseGrabDirBtn.disabled = on || getGrabMode() === 'none';
@@ -370,13 +385,13 @@ function syncGrabDirRow() {
   chooseGrabDirBtn.disabled = !needsTools || downloading;
 }
 
-for (const el of [modeApp, modeApi, modeNone]) {
+for (const el of [modeApp, modeApi, modeOffline, modeNone]) {
   if (!el) continue;
   el.addEventListener('change', () => {
     syncGrabDirRow();
     updateInputSummary();
     saveFormState();
-    // 切换抓取方式后重跑环境检查（纯协议不查安卓/Frida）
+    // 切换抓取方式后重跑环境检查（纯协议/离线六神不查安卓/Frida）
     if (!downloading) runEnvCheck();
   });
 }

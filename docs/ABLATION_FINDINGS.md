@@ -87,27 +87,30 @@
 **最小离线目标（抗 110001）：**
 
 ```text
-能生成 (X-Khronos, X-Gorgon) 且请求 URL = App full_url
+能生成 (X-Khronos, X-Gorgon)
 ```
 
-若 Gorgon 难而 Medusa 仿真易，可改走 H 路径：Helios+Medusa（+ 其它非硬字段）。
+### 2026-08-04 已达成
 
-## 5. 产品侧立即可用的策略
+- 纯 Python `encode_gorgon_8404` + 固定 mid→key oracle  
+- **short DEFAULT_DEVICE query 即可**（不必 App full_url）  
+- `video_detail` / `video_model` / `api_grab` 第 1 集 1080p 解密 MP4 **无模拟器**  
 
-1. **签名请求必须用 `NetworkParams.addCommonParams` 后的 URL**（`ttnet_signer.full_url`）。  
-2. 风控时优先发 **至少 Khronos+Gorgon**；App 签名器给 full6 也可以。  
+实现：`python/metasec_offline.py` → `OfflineSigner`；`api_grab` 默认启用。
+
+若 Gorgon oracle 失效，可改走 H 路径：Helios+Medusa（算法未离线，需设备签名）。
+
+## 5. 产品侧策略
+
+1. **默认离线 Khronos+Gorgon**（`SHORTDRAMA_OFFLINE_SIGN=1`）。  
+2. Gorgon 的 URL 输入是 **query string only**（不含 path/host）。  
 3. 切勿只带 Medusa 或只带 Helios。  
-4. 纯协议短 query 在强风控下不可用——与「要不要六神」是两件事。
+4. 仍 110001 时再 `--device-sign` 挂 App。  
 
-## 6. 下一步实验（Gorgon P0）
+## 6. 研究剩余
 
-工具与进度见 **[GORGON_RE_STATUS.md](./GORGON_RE_STATUS.md)**。
-
-1. `gorgon_corpus_collect.py` — 差分语料  
-2. `gorgon_crack.py` — 经典算法反推  
-3. `frida_gorgon_native.py` — 内存定位 26B 缓冲  
-4. 写断点 / Stalker 拿加密前明文 → 离线实现  
+见 **[GORGON_RE_STATUS.md](./GORGON_RE_STATUS.md)**：`key=f(mid)` 闭式、Helios/Medusa 离线。
 
 ---
 
-**一句话：** 风控下不必六神齐；**Khronos+Gorgon 就够**，或 **Helios+Medusa 成对** 的另一条路；Helios/Medusa 不能拆开。  
+**一句话：** 风控下不必六神齐；**离线 Khronos+Gorgon 已够脱离模拟器出片**；Helios/Medusa 为备选路径。  
