@@ -136,6 +136,80 @@ def resolve_key(cache: KeyCache, *, kid: str, spade_a: str, explicit: str = "") 
     return None
 
 
+# --- CDN 下载重试 ---------------------------------------------------------
+# 一轮 = main + backup 各试一次。轮与轮之间退避，给对端喘息的机会。
+CDN_ROUNDS = int(os.environ.get("SHORTDRAMA_CDN_ROUNDS", "3") or 3)
+CDN_BACKOFF_S = (2.0, 6.0, 15.0)
+# socket 超时：管建连和每次 read
+CDN_SOCKET_TIMEOUT = float(os.environ.get("SHORTDRAMA_CDN_TIMEOUT", "40") or 40)
+# 单次尝试的总时限。分集实测十几到几十秒，这里留足余量；慢速连接被切断后
+# 下一轮能接着 .part 继续下，切早了也不会白费。
+CDN_ATTEMPT_DEADLINE = float(os.environ.get("SHORTDRAMA_CDN_DEADLINE", "240") or 240)
+
+
+def _part_bytes(dest: str) -> int:
+    """已经攒下多少字节（各 CDN 的分片取最大的那份），只用于日志。"""
+    base = os.path.basename(dest)
+    d = os.path.dirname(dest) or "."
+    best = 0
+    try:
+        for name in os.listdir(d):
+            if name.startswith(base) and name.endswith(".part"):
+                best = max(best, os.path.getsize(os.path.join(d, name)))
+    except OSError:
+        return 0
+    return best
+
+
+def download_cdn_with_retry(
+    sources,
+    dest: str,
+    *,
+    expect_size: int = 0,
+    label: str = "",
+    on_log=None,
+    sleep=time.sleep,
+    downloader=None,
+) -> int:
+    """按 main → backup 的顺序整对重试，轮间退避。
+
+    以前是一趟 for 循环走完两个地址就抛错：一次偶发超时就把这一集判死，
+    要等到几分钟后整部剧重跑的补漏轮才有下文，两次尝试之间连一秒退避都没有。
+    现在整对重试 CDN_ROUNDS 轮；.part 保留，重试是接着下不是从头下。
+
+    @param sources 形如 [("main", url), ("backup", url_or_None)]，None 的跳过
+    @returns 下载字节数；全部失败时抛 RuntimeError
+    """
+    fetch = downloader or http_download
+    say = on_log or (lambda level, message: None)
+    usable = [(name, url) for name, url in sources if url]
+    if not usable:
+        raise RuntimeError("cdn download failed: no url")
+
+    last_err = None
+    for rnd in range(CDN_ROUNDS):
+        for name, url in usable:
+            try:
+                got = fetch(
+                    url,
+                    dest,
+                    expect_size=expect_size,
+                    timeout=CDN_SOCKET_TIMEOUT,
+                    deadline_s=CDN_ATTEMPT_DEADLINE,
+                )
+                return got
+            except Exception as e:  # noqa: BLE001 网络什么都可能抛
+                last_err = e
+                say("warn", f"{label} {name} 下载失败（第 {rnd + 1}/{CDN_ROUNDS} 轮）: {e}")
+        if rnd + 1 < CDN_ROUNDS:
+            delay = CDN_BACKOFF_S[min(rnd, len(CDN_BACKOFF_S) - 1)]
+            have = _part_bytes(dest)
+            resume_hint = f"，已下 {have}B 可续" if have else ""
+            say("info", f"{label} {delay:.0f}s 后重试 CDN{resume_hint}")
+            sleep(delay)
+    raise RuntimeError(f"cdn download failed: {last_err}")
+
+
 def _is_risk_err(err: BaseException) -> bool:
     code = getattr(err, "code", None)
     if code in (110001, "110001", 101001, "101001"):
@@ -212,12 +286,12 @@ def main() -> int:
         "--offline-sign",
         action="store_true",
         default=None,
-        help="使用纯 Python 离线 Khronos+Gorgon（无需模拟器；默认开启）",
+        help="本机 Python 生成 Khronos+Gorgon（无需模拟器；下载仍需联网；默认开启）",
     )
     ap.add_argument(
         "--no-offline-sign",
         action="store_true",
-        help="关闭离线签名（仅裸 HTTP，易 110001）",
+        help="关闭本机签名（仅裸 HTTP，易 110001）",
     )
     ap.add_argument(
         "--device-sign",
@@ -227,7 +301,7 @@ def main() -> int:
     ap.add_argument(
         "--device-sign-auto",
         action="store_true",
-        help="离线签名仍 110001 时自动尝试挂载 App 签名（需模拟器/真机 + frida-server）",
+        help="本机签名仍 110001 时自动尝试挂载 App 签名（需模拟器/真机 + frida-server）",
     )
     ap.add_argument(
         "--adb-device",
@@ -253,7 +327,7 @@ def main() -> int:
         args.device_sign
         or os.environ.get("SHORTDRAMA_DEVICE_SIGN", "").strip() in ("1", "true", "yes")
     )
-    # 离线签名默认开；--no-offline-sign 或 SHORTDRAMA_OFFLINE_SIGN=0 关闭
+    # 本机签名默认开；--no-offline-sign 或 SHORTDRAMA_OFFLINE_SIGN=0 关闭
     use_offline = not args.no_offline_sign
     if os.environ.get("SHORTDRAMA_OFFLINE_SIGN", "").strip() in ("0", "false", "no"):
         use_offline = False
@@ -274,9 +348,9 @@ def main() -> int:
             from metasec_offline import OfflineSigner  # noqa: WPS433
 
             signer = OfflineSigner()
-            logev("info", "已启用纯协议离线签名（Khronos+Gorgon，无需模拟器）")
+            logev("info", "已启用本机签名（Khronos+Gorgon，无需模拟器；下载需联网）")
         except Exception as e:
-            logev("warn", f"离线签名初始化失败，将裸请求: {e}")
+            logev("warn", f"本机签名初始化失败，将裸请求: {e}")
             signer = None
 
     client = HongguoApiClient(
@@ -289,8 +363,8 @@ def main() -> int:
     def ensure_signed_or_recover(reason: str) -> bool:
         """110001 恢复策略（优先快路径）：
 
-        1. 已挂签名（离线或设备）→ 直接继续
-        2. 尝试切换/启用离线 OfflineSigner
+        1. 已挂签名（本机或设备）→ 直接继续
+        2. 尝试切换/启用本机 OfflineSigner
         3. 允许 auto_sign → 挂载 App 设备签名
         4. 冷却 + 轮换 device_id
         """
@@ -298,23 +372,23 @@ def main() -> int:
         logev("warn", f"触发风控恢复（{reason}）")
 
         if client.signer is not None:
-            # 若当前是离线仍失败，再尝试设备签名
+            # 若当前是本机签仍失败，再尝试设备签名
             is_offline = type(client.signer).__name__ == "OfflineSigner"
             if not is_offline:
                 logev("info", "已在设备签名路径，跳过冷却，直接重试")
                 return True
-            logev("info", "离线签名仍遇风控，尝试其它恢复…")
+            logev("info", "本机签名仍遇风控，尝试其它恢复…")
         else:
-            # 先上离线签名
+            # 先上本机签名
             try:
                 from metasec_offline import OfflineSigner  # noqa: WPS433
 
                 signer = OfflineSigner()
                 client.set_signer(signer)
-                logev("info", "已切换纯协议离线签名（Khronos+Gorgon）")
+                logev("info", "已切换本机签名（Khronos+Gorgon）")
                 return True
             except Exception as e:
-                logev("warn", f"离线签名不可用: {e}")
+                logev("warn", f"本机签名不可用: {e}")
 
         # 有设备就挂 App 签名
         if auto_sign:
@@ -506,20 +580,16 @@ def main() -> int:
 
             emit({"event": "progress", "ep": ep, "percent": 30.0})
             enc = os.path.join(tmpdir, f"ep{ep:04d}_{rung['definition']}.mp4")
-            last_err = None
-            for label, url in (("main", rung["url"]), ("backup", rung.get("backup"))):
-                if not url:
-                    continue
-                try:
-                    n = http_download(url, enc, expect_size=rung.get("size") or 0, timeout=40)
-                    dbg(f"[cdn] ep{ep} {rung['definition']} {label} {n}B")
-                    last_err = None
-                    break
-                except Exception as e:
-                    last_err = e
-                    logev("warn", f"第{ep}集 {label} 下载失败: {e}")
-            if last_err:
-                raise RuntimeError(f"cdn download failed: {last_err}")
+            # CDN 超时是最常见的偶发故障，而且多半下一秒就好了。以前 main、backup
+            # 各打一枪就把这一集判死，要等到几分钟后整部剧重跑的补漏轮才有下文。
+            got_bytes = download_cdn_with_retry(
+                [("main", rung["url"]), ("backup", rung.get("backup"))],
+                enc,
+                expect_size=rung.get("size") or 0,
+                label=f"第{ep}集",
+                on_log=logev,
+            )
+            dbg(f"[cdn] ep{ep} {rung['definition']} {got_bytes}B")
 
             emit({"event": "progress", "ep": ep, "percent": 80.0})
             final = os.path.join(outdir, epname(ep, width))

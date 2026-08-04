@@ -832,7 +832,7 @@ function normalizeGrabMode(payload = {}) {
 }
 
 function grabModeLabel(mode) {
-  if (mode === 'offline') return '离线六神纯协议';
+  if (mode === 'offline') return '本机签名纯协议';
   if (mode === 'api') return '纯协议下载';
   if (mode === 'app') return 'App 抓取';
   return '仅保存封面';
@@ -843,7 +843,7 @@ async function handleStartDownload(_event, payload) {
   isCanceled = false;
   stopAfterSeries = false;
   activeOutputPath = null;
-  // grabMode: offline（离线六神）| api（纯协议+可设备回退）| app | none
+  // grabMode: offline（本机签名纯协议）| api（纯协议+可设备回退）| app | none
   // 简介默认走简洁模式（只有剧名和简介），显式传 true 才写详细版
   const grabMode = normalizeGrabMode(payload);
   const opts = {
@@ -1988,7 +1988,7 @@ async function runEnvironmentCheck(grabDirConfigured, { interactive, grabMode = 
         message: pythonBin
           || (requireFrida
             ? '未找到可用的 Python（需 frida + cryptography）'
-            : '未找到可用的 Python（需 cryptography，纯协议/离线六神）'),
+            : '未找到可用的 Python（需 cryptography，纯协议/本机签名）'),
       });
     } catch (e) {
       send('env:item', { id: 'python', state: 'error', message: e.message });
@@ -1999,7 +1999,7 @@ async function runEnvironmentCheck(grabDirConfigured, { interactive, grabMode = 
       const purpose = needAndroid
         ? 'App 抓取'
         : mode === 'offline'
-          ? '离线六神纯协议'
+          ? '本机签名纯协议'
           : '纯协议下载';
       const ffmpegOk = interactive
         ? await ensureSystemMediaTools(mediaEnv, { purpose })
@@ -2016,18 +2016,18 @@ async function runEnvironmentCheck(grabDirConfigured, { interactive, grabMode = 
 
     if (!needAndroid) {
       const skipMsg =
-        mode === 'offline' ? '离线六神模式不需要' : '纯协议模式不需要';
+        mode === 'offline' ? '本机签名模式不需要' : '纯协议模式不需要';
       send('env:item', { id: 'android', state: 'ok', message: skipMsg });
       send('env:item', { id: 'hongguo_app', state: 'ok', message: skipMsg });
       send('env:item', { id: 'frida_server', state: 'ok', message: skipMsg });
-      // 离线模式额外确认 metasec_offline 是否在组件目录
+      // 本机签名模式额外确认 metasec_offline 是否在组件目录
       if (mode === 'offline' && grabDir) {
         const offlinePy = path.join(grabDir, 'metasec_offline.py');
         if (!fs.existsSync(offlinePy)) {
           send('env:item', {
             id: 'python',
             state: 'missing',
-            message: '缺少 metasec_offline.py（离线六神签名组件）',
+            message: '缺少 metasec_offline.py（本机签名组件）',
           });
         }
       }
@@ -2199,7 +2199,7 @@ function grabWithApp({ seriesName, startEp, endEp, seriesDir, total, grabDir, py
  * stdout JSON 事件协议与 hongguo_grab 子集一致，转发到同一 download:* 通道。
  *
  * @param {'offline'|'api'} signMode
- *   - offline：强制纯 Python 离线六神（Khronos+Gorgon），不挂设备签名
+ *   - offline：本机 Python 自签 Khronos+Gorgon，不挂设备签名（下载仍需联网）
  *   - api：纯协议；默认可借已运行的模拟器做 device-sign-auto 回退
  */
 function grabWithApi({
@@ -2217,7 +2217,7 @@ function grabWithApi({
 }) {
   return new Promise((resolve, reject) => {
     const offlineOnly = signMode === 'offline';
-    const modeTag = offlineOnly ? '离线六神' : '纯协议';
+    const modeTag = offlineOnly ? '本机签' : '纯协议';
     setStatus(`正在用${modeTag}下载全集…`);
     log(`调用${modeTag}下载：series_id=${seriesId}，第 ${startEp}–${endEp} 集`);
 
@@ -2234,13 +2234,13 @@ function grabWithApi({
 
     // 签名策略：
     // - offline：--offline-sign，关闭 device-sign-auto（绝不碰模拟器）
-    // - api：允许离线签（Python 默认）+ 可选 device-sign-auto（旧行为保留）
+    // - api：允许本机签（Python 默认）+ 可选 device-sign-auto（旧行为保留）
     let deviceSignAuto = false;
     if (offlineOnly) {
       args.push('--offline-sign');
-      log('签名：纯 Python 离线 Khronos+Gorgon（不使用模拟器/Frida）');
+      log('签名：本机 Python 生成 Khronos+Gorgon（无需模拟器；下载仍走网络）');
     } else {
-      // 纯协议模式仍可用离线签；遇风控再借设备（SHORTDRAMA_API_DEVICE_SIGN=0 关闭）
+      // 纯协议模式仍可用本机签；遇风控再借设备（SHORTDRAMA_API_DEVICE_SIGN=0 关闭）
       deviceSignAuto = process.env.SHORTDRAMA_API_DEVICE_SIGN !== '0';
       if (deviceSignAuto) {
         args.push('--device-sign-auto');
@@ -2363,7 +2363,7 @@ function grabWithApi({
       } else if (code === 4) {
         log(
           offlineOnly
-            ? '离线六神仍被业务 API 拒绝（110001）。可稍后重试，或改用「纯协议下载 / App 抓取」'
+            ? '本机签名仍被业务 API 拒绝（110001）。可稍后重试，或改用「纯协议下载 / App 抓取」'
             : '纯协议被业务 API 拒绝（常见 110001 风控/频控）。本地环境正常；请稍后重试或改用「App 抓取」',
           'warn'
         );
@@ -2408,7 +2408,7 @@ function formatElapsed(ms) {
 
 /**
  * 整剧下载核心：网页只解析详情和保存封面；视频由所选模式抓取：
- *   grabMode=offline → api_grab.py + 离线六神（无模拟器/Frida）
+ *   grabMode=offline → api_grab.py + 本机签名（无模拟器；下载需联网）
  *   grabMode=api     → api_grab.py（纯协议，可 device-sign-auto 回退）
  *   grabMode=app     → hongguo_grab.py（安卓 App + Frida）
  *   grabMode=none    → 仅封面/简介
@@ -2458,12 +2458,12 @@ async function downloadSeriesCore(url, saveDir, opts = {}) {
     log(`检测到本地已有完整 ${beforeCount}/${totalCnt} 集，跳过视频抓取`, 'success');
   } else if ((grabMode === 'api' || grabMode === 'offline') && !isCanceled) {
     const signMode = grabMode === 'offline' ? 'offline' : 'api';
-    grabLabel = grabMode === 'offline' ? '离线六神' : '纯协议';
+    grabLabel = grabMode === 'offline' ? '本机签' : '纯协议';
     const resolvedApiDir = resolveApiGrabDir(grabDir);
     if (!resolvedApiDir) {
       log(`未找到${grabLabel}组件（python/${API_GRAB_SCRIPT}），本次只保存封面；请配置工具目录`, 'warn');
     } else if (signMode === 'offline' && !fs.existsSync(path.join(resolvedApiDir, 'metasec_offline.py'))) {
-      log('未找到 metasec_offline.py（离线六神签名），本次只保存封面', 'warn');
+      log('未找到 metasec_offline.py（本机签名组件），本次只保存封面', 'warn');
     } else {
       try {
         const runtime = await ensureApiGrabEnvironment(resolvedApiDir);
@@ -2604,7 +2604,7 @@ async function downloadCategory(url, saveDir, opts = {}) {
 
   const mode = opts.grabMode || (opts.appGrab === false ? 'none' : 'app');
   const modeTxt =
-    mode === 'offline' ? '离线六神' : mode === 'api' ? '纯协议' : mode === 'app' ? 'App' : '仅封面';
+    mode === 'offline' ? '本机签' : mode === 'api' ? '纯协议' : mode === 'app' ? 'App' : '仅封面';
   log(`分类页共解析到 ${list.length} 部剧；模式：${modeTxt}…`, 'success');
 
   let okSeries = 0;

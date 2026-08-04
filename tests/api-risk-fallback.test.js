@@ -185,13 +185,15 @@ test('the emulator signing fallback can be switched off end to end', () => {
   assert.match(grab, /本次运行不再尝试挂载 App 签名/);
 });
 
-// 第四种模式：离线六神 — 强制 --offline-sign，且不挂 device-sign-auto
+// 第四种模式：本机签名纯协议 — 强制 --offline-sign，且不挂 device-sign-auto
 test('offline grab mode forces pure-python sign and never enables device-sign-auto', () => {
   const src = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
   assert.match(src, /signMode === 'offline'/);
   assert.match(src, /args\.push\('--offline-sign'\)/);
   // offline 分支里 deviceSignAuto 应为 false 路径
   assert.match(src, /const offlineOnly = signMode === 'offline'/);
+  assert.match(src, /本机签/);
+  assert.equal(src.includes('离线六神'), false, '用户可见文案勿再写「离线六神」');
   assert.ok(fs.existsSync(path.join(pyDir, 'metasec_offline.py')), 'metasec_offline.py 必须存在');
   assert.ok(
     fs.existsSync(path.join(pyDir, 'sign_samples', 'gorgon_mid_key_oracle.json')),

@@ -23,6 +23,7 @@ key 来源见 spade_keys.py（spade_a 解包 / 缓存）。
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -431,6 +432,17 @@ class HongguoApiClient:
         return rungs[0]
 
 
+def part_path(dest: str, url: str) -> str:
+    """分片文件按 URL 区分。
+
+    main / backup 是两台 CDN 上的同一个文件，但不能拿一半 main 的字节接上
+    backup 的后半段——两边真要有一字节不同，size 校验照样过，坏掉的是解密后的
+    成片。按 URL 分开存，续传只会续自己那一份。
+    """
+    tag = hashlib.sha1(url.encode("utf-8", "replace")).hexdigest()[:8]
+    return f"{dest}.{tag}.part"
+
+
 def http_download(
     url: str,
     dest: str,
@@ -438,34 +450,75 @@ def http_download(
     expect_size: int = 0,
     timeout: float = 30.0,
     max_bytes: int = 2 * 1024 * 1024 * 1024,
+    deadline_s: float = 0.0,
+    resume: bool = True,
 ) -> int:
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36",
-            "Accept": "*/*",
-        },
-    )
-    tmp = dest + ".part"
-    total = 0
+    """下载到 dest。支持断点续传，失败时保留 .part 供下次接着下。
+
+    timeout 是 socket 级的：管建连和每一次 read，不管整体。一条每 39 秒吐一个
+    字节的连接永远碰不到它，能挂住几十分钟。deadline_s 才是这一次尝试的总时限，
+    到点就断，让上层去重试——重试时 .part 还在，已经下好的字节不用重来。
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36",
+        "Accept": "*/*",
+    }
+    tmp = part_path(dest, url)
+
+    have = 0
+    if resume:
+        try:
+            have = os.path.getsize(tmp)
+        except OSError:
+            have = 0
+        # 已下的比目标还大 = 这份残片对不上，重下
+        if expect_size and have > expect_size:
+            have = 0
+        if expect_size and have == expect_size:
+            os.replace(tmp, dest)
+            return have
+    if not have:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+    else:
+        headers["Range"] = f"bytes={have}-"
+
+    req = urllib.request.Request(url, headers=headers)
+    started = time.monotonic()
+    total = have
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as src, open(tmp, "wb") as fh:
-            while True:
-                chunk = src.read(1 << 20)
-                if not chunk:
-                    break
-                total += len(chunk)
-                if total > max_bytes:
-                    raise RuntimeError("response exceeds 2GB")
-                fh.write(chunk)
+        with urllib.request.urlopen(req, timeout=timeout) as src:
+            status = getattr(src, "status", None) or src.getcode()
+            # 服务端不认 Range（返回 200 而不是 206）就从头写，别把整份接在残片后面
+            if have and status != 206:
+                have = 0
+                total = 0
+
+            # read(n) 会一直阻塞到攒够 n 个字节或对端结束，所以循环里检查时限是
+            # 没用的：一条每 0.2 秒吐一点的连接，单次 read 就能把整个下载耗光而
+            # 一次都不返回（关掉响应也不管用，阻塞中的 recv 不会因此醒来）。
+            # read1 只做一次底层读，有多少返回多少，检查才有机会执行。
+            reader = getattr(src, "read1", None) or src.read
+            with open(tmp, "ab" if have else "wb") as fh:
+                while True:
+                    if deadline_s and time.monotonic() - started > deadline_s:
+                        raise TimeoutError(
+                            f"download exceeded {deadline_s:.0f}s (got {total}B)"
+                        )
+                    chunk = reader(1 << 20)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > max_bytes:
+                        raise RuntimeError("response exceeds 2GB")
+                    fh.write(chunk)
         if expect_size and total != expect_size:
             raise RuntimeError(f"size mismatch got={total} expect={expect_size}")
     except Exception:
-        try:
-            if os.path.exists(tmp):
-                os.remove(tmp)
-        except OSError:
-            pass
+        # 故意不删 .part：这一份多半还能续（下次带 Range 接着下）。调用方放弃
+        # 整集时会连同 ep<NNNN>_* 临时文件一起清掉，不会留垃圾。
         raise
     os.replace(tmp, dest)
     return total
