@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/oppositenum/shortdrama-dl/compare/v1.5.0...v1.5.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* **api:** retry CDN downloads in place and resume from the partial file ([dee47fa](https://github.com/oppositenum/shortdrama-dl/commit/dee47faa34896e10875d51bed6c4bc058caa76f8))
+
 ## [1.5.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.4.0...v1.5.0) (2026-08-04)
 
 
