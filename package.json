@@ -1,6 +1,6 @@
 {
   "name": "shortdrama-dl",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "红果短剧下载器 - 抓取并下载红果短剧视频到本地（支持 Windows / macOS）",
   "main": "main.js",
   "author": "oppositenum",
