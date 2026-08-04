@@ -20,6 +20,7 @@
   "scripts": {
     "start": "cross-env ELECTRON_RUN_AS_NODE= PLAYWRIGHT_BROWSERS_PATH=./ms-playwright electron .",
     "dev": "cross-env ELECTRON_RUN_AS_NODE= PLAYWRIGHT_BROWSERS_PATH=./ms-playwright electron . --enable-logging",
+    "lint": "eslint .",
     "test": "node --test tests/*.test.js",
     "fetch-browser": "cross-env PLAYWRIGHT_BROWSERS_PATH=./ms-playwright playwright install chromium",
     "pack": "electron-builder --dir --config electron-builder.js --publish never",
@@ -39,6 +40,8 @@
   "devDependencies": {
     "cross-env": "^10.1.0",
     "electron": "^43.2.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "eslint": "^9.39.5",
+    "globals": "^17.9.0"
   }
 }

@@ -15,7 +15,11 @@ contextBridge.exposeInMainWorld('api', {
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
   /** 获取默认下载目录 */
   getDefaultDir: () => ipcRenderer.invoke('app:getDefaultDir'),
-  /** 开始下载 { url, outputDir, grabMode: 'app'|'api'|'none', appGrab?, grabDir, introDetailed } */
+  /**
+   * 开始下载
+   * { url, outputDir, grabMode: 'offline'|'api'|'app'|'none', appGrab?, grabDir, introDetailed }
+   * appGrab 是 v1.1 之前的兼容字段，新代码只看 grabMode。
+   */
   startDownload: (payload) => ipcRenderer.invoke('download:start', payload),
   /** 立即取消下载（打断正在进行的抓取） */
   cancelDownload: () => ipcRenderer.invoke('download:cancel'),

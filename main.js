@@ -34,6 +34,11 @@ const {
   windowsSdkRoot,
 } = require('./runtime-platform');
 const { describeBarkTarget, normalizeBarkBase, sendBark } = require('./notify');
+const {
+  consumeJsonLines,
+  describeGrabEvent,
+  pickStderrLines,
+} = require('./grab-protocol');
 
 // ---------------------------------------------------------------------------
 // 常量：红果短剧要求的请求头（防盗链）
@@ -545,7 +550,9 @@ async function captureVideoSource(pageUrl) {
 
   // 用 Promise 捕获视频源；优先 m3u8/dash，其次直连 mp4
   let resolveMedia;
-  const mediaPromise = new Promise((resolve) => (resolveMedia = resolve));
+  const mediaPromise = new Promise((resolve) => {
+    resolveMedia = resolve;
+  });
   let fallback = null;   // {url, type} mp4 候选，等待是否出现更优的 hls
   let graceTimer = null;
   let settled = false;
@@ -609,12 +616,12 @@ async function captureVideoSource(pageUrl) {
   // 反复尝试触发播放（播放器脚本可能稍后才就绪），不阻塞捕获竞速
   triggerPlay(page);
 
-  const timeoutPromise = new Promise((_, reject) =>
+  const timeoutPromise = new Promise((_, reject) => {
     setTimeout(
       () => reject(new Error('等待超时：未能在页面中捕获到视频源（m3u8 / mp4）')),
       CAPTURE_TIMEOUT
-    )
-  );
+    );
+  });
 
   try {
     return await Promise.race([mediaPromise, timeoutPromise]);
@@ -2079,104 +2086,74 @@ async function runEnvironmentCheck(grabDirConfigured, { interactive, grabMode = 
  *   code: 0 全成功 / 2 部分失败 / 3 环境不可用（已降级为 warn）
  * @throws Error('__CANCELED__') 当收到取消（退出码 130 或运行中被 kill）
  */
-function grabWithApp({ seriesName, startEp, endEp, seriesDir, total, grabDir, pythonBin, grabEnv }) {
+/**
+ * 接管一个已经起好的抓取子进程：读 stdout 的 JSON Lines 事件转成界面动作，
+ * 过滤 stderr，处理取消和退出码。App 抓取和纯协议共用这一套——两边的事件协议
+ * 本来就是同一个，只有文案和退出码解释不同，都由参数传进来。
+ *
+ * @param {import('child_process').ChildProcess} child
+ * @param {object} opts
+ * @param {string} opts.label      模式名，进日志和状态栏（"App 抓取" / "本机签名"）
+ * @param {string} opts.logTag     Python 侧日志的前缀（"App" / "API"）
+ * @param {number} opts.total      该剧总集数，进度显示用
+ * @param {boolean} [opts.showDevice]      就绪行里报不报设备（只有 App 抓取有设备）
+ * @param {RegExp} [opts.stderrExtra]      额外算作"值得看"的 stderr 模式
+ * @param {(code: number) => string|null} [opts.explainExit] 非零退出码的人话解释
+ * @param {number} [opts.expectedEpisodes] 事件里没给总数时的兜底
+ * @returns {Promise<{code: number, ok: number, failed: number[]}>}
+ */
+function runGrabChild(child, {
+  label,
+  logTag,
+  total,
+  showDevice = false,
+  stderrExtra = null,
+  explainExit = null,
+  expectedEpisodes = 0,
+}) {
   return new Promise((resolve, reject) => {
-    setStatus('正在用 App 抓取全集…');
-    log(`调用 App 抓取工具：第 ${startEp}–${endEp} 集`);
-
-    const child = spawn(
-      pythonBin,
-      [
-        GRAB_SCRIPT,
-        '--series-name', seriesName,
-        '--start-ep', String(startEp),
-        '--end-ep', String(endEp),
-        '--output-dir', seriesDir,
-      ],
-      { cwd: grabDir, env: grabEnv }
-    );
     currentGrab = child;
 
     let okCount = 0;
     let failedEps = [];
-    let grabTotal = endEp - startEp + 1;
-    let stdoutBuf = '';
+    let stdoutRest = '';
 
-    const handleEvent = (ev) => {
-      switch (ev.event) {
-        case 'init':
-          grabTotal = ev.total != null ? ev.total : grabTotal;
-          log(`App 抓取就绪：设备 ${ev.device || '?'}，本次待抓 ${grabTotal} 集`);
-          break;
-        case 'episode_start':
-          send('download:episode', { current: ev.ep, total });
-          setStatus(`App 抓取 第 ${ev.ep}/${total} 集…`);
-          send('download:progress', { percent: 0, timemark: '', speed: '' });
-          break;
-        case 'progress':
-          send('download:progress', {
-            percent: Math.max(0, Math.min(100, Number(ev.percent) || 0)),
-            timemark: '',
-            speed: '',
-          });
-          break;
-        case 'episode_done':
-          okCount++;
-          send('download:progress', { percent: 100, timemark: '', speed: '' });
-          log(`App 抓取 第 ${ev.ep} 集完成（${ev.file || ''}）`, 'success');
-          break;
-        case 'episode_failed':
-          log(`App 抓取 第 ${ev.ep} 集失败：${ev.error || ''}`, 'error');
-          break;
-        case 'log':
-          log(`[App] ${ev.message || ''}`, ev.level || 'info');
-          break;
-        case 'done':
-          if (typeof ev.ok === 'number') okCount = ev.ok;
-          if (Array.isArray(ev.failed)) failedEps = ev.failed;
-          break;
-        default:
-          break;
+    const applyEvent = (event) => {
+      const act = describeGrabEvent(event, {
+        label,
+        logTag,
+        total,
+        showDevice,
+        fallbackTotal: expectedEpisodes,
+      });
+      for (const line of act.logs) log(line.message, line.level);
+      if (act.status) setStatus(act.status);
+      if (act.episode) send('download:episode', act.episode);
+      if (act.progress) {
+        send('download:progress', { percent: act.progress.percent, timemark: '', speed: '' });
       }
+      if (act.okDelta) okCount += act.okDelta;
+      if (typeof act.ok === 'number') okCount = act.ok;
+      if (Array.isArray(act.failed)) failedEps = act.failed;
     };
 
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk) => {
-      stdoutBuf += chunk;
-      let nl;
-      while ((nl = stdoutBuf.indexOf('\n')) >= 0) {
-        const line = stdoutBuf.slice(0, nl).trim();
-        stdoutBuf = stdoutBuf.slice(nl + 1);
-        if (!line) continue;
-        let ev;
-        try {
-          ev = JSON.parse(line);
-        } catch {
-          continue; // 非 JSON 行忽略（契约保证 stdout 纯净，兜底防脏字节）
-        }
-        try {
-          handleEvent(ev);
-        } catch {
-          /* 单条事件处理异常不影响后续 */
-        }
-      }
+      stdoutRest = consumeJsonLines(stdoutRest + chunk, applyEvent);
     });
 
     // stderr 是调试噪声，仅挑真正的错误行降级为 warn
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (chunk) => {
-      for (const line of String(chunk).split('\n')) {
-        const t = line.trim();
-        if (t && /(error|exception|traceback|failed|refused|not found)/i.test(t)) {
-          log(`[App-stderr] ${t}`, 'warn');
-        }
+      for (const line of pickStderrLines(chunk, stderrExtra)) {
+        log(`[${logTag}-stderr] ${line}`, 'warn');
       }
     });
 
     child.on('error', (err) => {
       currentGrab = null;
-      // Python 进程启动错误：降级为环境不可用，不中断整体流程
-      log(`无法启动 App 抓取工具：${err.message}（请检查应用准备的 Python 环境）`, 'warn');
+      // 子进程起不来：降级为环境不可用，不中断整体流程
+      log(`无法启动${label}工具：${err.message}（请检查应用准备的 Python 环境）`, 'warn');
       resolve({ code: 3, ok: 0, failed: [] });
     });
 
@@ -2186,11 +2163,37 @@ function grabWithApp({ seriesName, startEp, endEp, seriesDir, total, grabDir, py
         reject(new Error('__CANCELED__'));
         return;
       }
-      if (code === 3) {
-        log('App 抓取环境不可用（无设备 / 未装 App / 缺依赖），本次只保存封面', 'warn');
-      }
+      const explained = explainExit ? explainExit(code) : null;
+      if (explained) log(explained, 'warn');
       resolve({ code, ok: okCount, failed: failedEps });
     });
+  });
+}
+
+function grabWithApp({ seriesName, startEp, endEp, seriesDir, total, grabDir, pythonBin, grabEnv }) {
+  setStatus('正在用 App 抓取全集…');
+  log(`调用 App 抓取工具：第 ${startEp}–${endEp} 集`);
+
+  const child = spawn(
+    pythonBin,
+    [
+      GRAB_SCRIPT,
+      '--series-name', seriesName,
+      '--start-ep', String(startEp),
+      '--end-ep', String(endEp),
+      '--output-dir', seriesDir,
+    ],
+    { cwd: grabDir, env: grabEnv }
+  );
+
+  return runGrabChild(child, {
+    label: 'App 抓取',
+    logTag: 'App',
+    total,
+    showDevice: true,
+    expectedEpisodes: endEp - startEp + 1,
+    explainExit: (code) =>
+      code === 3 ? 'App 抓取环境不可用（无设备 / 未装 App / 缺依赖），本次只保存封面' : null,
   });
 }
 
@@ -2215,161 +2218,76 @@ function grabWithApi({
   keyCache,
   signMode = 'api',
 }) {
-  return new Promise((resolve, reject) => {
-    const offlineOnly = signMode === 'offline';
-    const modeTag = offlineOnly ? '本机签' : '纯协议';
-    setStatus(`正在用${modeTag}下载全集…`);
-    log(`调用${modeTag}下载：series_id=${seriesId}，第 ${startEp}–${endEp} 集`);
+  const offlineOnly = signMode === 'offline';
+  const modeTag = offlineOnly ? '本机签' : '纯协议';
+  setStatus(`正在用${modeTag}下载全集…`);
+  log(`调用${modeTag}下载：series_id=${seriesId}，第 ${startEp}–${endEp} 集`);
 
-    const args = [
-      API_GRAB_SCRIPT,
-      '--series-id', String(seriesId),
-      '--start-ep', String(startEp),
-      '--end-ep', String(endEp),
-      '--output-dir', seriesDir,
-      // 分集间隔，降低连打 video_model 触发 110001 的概率
-      '--interval', String(process.env.SHORTDRAMA_API_INTERVAL || '1.2'),
-      '--risk-cooldown', String(process.env.SHORTDRAMA_RISK_COOLDOWN || '45'),
-    ];
+  const args = [
+    API_GRAB_SCRIPT,
+    '--series-id', String(seriesId),
+    '--start-ep', String(startEp),
+    '--end-ep', String(endEp),
+    '--output-dir', seriesDir,
+    // 分集间隔，降低连打 video_model 触发 110001 的概率
+    '--interval', String(process.env.SHORTDRAMA_API_INTERVAL || '1.2'),
+    '--risk-cooldown', String(process.env.SHORTDRAMA_RISK_COOLDOWN || '45'),
+  ];
 
-    // 签名策略：
-    // - offline：--offline-sign，关闭 device-sign-auto（绝不碰模拟器）
-    // - api：允许本机签（Python 默认）+ 可选 device-sign-auto（旧行为保留）
-    let deviceSignAuto = false;
-    if (offlineOnly) {
-      args.push('--offline-sign');
-      log('签名：本机 Python 生成 Khronos+Gorgon（无需模拟器；下载仍走网络）');
+  // 签名策略：
+  // - offline：--offline-sign，关闭 device-sign-auto（绝不碰模拟器）
+  // - api：允许本机签（Python 默认）+ 可选 device-sign-auto（旧行为保留）
+  let deviceSignAuto = false;
+  if (offlineOnly) {
+    args.push('--offline-sign');
+    log('签名：本机 Python 生成 Khronos+Gorgon（无需模拟器；下载仍走网络）');
+  } else {
+    // 纯协议模式仍可用本机签；遇风控再借设备（SHORTDRAMA_API_DEVICE_SIGN=0 关闭）
+    deviceSignAuto = process.env.SHORTDRAMA_API_DEVICE_SIGN !== '0';
+    if (deviceSignAuto) {
+      args.push('--device-sign-auto');
     } else {
-      // 纯协议模式仍可用本机签；遇风控再借设备（SHORTDRAMA_API_DEVICE_SIGN=0 关闭）
-      deviceSignAuto = process.env.SHORTDRAMA_API_DEVICE_SIGN !== '0';
-      if (deviceSignAuto) {
-        args.push('--device-sign-auto');
-      } else {
-        log('已关闭纯协议的模拟器签名回退（SHORTDRAMA_API_DEVICE_SIGN=0），遇风控只冷却重试');
-      }
+      log('已关闭纯协议的模拟器签名回退（SHORTDRAMA_API_DEVICE_SIGN=0），遇风控只冷却重试');
     }
+  }
 
-    if (seriesName) args.push('--series-name', seriesName);
-    if (keyCache) args.push('--key-cache', keyCache);
-    const adbDevice =
-      process.env.SHORTDRAMA_ADB_DEVICE ||
-      process.env.ANDROID_SERIAL ||
-      'emulator-5554';
-    if (!offlineOnly) {
-      args.push('--adb-device', String(adbDevice));
-    }
+  if (seriesName) args.push('--series-name', seriesName);
+  if (keyCache) args.push('--key-cache', keyCache);
+  const adbDevice =
+    process.env.SHORTDRAMA_ADB_DEVICE ||
+    process.env.ANDROID_SERIAL ||
+    'emulator-5554';
+  if (!offlineOnly) {
+    args.push('--adb-device', String(adbDevice));
+  }
 
-    // api_grab.py 自己也默认开启签名回退，只靠不传参数关不掉，必须把环境变量也带上。
-    const childEnv = {
-      ...grabEnv,
-      SHORTDRAMA_DEVICE_SIGN_AUTO: deviceSignAuto ? (grabEnv.SHORTDRAMA_DEVICE_SIGN_AUTO || '1') : '0',
-      SHORTDRAMA_OFFLINE_SIGN: offlineOnly ? '1' : (grabEnv.SHORTDRAMA_OFFLINE_SIGN || '1'),
-    };
-    if (offlineOnly) {
-      childEnv.SHORTDRAMA_DEVICE_SIGN = '0';
-    }
-    const child = spawn(pythonBin, args, { cwd: grabDir, env: childEnv });
-    currentGrab = child;
+  // api_grab.py 自己也默认开启签名回退，只靠不传参数关不掉，必须把环境变量也带上。
+  const childEnv = {
+    ...grabEnv,
+    SHORTDRAMA_DEVICE_SIGN_AUTO: deviceSignAuto ? (grabEnv.SHORTDRAMA_DEVICE_SIGN_AUTO || '1') : '0',
+    SHORTDRAMA_OFFLINE_SIGN: offlineOnly ? '1' : (grabEnv.SHORTDRAMA_OFFLINE_SIGN || '1'),
+  };
+  if (offlineOnly) {
+    childEnv.SHORTDRAMA_DEVICE_SIGN = '0';
+  }
+  const child = spawn(pythonBin, args, { cwd: grabDir, env: childEnv });
 
-    let okCount = 0;
-    let failedEps = [];
-    let grabTotal = endEp - startEp + 1;
-    let stdoutBuf = '';
-
-    const handleEvent = (ev) => {
-      switch (ev.event) {
-        case 'init':
-          grabTotal = ev.total != null ? ev.total : grabTotal;
-          log(`${modeTag}就绪：本次待抓 ${grabTotal} 集`);
-          break;
-        case 'episode_start':
-          send('download:episode', { current: ev.ep, total });
-          setStatus(`${modeTag} 第 ${ev.ep}/${total} 集…`);
-          send('download:progress', { percent: 0, timemark: '', speed: '' });
-          break;
-        case 'progress':
-          send('download:progress', {
-            percent: Math.max(0, Math.min(100, Number(ev.percent) || 0)),
-            timemark: '',
-            speed: '',
-          });
-          break;
-        case 'episode_done':
-          okCount++;
-          send('download:progress', { percent: 100, timemark: '', speed: '' });
-          log(`${modeTag} 第 ${ev.ep} 集完成（${ev.file || ''}）`, 'success');
-          break;
-        case 'episode_failed':
-          log(`${modeTag} 第 ${ev.ep} 集失败：${ev.error || ''}`, 'error');
-          break;
-        case 'log':
-          log(`[API] ${ev.message || ''}`, ev.level || 'info');
-          break;
-        case 'done':
-          if (typeof ev.ok === 'number') okCount = ev.ok;
-          if (Array.isArray(ev.failed)) failedEps = ev.failed;
-          break;
-        default:
-          break;
+  return runGrabChild(child, {
+    label: modeTag,
+    logTag: 'API',
+    total,
+    // 纯协议的致命错误常常只带一个业务码，noise 正则里没有 110001
+    stderrExtra: /110001/,
+    expectedEpisodes: endEp - startEp + 1,
+    explainExit: (code) => {
+      if (code === 3) return `${modeTag}环境或参数不可用，本次只保存封面`;
+      if (code === 4) {
+        return offlineOnly
+          ? '本机签名仍被业务 API 拒绝（110001）。可稍后重试，或改用「纯协议下载 / App 抓取」'
+          : '纯协议被业务 API 拒绝（常见 110001 风控/频控）。本地环境正常；请稍后重试或改用「App 抓取」';
       }
-    };
-
-    child.stdout.setEncoding('utf8');
-    child.stdout.on('data', (chunk) => {
-      stdoutBuf += chunk;
-      let nl;
-      while ((nl = stdoutBuf.indexOf('\n')) >= 0) {
-        const line = stdoutBuf.slice(0, nl).trim();
-        stdoutBuf = stdoutBuf.slice(nl + 1);
-        if (!line) continue;
-        let ev;
-        try {
-          ev = JSON.parse(line);
-        } catch {
-          continue;
-        }
-        try {
-          handleEvent(ev);
-        } catch {
-          /* 单条事件处理异常不影响后续 */
-        }
-      }
-    });
-
-    child.stderr.setEncoding('utf8');
-    child.stderr.on('data', (chunk) => {
-      for (const line of String(chunk).split('\n')) {
-        const t = line.trim();
-        if (t && /(error|exception|traceback|failed|refused|not found|110001)/i.test(t)) {
-          log(`[API-stderr] ${t}`, 'warn');
-        }
-      }
-    });
-
-    child.on('error', (err) => {
-      currentGrab = null;
-      log(`无法启动${modeTag}工具：${err.message}（请检查应用准备的 Python 环境）`, 'warn');
-      resolve({ code: 3, ok: 0, failed: [] });
-    });
-
-    child.on('close', (code, signal) => {
-      currentGrab = null;
-      if (code === 130 || isCanceled || signal === 'SIGTERM') {
-        reject(new Error('__CANCELED__'));
-        return;
-      }
-      if (code === 3) {
-        log(`${modeTag}环境或参数不可用，本次只保存封面`, 'warn');
-      } else if (code === 4) {
-        log(
-          offlineOnly
-            ? '本机签名仍被业务 API 拒绝（110001）。可稍后重试，或改用「纯协议下载 / App 抓取」'
-            : '纯协议被业务 API 拒绝（常见 110001 风控/频控）。本地环境正常；请稍后重试或改用「App 抓取」',
-          'warn'
-        );
-      }
-      resolve({ code, ok: okCount, failed: failedEps });
-    });
+      return null;
+    },
   });
 }
 

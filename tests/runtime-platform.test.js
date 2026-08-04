@@ -106,6 +106,7 @@ test('packaging includes both platform scripts and the runtime router', () => {
   assert.ok(builder.files.includes('series-workflow.js'));
   assert.ok(builder.files.includes('ffmpeg-runner.js'));
   assert.ok(builder.files.includes('notify.js'));
+  assert.ok(builder.files.includes('grab-protocol.js'));
   assert.equal(builder.mac.identity, null);
   const pythonResource = builder.extraResources.find((item) => item.to === 'python');
   assert.ok(pythonResource);

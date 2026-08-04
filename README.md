@@ -18,36 +18,58 @@
 >
 > See [Safety and Compliance](#safety-and-compliance) for details.
 
-`shortdrama-dl` is a short-drama download tool composed of an Electron desktop application and a Python Android capture/decryption component. It provides two URL-handling paths:
+`shortdrama-dl` is a short-drama download tool composed of an Electron desktop application and Python capture/decryption components. It handles two kinds of URL:
 
 - **Single player page**: Electron uses Playwright to capture that page's media request and downloads that episode through Node.js or ffmpeg.
-- **Whole-series detail/category page**: the website only resolves the series name, total episode count, and cover. The Android App then captures the whole series starting at episode 1.
+- **Whole-series detail/category page**: the website only resolves the series name, total episode count, and cover; the episodes themselves come from the capture mode you pick.
+
+Whole-series capture offers four modes. The default needs nothing but Python and ffmpeg:
+
+| Mode | What it needs | Notes |
+|---|---|---|
+| **Local-signature protocol** (default) | Python + `cryptography` + ffmpeg | Signs the API requests on your computer, so no App, emulator, or Frida is involved. Downloading still needs a network connection. |
+| Plain protocol | Same as above | Same request path, but when the service rejects a request it may borrow the signature of an emulator that already happens to be running. Set `SHORTDRAMA_API_DEVICE_SIGN=0` to keep it away from Android entirely. |
+| App capture | Rooted Android + Frida + Python | The original path: drives the App on a device. Kept as a fallback for when the protocol path is refused. |
+| Covers only | Nothing | Saves the cover and synopsis without downloading video. |
 
 Electron and Python cooperate through a stable command-line and JSON Lines protocol; see [Architecture](docs/ARCHITECTURE.md) for runtime boundaries, arguments, and packaged resources.
 
 ## Features
 
-- Electron desktop UI, download task management, and an "environment check" panel (read-only probe of Python/ffmpeg/emulator/App/Frida Server on launch — never installs, downloads, or pops a dialog on its own)
-- Remembers the last-entered link, save directory, and other form fields
+- Electron desktop UI, download task management, and an "environment check" panel (read-only probe on launch — never installs, downloads, or pops a dialog on its own; the rows it probes follow the capture mode you selected)
+- Four capture modes for a whole series, defaulting to the one that needs no Android at all
+- Remembers the last-entered link, save directory, and other form fields; the settings card and the log both collapse to make room
 - Single player-page downloads: direct MP4, or ffmpeg for HLS/DASH
 - Detail/category page metadata parsing, cover downloads, multi-series batch processing with retry rounds
-- Existing-file skip, resumable runs, `.complete` markers
+- Existing-file skip, resumable runs, `.complete` markers, and per-series elapsed time in the log
+- CDN downloads retry both source URLs with backoff and resume from the partial file
+- Optional [Bark](https://bark.day.app) push: one notification per completed series, plus errors (coalesced, so a burst does not flood)
 - Android App whole-series capture from episode 1: Frida-captured decryption context, per-sample `.mdl` decryption, ffmpeg remuxing, ffprobe duration validation
 - Target selection in multi-device ADB environments, with a per-device lock preventing concurrent capture
 - Safe Python task cancellation through `SIGTERM`
 
-The Android workflow requires a controlled rooted device and a compatible app environment — it is not a generic Android downloader. App UI changes, SQLite schema changes, or Frida hook symbol changes can break it.
+The Android workflow requires a controlled rooted device and a compatible app environment — it is not a generic Android downloader. App UI changes, SQLite schema changes, or Frida hook symbol changes can break it. The protocol modes depend instead on the service's request signing, which the operator can change at any time.
 
 ## Project Layout
 
 ```text
 shortdrama-dl/
-├── main.js                 # Electron main process, web flow, Python orchestration
-├── preload.js               # Allowlisted contextBridge IPC API
+├── main.js                   # Electron main process, web flow, Python orchestration
+├── preload.js                # Allowlisted contextBridge IPC API
+├── grab-protocol.js          # JSON Lines event protocol shared by both Python entry points
+├── ffmpeg-runner.js          # ffmpeg invocation and progress parsing
+├── runtime-platform.js       # macOS/Windows paths, installers, Android bootstrap
+├── series-workflow.js        # Episode count, capture range, completion marker rules
+├── notify.js                 # Bark push (address normalisation and sending)
 ├── renderer/                 # Electron UI
 ├── electron-builder.js       # Packaging, signing, Python resources
 ├── python/
-│   ├── hongguo_grab.py       # Production Python entry point
+│   ├── api_grab.py           # Protocol capture entry point (default path)
+│   ├── api_client.py         # Service HTTP client, retry and resume
+│   ├── metasec_offline.py    # Local request signing
+│   ├── spade_keys.py         # Offline AES key unwrapping
+│   ├── ttnet_signer.py       # Optional Frida-backed signing fallback
+│   ├── hongguo_grab.py       # App capture entry point
 │   ├── decrypt_mdl.py        # Single .mdl decryption and remux
 │   ├── mp4parse.py           # MP4 sample-table parser
 │   ├── capture_final.js      # Frida hook
@@ -68,9 +90,9 @@ Runtime data generated while running Python directly in development is excluded 
 | macOS 12+ Apple Silicon (`arm64`) | Supported | Universal DMG, or the smaller arm64 DMG |
 | macOS 12+ Intel (`x64`) | Supported | Universal DMG, or the smaller x64 DMG |
 | Windows 10/11 x64 | Supported | NSIS installer |
-| Windows ARM64 / Linux | Automatic Android setup unsupported | Source development only; the web single-player-page path still works |
+| Windows ARM64 / Linux | Automatic Android setup unsupported | Source development only; the web and protocol paths still work |
 
-Single player-page downloads and whole-series cover parsing do not themselves require Android, ADB, Frida, or Python. Whole-series video from a detail/category page depends on the Android App workflow and additionally needs Python 3.11+, `adb`, an Android device/emulator capable of `adb root`, matching Frida components (currently pinned to `17.16.4`), and system `ffmpeg`/`ffprobe`. These are detected automatically on first use; missing pieces trigger a confirmation dialog before anything is installed — nothing happens silently.
+Single player-page downloads and cover parsing need neither Android nor Python. The two protocol modes need Python 3.11+, `cryptography`, and system `ffmpeg`/`ffprobe`. Only **App capture** additionally needs `adb`, an Android device/emulator capable of `adb root`, and matching Frida components (currently pinned to `17.16.4`). All of these are detected on first use; missing pieces trigger a confirmation dialog before anything is installed — nothing happens silently.
 
 ## Installation
 
@@ -99,7 +121,9 @@ winget install --exact --id Gyan.FFmpeg --source winget  # Windows
 
 ## Android Device Preparation
 
-With "Use App to capture the whole series" enabled, the app automatically checks/starts the emulator (an installed but stopped `hongguo` AVD is booted; if nothing is installed, it asks before installing the Android SDK, Emulator, and system image). You can also check manually:
+Only needed for **App capture** — skip this section entirely if you use the default local-signature mode.
+
+With App capture selected, the app automatically checks/starts the emulator (an installed but stopped `hongguo` AVD is booted; if nothing is installed, it asks before installing the Android SDK, Emulator, and system image). You can also check manually:
 
 ```bash
 ./python/start_avd.sh --check                  # macOS
@@ -115,7 +139,8 @@ For a physical device: enable Developer Options and USB debugging, connect and a
 
 - **Development launch**: `npm start` (`npm run dev` adds Electron debug logging).
 - **Single player page**: paste a `/player/...` link, choose a save folder, click Start Download.
-- **Whole series**: paste a `/detail?series_id=...` or `/category?...` link. The website only resolves the name/total-count/cover; clearing "Use App to capture the whole series" saves covers only. When enabled, Python searches for the series, skips existing episodes, captures the whole series, and writes decrypted output into the same series directory.
+- **Whole series**: paste a `/detail?series_id=...` or `/category?...` link, then pick a capture mode. The website only resolves the name/total-count/cover; the episodes come from the mode you picked. Existing episodes are skipped, so an interrupted run resumes by simply running it again.
+- **Notifications** (optional): paste a Bark address such as `https://api.day.app/<your-key>` and use "试发一条" to verify it. Pasting the full documented example including its title and body works too — only the key is kept.
 - Existing-episode skipping and the `.complete` marker are described in [Architecture](docs/ARCHITECTURE.md).
 
 ## Development and Packaging
@@ -123,7 +148,8 @@ For a physical device: enable Developer Options and USB debugging, connect and a
 | Command | Purpose |
 |---|---|
 | `npm start` / `npm run dev` | Start the app (the latter with debug logging) |
-| `npm test` | Run environment-startup mocks without a real device |
+| `npm run lint` | ESLint over every JavaScript file in the repository |
+| `npm test` | Run the test suite (no real device or network required) |
 | `npm run pack` | Create an unpacked app directory for the current platform |
 | `npm run dist` | Build a distribution for the current platform |
 | `npm run dist:mac` / `:mac:arm64` / `:mac:x64` | macOS ad-hoc signed DMG (universal / arm64 / x64) |
