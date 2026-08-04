@@ -54,7 +54,10 @@ Android 链路依赖已 root 的受控设备和特定 App 运行环境，不是�
 
 ```text
 shortdrama-dl/
-├── main.js                   # Electron 主进程、网页下载和 Python 编排
+├── main.js                   # Electron 主进程：窗口、IPC、流程编排、取消语义
+├── web-capture.js            # 分类页列表、详情页元数据、单播放页捕获；浏览器实例归它管
+├── url-utils.js              # 链接判别、文件名清洗、媒体类型识别、请求头整理
+├── series-files.js           # 完成标记、已有分集清点、封面与简介落盘
 ├── grab-protocol.js          # 两个 Python 入口共用的 JSON Lines 事件协议
 ├── ffmpeg-runner.js          # ffmpeg 调用与进度解析
 ├── runtime-platform.js       # macOS/Windows 路径、安装器、安卓引导

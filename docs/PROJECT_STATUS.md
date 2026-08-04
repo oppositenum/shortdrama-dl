@@ -4,7 +4,9 @@
 
 ## 当前组成
 
-桌面端以 Electron 为主进程，负责网页解析、单播放页媒体请求捕获、封面下载、任务状态、环境准备和 Python 子进程编排。详情页/分类页的整剧流程不会下载网页分集，只解析剧名、总集数和封面；抓取可走 **纯协议**（`grabMode=api` → `api_grab.py`，无需安卓）或 **App 抓取**（`grabMode=app` → `hongguo_grab.py`）。`series-workflow.js` 集中保存总集数、App 区间和完成标记规则。Android 抓取组件位于 `python/`，负责 ADB 设备控制、App 离线下载、SQLite 映射、Frida 数据采集、`.mdl` 解密、MP4 重封装和时长终检。
+桌面端以 Electron 为主进程，负责网页解析、单播放页媒体请求捕获、封面下载、任务状态、环境准备和 Python 子进程编排。详情页/分类页的整剧流程不会下载网页分集，只解析剧名、总集数和封面；整剧抓取有四种方式：**本机签名纯协议**（`grabMode=offline`，默认）、**纯协议**（`grabMode=api`，可借已运行的模拟器签名）、**App 抓取**（`grabMode=app` → `hongguo_grab.py`）和**仅封面**（`grabMode=none`）；前两种都走 `api_grab.py`，都不需要安卓。
+
+主进程按职责拆成多个模块，除 `main.js` 外都不 require Electron、可直接进测试：`web-capture.js`（网页取数与浏览器生命周期）、`url-utils.js`（链接与请求头的纯函数）、`series-files.js`（完成标记、封面、简介）、`grab-protocol.js`（Python 事件协议）、`ffmpeg-runner.js`、`runtime-platform.js`、`series-workflow.js`（总集数、抓取区间、完成标记规则）、`notify.js`（Bark 推送）。Android 抓取组件位于 `python/`，负责 ADB 设备控制、App 离线下载、SQLite 映射、Frida 数据采集、`.mdl` 解密、MP4 重封装和时长终检。
 
 **纯协议（2026-08-01）：** `video_detail` / `video_model` 裸 HTTP 即可 `code=0`；`spade_a` 本地解包 + `decrypt_mdl` 出片已端到端验证（无 Frida、无六神头）。风控 `110001` 时优先自动挂载 App 签名兜底：不会为了下载去启动模拟器，但本机已有模拟器在跑就借它的签名；`SHORTDRAMA_API_DEVICE_SIGN=0` 可关闭，只做冷却+轮换身份。签名回退需要 `frida-tools` 自带的 Java bridge，纯协议环境会一并安装；bridge 目录一律向 `frida_tools` 包本身查询（`SHORTDRAMA_FRIDA_BRIDGES` 可覆盖），不写死 venv 位置或解释器小版本。收到 110001 后立即交回上层，不再换 host、不再重试——那只会用同一身份多挨几次拒绝。  
 学习讲义：[REVERSE_LEARNING.md](REVERSE_LEARNING.md)；接口细节：[API_REVERSE.md](API_REVERSE.md)。
@@ -15,7 +17,10 @@
 python/hongguo_grab.py      # App 抓取
 python/api_grab.py          # 纯协议抓取（独立）
 python/api_client.py
+python/metasec_offline.py   # 本机签名（Khronos + Gorgon）
 python/spade_keys.py
+python/ttnet_signer.py
+python/sign_samples/gorgon_mid_key_oracle.json
 python/decrypt_mdl.py
 python/mp4parse.py
 python/capture_final.js
@@ -86,11 +91,12 @@ npm run dist:win                # Windows x64 NSIS 安装包
 
 - Node.js、Bash、Python 和 PowerShell 合同静态检查。
 - `python/hongguo_grab.py --help` 参数检查。
-- 36 项自动化测试全部通过，包括整剧网页视频为零、App 从第 1 集开始、无网页分集列表时的元数据解析、完成标记、macOS/Windows 路由、安装器选择、AVD 状态与创建 mock、Windows SDK 下载校验合同、运行目录隔离、打包资源清理、浏览器 sandbox、广告页恢复，以及 ByteVC2 离线副本改用标准 HEVC 档位出片。
+- 自动化测试全部通过（`npm test`，当前 127 项），覆盖整剧网页视频为零、App 从第 1 集开始、无网页分集列表时的元数据解析、完成标记、macOS/Windows 路由、安装器选择、AVD 状态与创建 mock、Windows SDK 下载校验合同、运行目录隔离、打包资源清理、浏览器 sandbox、广告页恢复、ByteVC2 离线副本改用标准 HEVC 档位出片，以及链接判别/请求头整理、抓取事件协议、CDN 重试与断点续传、Bark 推送、抓取方式迁移、日志滚动。
+- `npm run lint`（ESLint）全仓无告警；CI 另跑 `node --check` 覆盖仓库内全部 JS、`py_compile` 覆盖全部随包 Python。
 - Electron 43.2.0 / electron-builder 26.15.3 成功生成 macOS arm64 App、universal App 和 universal DMG。
 - 打包内白名单 Python 资源与项目文件逐字节一致；ADBKeyBoard 不随包分发，运行时固定来源下载并校验。
 - universal App 检查到的 16 个 Mach-O 文件均为 `x86_64 arm64`；隔离构建的 arm64 App 主程序、Framework 和 Helper 均为 `arm64`。
-- App 和挂载 DMG 内的 `codesign --verify --deep --strict` 均通过，`hdiutil verify` 通过。当前 universal DMG SHA-256 为 `584e597260980d697ebbb3ab933e9a742e6d66184186de6b776e172b2e69adb0`。
+- App 和挂载 DMG 内的 `codesign --verify --deep --strict` 均通过，`hdiutil verify` 通过。各制品的 SHA-256 由发布流水线生成，随 Release 附 `SHA256SUMS.txt`（写死在文档里的那份每次发版就会过期）。
 - `npm audit --omit=dev` 报告生产依赖 0 个已知漏洞。
 - 完整 `npm audit` 报告 electron-builder 构建期传递链 16 个 high advisory；当前无兼容的非破坏性修复，发布应使用锁文件和可信隔离构建机。
 - 当前 DMG 为 ad-hoc 测试包，Gatekeeper 拒绝且没有 stapled 公证票据；本次未提供 Apple 公证凭据，不能作为正式签名公证包发布。

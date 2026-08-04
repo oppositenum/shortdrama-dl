@@ -30,7 +30,7 @@ Electron 主进程的入口是根目录 `main.js`，具体职责按模块拆开�
 - 用 Node.js `fetch` 下载直连 MP4。
 - 用 `fluent-ffmpeg` + 当前系统原生 FFmpeg 合并 HLS/DASH；缺少时经用户确认安装。
 - 管理剧集目录、封面、断点续传和 `.complete`。
-- 处理整剧时按抓取方式启动 Python 子进程：`app` → `hongguo_grab.py`，`api` → `api_grab.py`，`none` 仅封面。
+- 处理整剧时按抓取方式启动 Python 子进程：`offline` / `api` → `api_grab.py`（前者加 `--offline-sign`），`app` → `hongguo_grab.py`，`none` 仅封面。
 - 解析 Python stdout JSON Lines、筛选 stderr、处理退出码和取消操作。
 - 按需发 Bark 推送（`notify.js`）：一部剧凑齐全集时推一条，出错时推一条。
 
@@ -49,7 +49,7 @@ Electron 主进程的入口是根目录 `main.js`，具体职责按模块拆开�
 Python 正式入口有两套（互不替代）：
 
 1. **`python/hongguo_grab.py`**（App 抓取，原有）  
-2. **`python/api_grab.py`**（纯协议，**默认推荐**；依赖 `api_client.py` / `spade_keys.py` / `decrypt_mdl.py`；只需 cryptography + ffmpeg，不需 Frida）
+2. **`python/api_grab.py`**（纯协议，**默认推荐**；依赖 `api_client.py` / `spade_keys.py` / `metasec_offline.py` / `decrypt_mdl.py`；只需 cryptography + ffmpeg，不需 Frida）
 
 App 抓取入口负责：
 
@@ -73,12 +73,12 @@ Electron 不导入 Python 模块，Python 也不依赖 Electron API。唯一正�
 正式调用位于 `main.js`：
 
 - `grabWithApp(...)`：`grabMode === 'app'`
-- `grabWithApi(...)`：`grabMode === 'api'`
+- `grabWithApi(...)`：`grabMode === 'offline'`（`signMode='offline'`，强制本机签名、绝不碰安卓）或 `grabMode === 'api'`
 
 公共触发条件：
 
 1. 处理的是详情页或分类页中的整剧。
-2. `grabMode` 为 `app` 或 `api`（`none` 只存封面）。
+2. `grabMode` 为 `offline`、`api` 或 `app`（`none` 只存封面）。
 3. 能从 `episode_cnt` 或 `vid_list.length` 确定大于 0 的总集数。
 4. 输出目录中尚未实际存在从第 1 集到总集数的全部非空分集。
 5. 未收到取消请求。
@@ -90,7 +90,7 @@ Electron 不导入 Python 模块，Python 也不依赖 Electron API。唯一正�
 
 | 字段 | 说明 |
 |---|---|
-| `grabMode` | `'app'` \| `'api'` \| `'none'`（推荐） |
+| `grabMode` | `'offline'`（默认，本机签名）\| `'api'` \| `'app'` \| `'none'` |
 | `appGrab` | 兼容旧 UI：`false` → `none`，否则默认 `app` |
 
 ## 3. Python 组件目录解析

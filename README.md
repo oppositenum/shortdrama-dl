@@ -54,8 +54,11 @@ The Android workflow requires a controlled rooted device and a compatible app en
 
 ```text
 shortdrama-dl/
-├── main.js                   # Electron main process, web flow, Python orchestration
+├── main.js                   # Electron main process: window, IPC, orchestration, cancellation
 ├── preload.js                # Allowlisted contextBridge IPC API
+├── web-capture.js            # Category listing, detail metadata, single-page capture; owns the browser
+├── url-utils.js              # Link classification, filename sanitising, media typing, headers
+├── series-files.js           # Completion marker, episode counting, cover and synopsis output
 ├── grab-protocol.js          # JSON Lines event protocol shared by both Python entry points
 ├── ffmpeg-runner.js          # ffmpeg invocation and progress parsing
 ├── runtime-platform.js       # macOS/Windows paths, installers, Android bootstrap

@@ -21,6 +21,7 @@
 | `python/hongguo_grab.py` | Electron App 抓取入口；CLI、ADB、Frida、SQLite 映射、任务状态和事件协议 | `main.js` 的 `grabWithApp(...)` |
 | `python/api_grab.py` | Electron **纯协议**抓取入口（独立功能）；video_detail/model → CDN → spade 解包 → 解密 | `main.js` 的 `grabWithApi(...)` |
 | `python/api_client.py` | 红果业务 HTTP 客户端（device query、video_detail/model） | `api_grab.py` import |
+| `python/metasec_offline.py` | 本机离线生成 `X-Khronos` / `X-Gorgon` 签名头，纯协议默认走它，不需要模拟器 | `api_grab.py` 动态 import |
 | `python/spade_keys.py` | `spade_a` 离线解包为 AES-128 key + 可选 key 缓存 | `api_grab.py` import |
 | `python/ttnet_signer.py` | 110001 时经 Frida 调用 App TTNet 签名（可选回退）；Java bridge 目录向 `frida_tools` 包查询，`SHORTDRAMA_FRIDA_BRIDGES` 可覆盖 | `api_grab.py` 动态 import |
 | `python/decrypt_mdl.py` | 单文件 AES-128-CTR 解密、ffmpeg 重封装、ffprobe 时长与轨道校验；接受 `.mdl` 或自行下载的同集分片，`--key` 可显式指定密钥 | `hongguo_grab.py` / `api_grab.py` 通过绝对路径启动 |
