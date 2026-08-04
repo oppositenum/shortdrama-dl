@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.4.0...v1.5.0) (2026-08-04)
+
+
+### Features
+
+* **offline:** sign X-Khronos and X-Gorgon in pure Python, no emulator at all ([9cee1eb](https://github.com/oppositenum/shortdrama-dl/commit/9cee1ebcdabebf0689944b28e85ed9356ffb63ac))
+
 ## [1.4.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.3.0...v1.4.0) (2026-08-03)
 
 
