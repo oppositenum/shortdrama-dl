@@ -18,11 +18,7 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const { safeUrlForLog, startFfmpegDownload } = require('./ffmpeg-runner');
-const {
-  appGrabRange,
-  isCompleteMarker,
-  normalizeEpisodeCount,
-} = require('./series-workflow');
+const { appGrabRange, normalizeEpisodeCount } = require('./series-workflow');
 const {
   androidBootstrapSpec,
   dependencyInstaller,
@@ -39,19 +35,22 @@ const {
   describeGrabEvent,
   pickStderrLines,
 } = require('./grab-protocol');
+const {
+  REFERER,
+  buildFfmpegHeaders,
+  buildFileName,
+  filterBrowserHeaders,
+  formatElapsed,
+  getSeriesIdFromUrl,
+  isCategoryUrl,
+  isSeriesUrl,
+  isValidUrl,
+  sanitizeName,
+} = require('./url-utils');
+const { createSeriesFiles } = require('./series-files');
+const { createWebCapture } = require('./web-capture');
 
-// ---------------------------------------------------------------------------
-// 常量：红果短剧要求的请求头（防盗链）
-// ---------------------------------------------------------------------------
-const REFERER = 'https://hongguoduanju.com';
-const USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-  '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
-// 捕获视频源的最长等待时间（毫秒）
-const CAPTURE_TIMEOUT = 45_000;
-// 只捕获到 mp4 时，再多等一会儿看是否有更优的 m3u8
-const M3U8_GRACE = 3_000;
 // 分类批量收尾时，对仍有缺集的剧目再跑的补漏轮数
 const SERIES_RETRY_ROUNDS = 2;
 
@@ -64,9 +63,8 @@ let webFfmpegPath = runtimeFfmpegPath({
 });
 
 // ---------------------------------------------------------------------------
-// 浏览器内核策略：优先复用系统已装的 Chrome / Edge（channel 方式），
-// 免去随包分发 500+MB Chromium；开发环境仍可回退到 ms-playwright 自带内核。
-// 打包后如果 resources/ms-playwright 存在（旧版全量包），也保留其兜底能力。
+// 浏览器内核：打包后如果 resources/ms-playwright 存在（旧版全量包），保留兜底能力。
+// 具体的启动策略和网页抓取都在 web-capture.js 里。
 // ---------------------------------------------------------------------------
 if (app.isPackaged) {
   const bundledBrowsers = path.join(process.resourcesPath, 'ms-playwright');
@@ -74,63 +72,11 @@ if (app.isPackaged) {
     process.env.PLAYWRIGHT_BROWSERS_PATH = bundledBrowsers;
   }
 }
-const { chromium } = require('playwright');
-
-// 首次成功的浏览器渠道（'chrome' | 'msedge' | ''=自带 Chromium），后续直接复用少走弯路
-let workingChannel = null;
-
-/**
- * 启动无头浏览器：依次尝试 系统 Chrome → 系统 Edge → Playwright 自带 Chromium。
- * 成功一次后记住渠道，本次会话内不再逐个试。
- */
-async function launchBrowser(extraArgs = [], allowInstall = true) {
-  const args = [...extraArgs];
-  const candidates =
-    workingChannel !== null
-      ? [workingChannel]
-      : ['chrome', 'msedge', ''];
-
-  let lastErr = null;
-  for (const channel of candidates) {
-    try {
-      const opts = { headless: true, args };
-      if (channel) opts.channel = channel;
-      const browser = await chromium.launch(opts);
-      if (workingChannel === null) {
-        workingChannel = channel;
-        const name = channel === 'chrome' ? '系统 Chrome' : channel === 'msedge' ? '系统 Edge' : '自带 Chromium';
-        log(`使用浏览器内核：${name}`);
-      }
-      return browser;
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-
-  if (allowInstall && (process.platform === 'darwin' || process.platform === 'win32')) {
-    const installed = await installHostDependency(
-      'browser',
-      '网页抓取需要 Chrome 或 Edge',
-      process.platform === 'win32'
-        ? '检测到 Windows，将使用 WinGet 安装 Google Chrome。'
-        : '检测到 macOS，将使用 Homebrew 安装 Google Chrome。',
-      '正在安装 Google Chrome…'
-    );
-    if (installed) {
-      workingChannel = null;
-      return launchBrowser(extraArgs, false);
-    }
-  }
-  throw new Error(
-    `未找到可用的浏览器内核：请安装 Google Chrome（或 Microsoft Edge）后重试。原始错误：${lastErr ? lastErr.message : '未知'}`
-  );
-}
 
 // ---------------------------------------------------------------------------
 // 全局状态
 // ---------------------------------------------------------------------------
 let mainWindow = null;
-let currentBrowser = null;   // 当前 Playwright 浏览器实例（便于取消时关闭）
 let currentCommand = null;   // 当前 ffmpeg 命令（便于取消时 kill）
 let currentAbort = null;     // 当前 Node 下载的 AbortController（便于取消）
 let currentGrab = null;      // 当前 App 抓取的 Python 子进程（便于取消时 SIGTERM）
@@ -146,169 +92,6 @@ let envCheckBusy = false;    // 「环境检查」面板自动检查/重新检�
 // 工具函数
 // ===========================================================================
 
-/** 校验是否为合法 http/https 链接 */
-function isValidUrl(input) {
-  try {
-    const u = new URL(String(input).trim());
-    return u.protocol === 'http:' || u.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
-/** 是否为剧集详情页链接（含 series_id 且非单集播放页） */
-function isSeriesUrl(input) {
-  try {
-    const u = new URL(String(input).trim());
-    if (u.pathname.includes('/player/')) return false;
-    return u.pathname.includes('/detail') || u.searchParams.has('series_id');
-  } catch {
-    return false;
-  }
-}
-
-/** 是否为分类/榜单列表页链接（如 /category?sort_type=1），页面内含多部剧 */
-function isCategoryUrl(input) {
-  try {
-    const u = new URL(String(input).trim());
-    return u.pathname.includes('/category') && !u.searchParams.has('series_id');
-  } catch {
-    return false;
-  }
-}
-
-/** 从详情页链接取 series_id（SSR 解析失败时兜底） */
-function getSeriesIdFromUrl(input) {
-  try {
-    return new URL(String(input).trim()).searchParams.get('series_id');
-  } catch {
-    return null;
-  }
-}
-
-/**
- * 取某个页面链接对应的 Referer（用页面自身的源）。
- * 不同站点（hongguoduanju.com / novelquickapp.com 分享页等）防盗链要求 Referer
- * 与页面域名一致，写死会导致 403。取不到时回退到默认站点。
- */
-function refererOf(pageUrl) {
-  try {
-    return new URL(pageUrl).origin;
-  } catch {
-    return REFERER;
-  }
-}
-
-/** 清洗成合法文件/文件夹名 */
-function sanitizeName(name) {
-  return String(name || '')
-    .replace(/[\\/:*?"<>|]/g, '_')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 80);
-}
-
-/**
- * 分集文件名。位宽由该剧总集数决定：≥100 集用三位补零（第006集.mp4），否则两位（第06集.mp4）。
- * ⚠️ 必须与 Python 端 hongguo_grab.py 的 epname() 完全一致，否则 App 断点续传和完成校验会错乱。
- */
-function epName(ep, total) {
-  const width = total >= 100 ? 3 : 2;
-  return `第${String(ep).padStart(width, '0')}集.mp4`;
-}
-
-/**
- * 判断某个请求/响应是否为视频源，并返回其类型。
- *
- * 不能只看扩展名——红果的真实地址往往没有 .mp4/.m3u8 后缀，
- * 例如：https://.../video/tos/cn/xxx/?...&mime_type=video_mp4&...
- * 因此综合判断：URL 扩展名、query 里的 mime_type、以及响应的 Content-Type。
- *
- * @returns {'hls'|'dash'|'mp4'|null}
- */
-function classifyMedia(url, contentType = '') {
-  const u = String(url).toLowerCase();
-  const ct = String(contentType).toLowerCase();
-
-  // HLS（m3u8）
-  if (/\.m3u8(\?|$)/.test(u) || ct.includes('mpegurl')) return 'hls';
-  // DASH（mpd）
-  if (/\.mpd(\?|$)/.test(u) || ct.includes('dash+xml')) return 'dash';
-  // 直连 MP4：扩展名、mime_type 参数、或 Content-Type 为 video/*
-  if (/\.mp4(\?|$)/.test(u)) return 'mp4';
-  if (/mime_type=video[_/]mp4/.test(u)) return 'mp4';
-  if (ct.startsWith('video/')) return 'mp4';
-
-  return null;
-}
-
-/**
- * 过滤 Playwright 抓到的浏览器请求头，得到可安全复用的头部对象。
- * 目的：尽量还原浏览器发起视频请求时的头部，绕过防盗链 / CDN 校验。
- *
- * - 剔除 HTTP/2 伪首部（以 : 开头）与逐跳/由客户端自行设置的头
- * - accept-encoding 剔除，避免拿到 gzip 影响处理
- * - range 剔除，确保请求完整文件
- * - 兜底补上 Referer / User-Agent
- *
- * @returns {Record<string,string>}
- */
-function filterBrowserHeaders(browserHeaders) {
-  const EXCLUDE = new Set([
-    'host', 'connection', 'content-length', 'accept-encoding',
-    'range', 'proxy-connection', 'te', 'upgrade',
-  ]);
-  const out = {};
-  let hasReferer = false;
-  let hasUA = false;
-
-  for (const [k, v] of Object.entries(browserHeaders || {})) {
-    if (!k || k.startsWith(':')) continue; // 伪首部
-    const lk = k.toLowerCase();
-    if (EXCLUDE.has(lk)) continue;
-    out[k] = v;
-    if (lk === 'referer') hasReferer = true;
-    if (lk === 'user-agent') hasUA = true;
-  }
-
-  if (!hasReferer) out['Referer'] = REFERER;
-  if (!hasUA) out['User-Agent'] = USER_AGENT;
-  return out;
-}
-
-/**
- * 把浏览器请求头转换成 ffmpeg 的 -headers 字符串（User-Agent 单独返回，走 -user_agent）。
- * 仅用于 HLS/DASH 走 ffmpeg 的场景。
- * @returns {{ headers: string, userAgent: string }}
- */
-function buildFfmpegHeaders(browserHeaders) {
-  const filtered = filterBrowserHeaders(browserHeaders);
-  let userAgent = USER_AGENT;
-  const lines = [];
-  for (const [k, v] of Object.entries(filtered)) {
-    if (k.toLowerCase() === 'user-agent') { userAgent = v; continue; }
-    lines.push(`${k}: ${v}`);
-  }
-  return { headers: lines.join('\r\n') + '\r\n', userAgent };
-}
-
-/** 根据播放页链接生成一个较友好的文件名（不含扩展名） */
-function buildFileName(playerUrl) {
-  let base = 'hongguo_video';
-  try {
-    const segs = new URL(playerUrl).pathname.split('/').filter(Boolean);
-    if (segs.length) base = segs.slice(-2).join('_');
-  } catch {
-    /* 忽略，使用默认名 */
-  }
-  // 去掉文件系统非法字符
-  base = base.replace(/[\\/:*?"<>|]/g, '_').slice(0, 60) || 'hongguo_video';
-  const stamp = new Date()
-    .toISOString()
-    .replace(/[-:T]/g, '')
-    .slice(0, 14); // yyyyMMddHHmmss
-  return `${base}_${stamp}`;
-}
 
 /** 向渲染进程发送消息（窗口可能已关闭，做保护） */
 function send(channel, payload) {
@@ -326,6 +109,39 @@ function log(message, level = 'info') {
   });
   if (level === 'error') notifyError(message);
 }
+
+// ---------------------------------------------------------------------------
+// 网页取数（分类页 / 详情页 / 单播放页）——浏览器实例的生命周期归它管
+// ---------------------------------------------------------------------------
+const {
+  captureVideoSource,
+  closeBrowser,
+  extractCategorySeries,
+  extractSeriesInfo,
+} = createWebCapture({
+  log: (message, level) => log(message, level),
+  setStatus: (text) => setStatus(text),
+  installBrowser: () =>
+    installHostDependency(
+      'browser',
+      '网页抓取需要 Chrome 或 Edge',
+      process.platform === 'win32'
+        ? '检测到 Windows，将使用 WinGet 安装 Google Chrome。'
+        : '检测到 macOS，将使用 Homebrew 安装 Google Chrome。',
+      '正在安装 Google Chrome…'
+    ),
+});
+
+// ---------------------------------------------------------------------------
+// 剧目文件夹产物（完成标记 / 已有分集 / 封面 / 简介）——日志出口注入进去
+// ---------------------------------------------------------------------------
+const {
+  countExistingEpisodes,
+  downloadCover,
+  hasCompleteMarker,
+  syncCompleteMarker,
+  writeSeriesIntro,
+} = createSeriesFiles({ log: (message, level) => log(message, level) });
 
 // ===========================================================================
 // Bark 推送
@@ -415,270 +231,6 @@ function flushSuppressedErrors() {
 /** 发送状态文案 */
 function setStatus(text) {
   send('download:status', text);
-}
-
-// ===========================================================================
-// 核心负一：解析分类/榜单页，取出全部剧目的 series_id
-//
-// 分类页为服务端渲染直出，每部剧是一张 <a href="/detail?series_id=..."> 卡片，
-// 卡片内文本节点依次为：集数（"全72集"）、剧名、分类标签。
-// 无需浏览器内核，直接 fetch HTML 后正则解析即可。
-// ===========================================================================
-async function extractCategorySeries(categoryUrl) {
-  setStatus('正在解析分类页剧目列表…');
-  log('抓取分类页，解析全部剧目…');
-
-  let res;
-  try {
-    res = await fetch(categoryUrl, {
-      headers: { 'User-Agent': USER_AGENT, Referer: refererOf(categoryUrl) },
-      redirect: 'follow',
-    });
-  } catch (err) {
-    throw new Error(`分类页请求失败：${err.message}`);
-  }
-  if (!res.ok) throw new Error(`分类页请求失败：${res.status} ${res.statusText}`);
-  const html = await res.text();
-
-  // 同一部剧的卡片可能出现多次（PC/移动两套布局），用 Map 按 series_id 去重
-  const seen = new Map();
-  const cardRe = /href="\/detail\?series_id=(\d+)"([\s\S]*?)<\/a>/g;
-  let m;
-  while ((m = cardRe.exec(html)) !== null) {
-    const id = m[1];
-    if (seen.has(id)) continue;
-    // 卡片内的文本节点里，剔除"全N集"后第一个即剧名（仅用于日志，文件夹名以详情页为准）
-    const texts = [...m[2].matchAll(/>([^<>]+)</g)]
-      .map((t) => t[1].trim())
-      .filter(Boolean);
-    const title = texts.find((t) => !/^全\s*\d+\s*集$/.test(t)) || '';
-    seen.set(id, title);
-  }
-
-  if (!seen.size) {
-    throw new Error('未能从分类页解析到任何剧目（页面结构可能已变化）');
-  }
-  return [...seen.entries()].map(([seriesId, title]) => ({ seriesId, title }));
-}
-
-// ===========================================================================
-// 核心零：解析剧集详情页元数据
-//
-// 分集数据由详情页服务端渲染在 window._ROUTER_DATA.loaderData.detail_page.seriesDetail：
-//   series_name / series_cover / episode_cnt（总集数）/ vid_list（总集数兜底）
-// 整剧流程不再打开网页分集播放器；网页只用于解析元数据和封面。
-// ===========================================================================
-async function extractSeriesInfo(seriesUrl) {
-  setStatus('正在解析剧集详情…');
-  log('打开详情页解析剧名、总集数和封面…');
-
-  currentBrowser = await launchBrowser();
-
-  try {
-    const context = await currentBrowser.newContext({
-      userAgent: USER_AGENT,
-      extraHTTPHeaders: { Referer: refererOf(seriesUrl) },
-      viewport: { width: 1280, height: 720 },
-    });
-    const page = await context.newPage();
-
-    await page
-      .goto(seriesUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 })
-      .catch((e) => log(`页面导航提示：${e.message}`, 'warn'));
-
-    // 轮询等待 SSR 数据就绪（最多 ~15s）
-    const handle = await page
-      .waitForFunction(
-        () => {
-          const sd = window._ROUTER_DATA?.loaderData?.detail_page?.seriesDetail;
-          const list = Array.isArray(sd?.vid_list) ? sd.vid_list : [];
-          const total = Number(sd?.episode_cnt);
-          if (sd?.series_name && ((Number.isFinite(total) && total > 0) || list.length > 0)) {
-            return {
-              seriesId: sd.series_id,
-              seriesName: sd.series_name,
-              vidList: list,
-              episodeCnt: sd.episode_cnt || 0,
-              cover: sd.series_cover || '',
-              // 下面这些只用于生成「简介.txt」。缺了也不影响下载流程，所以一律给默认值，
-              // 绝不让详情页少个字段就把整剧判失败。
-              // 【抓取范围只能由 episode_cnt / vid_list 决定】。详情页上还有一个"网页免费可看
-              // 集数"的字段（通常只有 5），历史上误拿它当过总集数，70 集的剧只抓 5 集就收工；
-              // tests/series-workflow.test.js 里有一条断言专门禁止这里再碰那个字段。
-              intro: sd.series_intro || '',
-              tags: Array.isArray(sd.tags) ? sd.tags.filter((t) => typeof t === 'string') : [],
-              episodeText: sd.episode_right_text || '',
-              updatedCnt: Number(sd.series_episode_info?.episode_cnt) || 0,
-              totalEpisodeCnt: Number(sd.series_episode_info?.episode_total_cnt) || 0,
-              celebrities: (Array.isArray(sd.celebrities) ? sd.celebrities : [])
-                .filter((c) => c && typeof c === 'object')
-                .map((c) => ({ name: c.nickname || '', role: c.sub_title || '' })),
-            };
-          }
-          return null;
-        },
-        { timeout: 15_000, polling: 500 }
-      )
-      .catch(() => null);
-
-    const info = handle ? await handle.jsonValue() : null;
-    if (!info?.seriesName || normalizeEpisodeCount(info.episodeCnt, info.vidList?.length) <= 0) {
-      throw new Error('未能解析到剧名或总集数（页面结构可能已变化，或该链接不是详情页）');
-    }
-    return info;
-  } finally {
-    await closeBrowser();
-  }
-}
-
-// ===========================================================================
-// 核心一：用 Playwright 捕获真实视频源地址
-// ===========================================================================
-async function captureVideoSource(pageUrl) {
-  setStatus('正在启动浏览器内核…');
-  log('启动 Chromium（Playwright）…');
-
-  currentBrowser = await launchBrowser(['--autoplay-policy=no-user-gesture-required']);
-
-  const context = await currentBrowser.newContext({
-    userAgent: USER_AGENT,
-    extraHTTPHeaders: { Referer: refererOf(pageUrl) },
-    viewport: { width: 1280, height: 720 },
-  });
-
-  const page = await context.newPage();
-
-  // 用 Promise 捕获视频源；优先 m3u8/dash，其次直连 mp4
-  let resolveMedia;
-  const mediaPromise = new Promise((resolve) => {
-    resolveMedia = resolve;
-  });
-  let fallback = null;   // {url, type} mp4 候选，等待是否出现更优的 hls
-  let graceTimer = null;
-  let settled = false;
-
-  const accept = (url, type, headers) => {
-    if (settled) return;
-    settled = true;
-    if (graceTimer) clearTimeout(graceTimer);
-    resolveMedia({ url, type, headers: headers || {} });
-  };
-
-  const consider = (url, type, headers) => {
-    if (settled || !type) return;
-    if (type === 'hls' || type === 'dash') {
-      log(`捕获到 ${type.toUpperCase()} 视频源`, 'success');
-      accept(url, type, headers);
-    } else if (type === 'mp4' && !fallback) {
-      // 先记为候选，短暂等待是否出现流媒体（hls）；到期仍无则采用 mp4
-      fallback = { url, type, headers: headers || {} };
-      log('捕获到 MP4 视频源（稍候确认是否有更优的流…）', 'warn');
-      graceTimer = setTimeout(
-        () => accept(fallback.url, fallback.type, fallback.headers),
-        M3U8_GRACE
-      );
-    }
-  };
-
-  // 请求阶段：靠 URL 与资源类型判断（<video> 触发的请求 resourceType 为 media）
-  // 同时抓下该请求的真实头部，供后续 ffmpeg 还原
-  page.on('request', (req) => {
-    try {
-      let type = classifyMedia(req.url());
-      if (!type && req.resourceType() === 'media') type = 'mp4';
-      if (type) consider(req.url(), type, req.headers());
-    } catch {
-      /* 忽略单个请求的解析异常 */
-    }
-  });
-
-  // 响应阶段：可拿到 Content-Type，判断最可靠
-  page.on('response', (res) => {
-    try {
-      const ct = (res.headers()['content-type'] || '');
-      const type = classifyMedia(res.url(), ct);
-      if (type) consider(res.url(), type, res.request().headers());
-    } catch {
-      /* 忽略 */
-    }
-  });
-
-  setStatus('正在打开页面并等待视频加载…');
-  log(`打开页面：${pageUrl}`);
-
-  try {
-    await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-  } catch (e) {
-    // 导航超时/失败不一定致命——可能已经捕获到媒体；继续等待竞速结果
-    log(`页面导航提示：${e.message}`, 'warn');
-  }
-
-  // 反复尝试触发播放（播放器脚本可能稍后才就绪），不阻塞捕获竞速
-  triggerPlay(page);
-
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(
-      () => reject(new Error('等待超时：未能在页面中捕获到视频源（m3u8 / mp4）')),
-      CAPTURE_TIMEOUT
-    );
-  });
-
-  try {
-    return await Promise.race([mediaPromise, timeoutPromise]);
-  } finally {
-    if (graceTimer) clearTimeout(graceTimer);
-    // 捕获完成后即可关闭浏览器，释放资源（视频地址通常已自带鉴权 token）
-    await closeBrowser();
-  }
-}
-
-/**
- * 多次尝试触发页面播放，促使播放器发起真实视频流请求。
- * 全程吞掉异常（页面可能已关闭），避免未处理的 Promise 异常。
- */
-async function triggerPlay(page) {
-  const once = async () => {
-    try {
-      await page.evaluate(() => {
-        const v = document.querySelector('video');
-        if (v) {
-          v.muted = true;
-          const p = v.play();
-          if (p && typeof p.catch === 'function') p.catch(() => {});
-        }
-        const btn = document.querySelector(
-          '.play, .play-btn, .vjs-big-play-button, [class*="play"], [class*="Play"]'
-        );
-        if (btn) btn.click();
-      });
-      // 模拟一次点击，满足部分播放器的"用户手势"要求
-      await page.mouse.click(640, 360);
-    } catch {
-      /* 页面可能已关闭或结构未知，忽略 */
-    }
-  };
-
-  try {
-    await once();
-    await page.waitForTimeout(2000);
-    await once();
-    await page.waitForTimeout(3000);
-    await once();
-  } catch {
-    /* 忽略 */
-  }
-}
-
-/** 关闭 Playwright 浏览器 */
-async function closeBrowser() {
-  if (currentBrowser) {
-    try {
-      await currentBrowser.close();
-    } catch {
-      /* 忽略 */
-    }
-    currentBrowser = null;
-  }
 }
 
 // ===========================================================================
@@ -933,132 +485,6 @@ async function downloadSingle(url, saveDir) {
 }
 
 /** 剧目文件夹内的"整剧已完成"标记文件名 */
-const COMPLETE_MARK = '.complete';
-
-function hasCompleteMarker(seriesDir) {
-  try {
-    return isCompleteMarker(fs.readFileSync(path.join(seriesDir, COMPLETE_MARK), 'utf8'));
-  } catch {
-    return false;
-  }
-}
-
-function countExistingEpisodes(seriesDir, total) {
-  let count = 0;
-  for (let ep = 1; ep <= total; ep++) {
-    try {
-      const candidate = path.join(seriesDir, epName(ep, total));
-      if (fs.existsSync(candidate) && fs.statSync(candidate).size > 0) count++;
-    } catch {
-      // 单个文件无法读取时按缺集处理。
-    }
-  }
-  return count;
-}
-
-function syncCompleteMarker(seriesDir, completed, total) {
-  const markerPath = path.join(seriesDir, COMPLETE_MARK);
-  try {
-    if (total > 0 && completed >= total) {
-      fs.writeFileSync(markerPath, `${total}/${total}\n`);
-    } else if (fs.existsSync(markerPath)) {
-      fs.unlinkSync(markerPath);
-    }
-  } catch {
-    // 标记维护失败不覆盖视频抓取结果。
-  }
-}
-
-/**
- * 下载剧集封面到剧目文件夹（文件名"封面.jpg/.png/.webp"，按响应类型定扩展名）。
- * 已存在则跳过；失败仅记警告，不影响剧集下载。
- */
-async function downloadCover(coverUrl, seriesDir) {
-  if (!coverUrl) return;
-  try {
-    const existing = fs
-      .readdirSync(seriesDir)
-      .find((f) => f.startsWith('封面.'));
-    if (existing) return;
-
-    const res = await fetch(coverUrl, {
-      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-      redirect: 'follow',
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    const ct = (res.headers.get('content-type') || '').toLowerCase();
-    const ext = ct.includes('png') ? '.png' : ct.includes('webp') ? '.webp' : '.jpg';
-    const buf = Buffer.from(await res.arrayBuffer());
-    fs.writeFileSync(path.join(seriesDir, `封面${ext}`), buf);
-    log(`封面已保存：封面${ext}`);
-  } catch (err) {
-    log(`封面下载失败（不影响剧集）：${err.message}`, 'warn');
-  }
-}
-
-/** 简洁模式的正文：只有剧名和剧情简介。 */
-function buildIntroBrief(info) {
-  const name = info.seriesName || '（未知剧名）';
-  return info.intro ? `${name}\n\n${info.intro}\n` : `${name}\n`;
-}
-
-/** 详细模式的正文：再带上集数、标签、来源和演职人员。 */
-function buildIntroDetailed(info, sourceUrl) {
-  const L = [];
-  const total = normalizeEpisodeCount(info.episodeCnt, info.vidList?.length);
-  L.push(info.seriesName || '（未知剧名）', '');
-  L.push(`剧名：${info.seriesName || ''}`);
-  if (total > 0) L.push(`集数：${info.episodeText || `全${total}集`}（共 ${total} 集）`);
-  // 连载中的剧「已更新」会少于总集数；两者相等时这行没有信息量，不写。
-  if (info.updatedCnt > 0 && info.totalEpisodeCnt > 0 && info.updatedCnt !== info.totalEpisodeCnt) {
-    L.push(`已更新：${info.updatedCnt} / 共 ${info.totalEpisodeCnt} 集`);
-  }
-  if (info.tags?.length) L.push(`标签：${info.tags.join(' / ')}`);
-  if (info.seriesId) L.push(`series_id：${info.seriesId}`);
-  if (sourceUrl) L.push(`详情页：${sourceUrl}`);
-
-  if (info.intro) L.push('', '【简介】', info.intro);
-
-  const cast = (info.celebrities || []).filter((c) => c?.name);
-  if (cast.length) {
-    L.push('', '【演职人员】');
-    // 按最长的名字补空格对齐。用展开而不是 .length：中文名逐字算宽，
-    // 而 JS 的字符串长度对代理对（部分生僻字）会多算一位。
-    const w = Math.max(...cast.map((c) => [...c.name].length));
-    for (const c of cast) {
-      L.push(`${c.name}${' '.repeat(Math.max(0, w - [...c.name].length))}  ${c.role || ''}`.trimEnd());
-    }
-  }
-
-  const t = new Date();
-  const p2 = (n) => String(n).padStart(2, '0');
-  L.push(
-    '',
-    `抓取时间：${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())} ` +
-      `${p2(t.getHours())}:${p2(t.getMinutes())}:${p2(t.getSeconds())}`
-  );
-  return L.join('\n') + '\n';
-}
-
-/**
- * 把详情页解析到的信息写成剧目文件夹里的「简介.txt」。
- * detailed=false（默认）只写剧名和简介；detailed=true 另带集数、标签、来源和演职人员。
- *
- * 每次都重写：连载中的剧简介会改，保留旧的没意义。
- * 这是个纯附带产物，任何一步出问题都只记警告——绝不能因为写不出一个文本文件
- * 就影响视频下载（封面下载也是同样的处理原则）。
- */
-function writeSeriesIntro(info, seriesDir, { detailed = false, sourceUrl = '' } = {}) {
-  try {
-    const text = detailed ? buildIntroDetailed(info, sourceUrl) : buildIntroBrief(info);
-    fs.writeFileSync(path.join(seriesDir, '简介.txt'), text, 'utf8');
-    log(`简介已保存：简介.txt（${detailed ? '详细' : '简洁'}）`);
-  } catch (err) {
-    log(`简介保存失败（不影响剧集）：${err.message}`, 'warn');
-  }
-}
-
 // ===========================================================================
 // 核心三：调用 Python 工具（hongguo_grab.py）从红果 App 抓取全集
 //
@@ -2311,18 +1737,6 @@ function killGrab() {
   }
 }
 
-/** 毫秒转「1小时02分03秒 / 2分03秒 / 3.4秒」，用于单剧耗时日志。 */
-function formatElapsed(ms) {
-  const totalSec = Math.max(0, ms) / 1000;
-  // 用四舍五入后的秒数判边界，避免 59.99 秒被打成「60.0秒」
-  if (Math.round(totalSec * 10) < 600) return `${totalSec.toFixed(1)}秒`;
-  const s = Math.round(totalSec);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  const pad = (n) => String(n).padStart(2, '0');
-  return h ? `${h}小时${pad(m)}分${pad(sec)}秒` : `${m}分${pad(sec)}秒`;
-}
 
 /**
  * 整剧下载核心：网页只解析详情和保存封面；视频由所选模式抓取：

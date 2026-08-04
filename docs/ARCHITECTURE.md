@@ -6,7 +6,23 @@
 
 ### Electron
 
-Electron 主进程位于项目根目录 `main.js`，负责：
+Electron 主进程的入口是根目录 `main.js`，具体职责按模块拆开：
+
+| 模块 | 负责 |
+|---|---|
+| `main.js` | 窗口与生命周期、IPC 注册、整体流程编排、取消/温和停止的全局状态 |
+| `url-utils.js` | 链接判别、文件名清洗、媒体类型识别、请求头整理（纯函数） |
+| `web-capture.js` | 分类页剧目列表、详情页元数据、单播放页媒体源；浏览器实例的生命周期 |
+| `series-files.js` | 完成标记、已有分集清点、封面与简介落盘 |
+| `grab-protocol.js` | 两个 Python 入口共用的 JSON Lines 事件协议 |
+| `ffmpeg-runner.js` | ffmpeg 调用与进度解析 |
+| `runtime-platform.js` | macOS/Windows 路径、安装器、安卓引导脚本选择 |
+| `series-workflow.js` | 总集数、抓取区间、完成标记规则 |
+| `notify.js` | Bark 推送（地址整理与发送；推不推、多久推一次的策略在 `main.js`） |
+
+除 `main.js` 外都不 require Electron，可以直接进测试。带副作用的几个（网页取数、文件落盘）用 `create*(deps)` 工厂把日志出口注入进去，模块本身不假设有界面。
+
+主进程整体负责：
 
 - 创建桌面窗口并通过 `preload.js` 暴露白名单 IPC。
 - 解析播放页，以及详情页/分类页的剧名、总集数和封面。

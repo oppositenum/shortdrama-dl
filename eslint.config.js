@@ -71,11 +71,11 @@ module.exports = [
     },
   },
   {
-    // main.js 里 page.evaluate(() => ...) 的回调是被序列化后送进浏览器执行的，
+    // page.evaluate(() => ...) 的回调是被序列化后送进浏览器执行的，
     // 里面的 window / document 指的是页面，不是主进程。规则看不出这层边界，
     // 只能在这里声明成只读全局；主进程自己误用 document 的话，运行时立刻就炸，
     // 不指望 lint 兜住。
-    files: ['main.js'],
+    files: ['main.js', 'web-capture.js'],
     languageOptions: {
       globals: {
         document: 'readonly',
