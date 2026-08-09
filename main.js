@@ -42,7 +42,7 @@ const {
   filterBrowserHeaders,
   formatElapsed,
   getSeriesIdFromUrl,
-  isCategoryUrl,
+  isSeriesListUrl,
   isSeriesUrl,
   isValidUrl,
   sanitizeName,
@@ -426,9 +426,9 @@ async function handleStartDownload(_event, payload) {
     log(`未指定有效目录，使用默认下载目录：${saveDir}`, 'warn');
   }
 
-  // 3) 分发：分类/详情页 → 网页保存封面并由 App 抓取全集；单集播放页 → 网页下载单个
+  // 3) 分发：分类/角色聚合页（一页多部剧）→ 批量；详情页 → 保存封面并抓全集；单集播放页 → 网页下载单个
   try {
-    if (isCategoryUrl(url)) {
+    if (isSeriesListUrl(url)) {
       return await downloadCategory(url, saveDir, opts);
     }
     if (isSeriesUrl(url)) {
@@ -1929,7 +1929,7 @@ async function downloadSeries(url, saveDir, opts = {}) {
   return { ok: true, dir: r.dir, ok_count: r.ok_count, total: r.total, complete: r.complete };
 }
 
-/** 分类页批量下载：解析全部剧目，逐部保存封面并按 grabMode 抓全集 */
+/** 列表页（分类/角色聚合页）批量下载：解析全部剧目，逐部保存封面并按 grabMode 抓全集 */
 async function downloadCategory(url, saveDir, opts = {}) {
   const list = await extractCategorySeries(url);
   if (isCanceled) throw new Error('__CANCELED__');
@@ -1937,7 +1937,7 @@ async function downloadCategory(url, saveDir, opts = {}) {
   const mode = opts.grabMode || (opts.appGrab === false ? 'none' : 'app');
   const modeTxt =
     mode === 'offline' ? '本机签' : mode === 'api' ? '纯协议' : mode === 'app' ? 'App' : '仅封面';
-  log(`分类页共解析到 ${list.length} 部剧；模式：${modeTxt}…`, 'success');
+  log(`列表页共解析到 ${list.length} 部剧；模式：${modeTxt}…`, 'success');
 
   let okSeries = 0;
   let skipped = 0;

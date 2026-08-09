@@ -142,7 +142,8 @@ For a physical device: enable Developer Options and USB debugging, connect and a
 
 - **Development launch**: `npm start` (`npm run dev` adds Electron debug logging).
 - **Single player page**: paste a `/player/...` link, choose a save folder, click Start Download.
-- **Whole series**: paste a `/detail?series_id=...` or `/category?...` link, then pick a capture mode. The website only resolves the name/total-count/cover; the episodes come from the mode you picked. Existing episodes are skipped, so an interrupted run resumes by simply running it again.
+- **Whole series**: paste a `/detail?series_id=...` link, then pick a capture mode. The website only resolves the name/total-count/cover; the episodes come from the mode you picked. Existing episodes are skipped, so an interrupted run resumes by simply running it again.
+- **Multiple series in one page**: paste a `/category?...` (category/ranking) or `/character/...` (actor/character) link to parse every series on the page and download them one by one, using the same skip/retry logic.
 - **Notifications** (optional): paste a Bark address such as `https://api.day.app/<your-key>` and use "试发一条" to verify it. Pasting the full documented example including its title and body works too — only the key is kept.
 - Existing-episode skipping and the `.complete` marker are described in [Architecture](docs/ARCHITECTURE.md).
 

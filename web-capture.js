@@ -75,15 +75,15 @@ function createWebCapture({ log, setStatus, installBrowser }) {
 
 
   // ===========================================================================
-  // 核心负一：解析分类/榜单页，取出全部剧目的 series_id
+  // 核心负一：解析列表页（分类/榜单页、演员/角色聚合页），取出全部剧目的 series_id
   //
-  // 分类页为服务端渲染直出，每部剧是一张 <a href="/detail?series_id=..."> 卡片，
-  // 卡片内文本节点依次为：集数（"全72集"）、剧名、分类标签。
+  // 这类页面均为服务端渲染直出，每部剧是一张 <a href="/detail?series_id=..."> 卡片，
+  // 卡片内文本节点依次为：集数（"全72集"）、剧名、分类标签。结构一致，共用这套解析。
   // 无需浏览器内核，直接 fetch HTML 后正则解析即可。
   // ===========================================================================
   async function extractCategorySeries(categoryUrl) {
-    setStatus('正在解析分类页剧目列表…');
-    log('抓取分类页，解析全部剧目…');
+    setStatus('正在解析列表页剧目…');
+    log('抓取列表页，解析全部剧目…');
 
     let res;
     try {
@@ -92,9 +92,9 @@ function createWebCapture({ log, setStatus, installBrowser }) {
         redirect: 'follow',
       });
     } catch (err) {
-      throw new Error(`分类页请求失败：${err.message}`);
+      throw new Error(`列表页请求失败：${err.message}`);
     }
-    if (!res.ok) throw new Error(`分类页请求失败：${res.status} ${res.statusText}`);
+    if (!res.ok) throw new Error(`列表页请求失败：${res.status} ${res.statusText}`);
     const html = await res.text();
 
     // 同一部剧的卡片可能出现多次（PC/移动两套布局），用 Map 按 series_id 去重
@@ -113,7 +113,7 @@ function createWebCapture({ log, setStatus, installBrowser }) {
     }
 
     if (!seen.size) {
-      throw new Error('未能从分类页解析到任何剧目（页面结构可能已变化）');
+      throw new Error('未能从列表页解析到任何剧目（页面结构可能已变化）');
     }
     return [...seen.entries()].map(([seriesId, title]) => ({ seriesId, title }));
   }

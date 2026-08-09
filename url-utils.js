@@ -45,6 +45,25 @@ function isCategoryUrl(input) {
   }
 }
 
+/**
+ * 是否为演员/角色聚合页链接（如 /character/7429227723668591897），页面内含多部剧。
+ * 结构与分类页一致（每部剧是一张 <a href="/detail?series_id=..."> 卡片），
+ * 因此走同一套列表页流程；这里另立一个判别只是为了让路由读起来清楚。
+ */
+function isCharacterUrl(input) {
+  try {
+    const u = new URL(String(input).trim());
+    return u.pathname.includes('/character') && !u.searchParams.has('series_id');
+  } catch {
+    return false;
+  }
+}
+
+/** 是否为「一页多部剧」的列表页（分类页或角色聚合页），走批量下载流程 */
+function isSeriesListUrl(input) {
+  return isCategoryUrl(input) || isCharacterUrl(input);
+}
+
 /** 从详情页链接取 series_id（SSR 解析失败时兜底） */
 function getSeriesIdFromUrl(input) {
   try {
@@ -202,6 +221,8 @@ module.exports = {
   formatElapsed,
   getSeriesIdFromUrl,
   isCategoryUrl,
+  isCharacterUrl,
+  isSeriesListUrl,
   isSeriesUrl,
   isValidUrl,
   refererOf,
