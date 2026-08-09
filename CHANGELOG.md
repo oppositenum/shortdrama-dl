@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.6.0...v1.7.0) (2026-08-09)
+
+
+### Features
+
+* **ui:** redesign into a sidebar + content layout ([#21](https://github.com/oppositenum/shortdrama-dl/issues/21)) ([8bf2207](https://github.com/oppositenum/shortdrama-dl/commit/8bf22075b85f3f0cd201900e866c8bb51d81aea9))
+
 ## [1.6.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.5.1...v1.6.0) (2026-08-09)
 
 
