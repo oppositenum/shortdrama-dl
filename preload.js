@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('api', {
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
   /** 获取默认下载目录 */
   getDefaultDir: () => ipcRenderer.invoke('app:getDefaultDir'),
+  /** 获取应用版本号（显示在侧栏页脚） */
+  getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
   /**
    * 开始下载
    * { url, outputDir, grabMode: 'offline'|'api'|'app'|'none', appGrab?, grabDir, introDetailed }

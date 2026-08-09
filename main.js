@@ -2186,6 +2186,7 @@ app.whenReady().then(() => {
   ipcMain.handle('dialog:selectFolder', handleSelectFolder);
   ipcMain.handle('shell:openFolder', handleOpenFolder);
   ipcMain.handle('app:getDefaultDir', () => app.getPath('downloads'));
+  ipcMain.handle('app:getVersion', () => app.getVersion());
   ipcMain.handle('env:check', (_e, payload) =>
     runEnvironmentCheck(payload && payload.grabDir, {
       interactive: false,
