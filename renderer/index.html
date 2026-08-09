@@ -11,175 +11,216 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div class="app">
-      <!-- 顶部标题 -->
-      <header class="header">
+    <div class="shell">
+      <!-- ===================== 左侧：菜单 ===================== -->
+      <aside class="sidebar">
         <div class="brand">
           <span class="logo">🎬</span>
-          <div>
-            <h1>红果短剧下载器</h1>
-            <p class="subtitle">粘贴播放页 / 详情页链接；支持 App 抓取与独立纯协议下载</p>
+          <div class="brand-text">
+            <h1>红果短剧</h1>
+            <p>下载器</p>
           </div>
         </div>
-      </header>
 
-      <!-- 环境检查 -->
-      <section class="card pane env-card" id="envCard">
-        <div class="pane-head">
-          <button id="envToggle" class="pane-toggle" type="button" aria-expanded="true" aria-controls="envBody">
-            <span class="pane-chevron">▾</span>
-            <span>环境检查</span>
-            <span id="envSummary" class="pane-summary"></span>
+        <nav class="nav" id="nav">
+          <button class="nav-item active" type="button" data-view="download">
+            <span class="nav-icon">⬇️</span>
+            <span class="nav-label">下载</span>
           </button>
-          <div class="env-actions">
-            <button id="envRecheck" class="btn btn-mini">重新检查</button>
-            <button id="envFix" class="btn btn-mini" disabled>修复缺失项</button>
-          </div>
-        </div>
-        <div class="pane-body" id="envBody">
-          <div class="env-row" data-env="python">
-            <span class="env-dot checking"></span>
-            <span class="env-label">Python 依赖</span>
-            <span class="env-msg">检查中…</span>
-          </div>
-          <div class="env-row" data-env="ffmpeg">
-            <span class="env-dot checking"></span>
-            <span class="env-label">ffmpeg/ffprobe</span>
-            <span class="env-msg">检查中…</span>
-          </div>
-          <div class="env-row" data-env="android">
-            <span class="env-dot checking"></span>
-            <span class="env-label">Android 模拟器/设备</span>
-            <span class="env-msg">检查中…</span>
-          </div>
-          <div class="env-row" data-env="hongguo_app">
-            <span class="env-dot checking"></span>
-            <span class="env-label">红果 App</span>
-            <span class="env-msg">检查中…</span>
-          </div>
-          <div class="env-row" data-env="frida_server">
-            <span class="env-dot checking"></span>
-            <span class="env-label">Frida Server</span>
-            <span class="env-msg">检查中…</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- 输入区 -->
-      <section class="card pane input-card" id="inputCard">
-        <div class="pane-head">
-          <button id="inputToggle" class="pane-toggle" type="button" aria-expanded="true" aria-controls="inputBody">
-            <span class="pane-chevron">▾</span>
-            <span>链接与下载设置</span>
-            <span id="inputSummary" class="pane-summary"></span>
+          <button class="nav-item" type="button" data-view="settings">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">设置</span>
           </button>
-        </div>
-        <!-- 折叠只收起表单；下面的操作按钮永远留在外面，收起后照样能开始/取消 -->
-        <div class="pane-body" id="inputBody">
-        <label class="field-label" for="url">播放页 / 详情页链接</label>
-        <div class="input-row">
-          <input
-            id="url"
-            type="text"
-            placeholder="播放页 /player/... 下单集；详情/分类页选抓取方式后从第1集下全集"
-            autocomplete="off"
-            spellcheck="false"
-          />
-        </div>
-
-        <label class="field-label" for="dir">保存目录</label>
-        <div class="input-row">
-          <input id="dir" type="text" placeholder="默认下载文件夹" readonly />
-          <button id="chooseDir" class="btn btn-ghost">选择文件夹</button>
-        </div>
-
-        <div class="field-label">整剧抓取方式</div>
-        <div class="mode-group" id="grabModeGroup" role="radiogroup" aria-label="整剧抓取方式">
-          <label class="checkbox-row">
-            <input type="radio" name="grabMode" id="modeOffline" value="offline" checked />
-            <span>本机签名纯协议（推荐：电脑上自签 API，无需 App/模拟器；下载仍需联网）</span>
-          </label>
-          <label class="checkbox-row">
-            <input type="radio" name="grabMode" id="modeApi" value="api" />
-            <span>纯协议下载（网络 + Python + ffmpeg；遇 110001 时若本机已有模拟器在跑，可借 App 签名回退）</span>
-          </label>
-          <label class="checkbox-row">
-            <input type="radio" name="grabMode" id="modeApp" value="app" />
-            <span>App 抓取（需 root 安卓 + Frida；风控备用路径）</span>
-          </label>
-          <label class="checkbox-row">
-            <input type="radio" name="grabMode" id="modeNone" value="none" />
-            <span>仅保存封面与简介（不下载视频）</span>
-          </label>
-        </div>
-        <div class="input-row" id="grabDirRow">
-          <input
-            id="grabDir"
-            type="text"
-            placeholder="Python 组件目录，留空使用内置 python/（HONGGUO_GRAB_DIR 可覆盖）"
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <button id="chooseGrabDir" class="btn btn-ghost">选择目录</button>
-        </div>
-
-        <label class="checkbox-row">
-          <input id="introDetailed" type="checkbox" />
-          <span>简介.txt 写详细信息（默认只写剧名和剧情简介；勾选后另附集数、标签、来源和演职人员）</span>
-        </label>
-
-        <label class="field-label" for="barkUrl">Bark 通知（可选）</label>
-        <div class="input-row">
-          <input
-            id="barkUrl"
-            type="text"
-            placeholder="https://api.day.app/你的Key（留空不通知；每抓完一整部剧、以及出错时推送）"
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <button id="testNotify" class="btn btn-ghost">试发一条</button>
-        </div>
-        </div>
-
-        <div class="actions">
-          <button id="start" class="btn btn-primary">
-            <span class="btn-text">开始下载</span>
+          <button class="nav-item" type="button" data-view="env">
+            <span class="nav-icon">🧩</span>
+            <span class="nav-label">环境检查</span>
+            <span id="envSummary" class="nav-badge"></span>
           </button>
-          <button id="stopAfterSeries" class="btn btn-ghost" disabled title="不再从清单开新的剧；当前这一部抓完、并把前面攒下的缺集补完之后才结束。要立刻中断请按「取消」">
-            抓完本部再停
+          <button class="nav-item" type="button" data-view="log">
+            <span class="nav-icon">📜</span>
+            <span class="nav-label">运行日志</span>
           </button>
-          <button id="cancel" class="btn btn-danger" disabled title="立即打断，正在抓的这一部会中断">取消</button>
-          <button id="openDir" class="btn btn-ghost" disabled>打开文件夹</button>
-        </div>
-      </section>
+        </nav>
 
-      <!-- 进度区 -->
-      <section class="card">
-        <div class="status-row">
+        <div class="sidebar-foot">
+          <span id="appVersion" class="version">—</span>
+          <span class="foot-note">本地下载 · 开源</span>
+        </div>
+      </aside>
+
+      <!-- ===================== 右侧：内容 ===================== -->
+      <main class="content">
+        <!-- 常驻状态条：无论在哪个页面都能看到下载状态与进度 -->
+        <div class="statusbar">
           <span class="status-dot" id="statusDot"></span>
           <span id="status" class="status-text">就绪</span>
           <span id="episode" class="episode-badge"></span>
+          <span class="statusbar-spacer"></span>
+          <span id="speed" class="stat-speed"></span>
+          <span id="timemark" class="stat-time">--:--:--</span>
           <span id="progressText" class="progress-text">0%</span>
         </div>
         <div class="progress-track">
           <div id="progressBar" class="progress-bar"></div>
         </div>
-        <div class="meta-row">
-          <span id="timemark">--:--:--</span>
-          <span id="speed"></span>
-        </div>
-      </section>
 
-      <!-- 日志区 -->
-      <section class="card log-card">
-        <div class="log-head">
-          <span>运行日志</span>
-          <button id="clearLog" class="btn btn-mini">清空</button>
+        <div class="content-body">
+          <!-- ---------- 页：下载 ---------- -->
+          <section class="view view-download active" data-view="download">
+            <div class="card">
+              <label class="field-label" for="url">播放页 / 详情页 / 列表页链接</label>
+              <div class="input-row">
+                <input
+                  id="url"
+                  type="text"
+                  placeholder="播放页 /player/… 下单集；详情/分类/角色页选抓取方式后下全集"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+
+              <div class="field-label">整剧抓取方式</div>
+              <div class="mode-group" id="grabModeGroup" role="radiogroup" aria-label="整剧抓取方式">
+                <label class="mode-option">
+                  <input type="radio" name="grabMode" id="modeOffline" value="offline" checked />
+                  <span class="mode-text">
+                    <span class="mode-title">本机签名纯协议 <em class="tag-recommend">推荐</em></span>
+                    <span class="mode-desc">电脑上自签 API，无需 App / 模拟器；下载仍需联网</span>
+                  </span>
+                </label>
+                <label class="mode-option">
+                  <input type="radio" name="grabMode" id="modeApi" value="api" />
+                  <span class="mode-text">
+                    <span class="mode-title">纯协议下载</span>
+                    <span class="mode-desc">网络 + Python + ffmpeg；遇 110001 时若本机已有模拟器在跑，可借 App 签名回退</span>
+                  </span>
+                </label>
+                <label class="mode-option">
+                  <input type="radio" name="grabMode" id="modeApp" value="app" />
+                  <span class="mode-text">
+                    <span class="mode-title">App 抓取</span>
+                    <span class="mode-desc">需 root 安卓 + Frida；风控备用路径</span>
+                  </span>
+                </label>
+                <label class="mode-option">
+                  <input type="radio" name="grabMode" id="modeNone" value="none" />
+                  <span class="mode-text">
+                    <span class="mode-title">仅保存封面与简介</span>
+                    <span class="mode-desc">不下载视频</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button id="start" class="btn btn-primary">
+                <span class="btn-text">开始下载</span>
+              </button>
+              <button id="stopAfterSeries" class="btn btn-ghost" disabled title="不再从清单开新的剧；当前这一部抓完、并把前面攒下的缺集补完之后才结束。要立刻中断请按「取消」">
+                抓完本部再停
+              </button>
+              <button id="cancel" class="btn btn-danger" disabled title="立即打断，正在抓的这一部会中断">取消</button>
+              <button id="openDir" class="btn btn-ghost" disabled>打开文件夹</button>
+            </div>
+          </section>
+
+          <!-- ---------- 页：设置 ---------- -->
+          <section class="view view-settings" data-view="settings">
+            <div class="card">
+              <label class="field-label" for="dir">保存目录</label>
+              <div class="input-row">
+                <input id="dir" type="text" placeholder="默认下载文件夹" readonly />
+                <button id="chooseDir" class="btn btn-ghost">选择文件夹</button>
+              </div>
+
+              <label class="field-label" for="grabDir">Python 组件目录</label>
+              <div class="input-row" id="grabDirRow">
+                <input
+                  id="grabDir"
+                  type="text"
+                  placeholder="留空使用内置 python/（HONGGUO_GRAB_DIR 可覆盖）"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button id="chooseGrabDir" class="btn btn-ghost">选择目录</button>
+              </div>
+
+              <label class="checkbox-row">
+                <input id="introDetailed" type="checkbox" />
+                <span>简介.txt 写详细信息（默认只写剧名和剧情简介；勾选后另附集数、标签、来源和演职人员）</span>
+              </label>
+            </div>
+
+            <div class="card">
+              <label class="field-label" for="barkUrl">Bark 通知（可选）</label>
+              <div class="input-row">
+                <input
+                  id="barkUrl"
+                  type="text"
+                  placeholder="https://api.day.app/你的Key（留空不通知；每抓完一整部剧、以及出错时推送）"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button id="testNotify" class="btn btn-ghost">试发一条</button>
+              </div>
+              <p class="field-hint">填好地址后点「试发一条」可立即确认地址是否正确，不必等一部剧抓完。</p>
+            </div>
+          </section>
+
+          <!-- ---------- 页：环境检查 ---------- -->
+          <section class="view view-env" data-view="env">
+            <div class="card">
+              <div class="card-head">
+                <span class="card-title">环境检查</span>
+                <div class="env-actions">
+                  <button id="envRecheck" class="btn btn-mini">重新检查</button>
+                  <button id="envFix" class="btn btn-mini" disabled>修复缺失项</button>
+                </div>
+              </div>
+              <div class="env-list">
+                <div class="env-row" data-env="python">
+                  <span class="env-dot checking"></span>
+                  <span class="env-label">Python 依赖</span>
+                  <span class="env-msg">检查中…</span>
+                </div>
+                <div class="env-row" data-env="ffmpeg">
+                  <span class="env-dot checking"></span>
+                  <span class="env-label">ffmpeg/ffprobe</span>
+                  <span class="env-msg">检查中…</span>
+                </div>
+                <div class="env-row" data-env="android">
+                  <span class="env-dot checking"></span>
+                  <span class="env-label">Android 模拟器/设备</span>
+                  <span class="env-msg">检查中…</span>
+                </div>
+                <div class="env-row" data-env="hongguo_app">
+                  <span class="env-dot checking"></span>
+                  <span class="env-label">红果 App</span>
+                  <span class="env-msg">检查中…</span>
+                </div>
+                <div class="env-row" data-env="frida_server">
+                  <span class="env-dot checking"></span>
+                  <span class="env-label">Frida Server</span>
+                  <span class="env-msg">检查中…</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------- 页：运行日志 ---------- -->
+          <section class="view view-log" data-view="log">
+            <div class="card log-card">
+              <div class="card-head">
+                <span class="card-title">运行日志</span>
+                <button id="clearLog" class="btn btn-mini">清空</button>
+              </div>
+              <div id="log" class="log"></div>
+              <!-- 往上翻看历史时不打断视线：新日志照常写入，只在这里提示有多少条 -->
+              <button id="logJump" class="log-jump" type="button" hidden></button>
+            </div>
+          </section>
         </div>
-        <div id="log" class="log"></div>
-        <!-- 往上翻看历史时不打断视线：新日志照常写入，只在这里提示有多少条 -->
-        <button id="logJump" class="log-jump" type="button" hidden></button>
-      </section>
+      </main>
     </div>
 
     <script src="app.js"></script>

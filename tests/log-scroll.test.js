@@ -134,22 +134,47 @@ test('差一点点到底（行高取整/惯性）仍算在底部', () => {
   assert.equal(ui.logJumpBtn.hidden, true);
 });
 
-test('链接与下载设置可折叠，且操作按钮留在折叠区外', () => {
+// 布局：左侧菜单切换右侧内容。四个页面都在，且每个都有对应的导航项。
+test('侧栏导航覆盖全部四个页面', () => {
   const html = fs.readFileSync(indexHtml, 'utf8');
-  const card = html.slice(html.indexOf('id="inputCard"'), html.indexOf('<!-- 进度区 -->'));
-  assert.match(card, /id="inputToggle"[^>]*aria-controls="inputBody"/);
-  assert.match(card, /id="inputBody"/);
+  for (const view of ['download', 'settings', 'env', 'log']) {
+    assert.match(html, new RegExp(`class="nav-item[^"]*"[^>]*data-view="${view}"`), `缺导航项 ${view}`);
+    assert.match(html, new RegExp(`class="view [^"]*"[^>]*data-view="${view}"`), `缺内容页 ${view}`);
+  }
+});
 
-  // 折叠体必须在 actions 之前闭合：收起后仍要能点「开始下载」「取消」
-  const bodyStart = card.indexOf('id="inputBody"');
-  const actionsAt = card.indexOf('<div class="actions">');
-  const bodyEnd = card.lastIndexOf('</div>', actionsAt);
-  assert.ok(bodyStart < bodyEnd && bodyEnd < actionsAt, '操作按钮不能被折叠进去');
+// 状态条和进度条必须在页面容器（.content-body）之外，切到任何页都看得到下载进度。
+test('状态条与进度条常驻在页面容器之外', () => {
+  const html = fs.readFileSync(indexHtml, 'utf8');
+  const statusAt = html.indexOf('class="statusbar"');
+  const progressAt = html.indexOf('id="progressBar"');
+  const bodyAt = html.indexOf('class="content-body"');
+  assert.ok(statusAt !== -1 && progressAt !== -1 && bodyAt !== -1);
+  assert.ok(statusAt < bodyAt, '状态条要在 content-body 前面（常驻）');
+  assert.ok(progressAt < bodyAt, '进度条要在 content-body 前面（常驻）');
+});
 
+// 开始/取消按钮在下载页里，不该被藏进任何会整体隐藏的容器之外的机制里——
+// 这里保证它们和链接输入同处下载页，切页只影响可见性由 CSS 控制。
+test('下载操作按钮与链接输入同在下载页', () => {
+  const html = fs.readFileSync(indexHtml, 'utf8');
+  const viewStart = html.indexOf('class="view view-download');
+  const viewEnd = html.indexOf('class="view view-settings');
+  assert.ok(viewStart !== -1 && viewEnd !== -1 && viewStart < viewEnd);
+  const downloadView = html.slice(viewStart, viewEnd);
+  assert.match(downloadView, /id="url"/);
+  assert.match(downloadView, /id="start"/);
+  assert.match(downloadView, /id="cancel"/);
+});
+
+// 记住上次停在哪一页，下次打开还在那。
+test('当前页会被记住并在启动时恢复', () => {
   const app = fs.readFileSync(appJs, 'utf8');
-  assert.match(app, /inputCollapsed: collapsed/, '折叠状态要记住');
-  assert.match(app, /setInputCollapsed\(saved\.inputCollapsed === true\)/);
+  assert.match(app, /saveSettings\(\{ activeView: target \}\)/, '切页要记住 activeView');
+  assert.match(app, /showView\(saved\.activeView\)/, '启动时要恢复上次的页面');
 
+  // 只显示当前激活的视图
   const css = fs.readFileSync(path.join(projectRoot, 'renderer', 'style.css'), 'utf8');
-  assert.match(css, /\.pane\.collapsed \.pane-body \{\s*display: none;/);
+  assert.match(css, /\.view \{[^}]*display: none;/s);
+  assert.match(css, /\.view\.active \{[^}]*display: block;/s);
 });

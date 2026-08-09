@@ -1,12 +1,14 @@
 /* ==========================================================================
-   红果短剧下载器 —— 深色主题样式
+   红果短剧下载器 —— 深色主题样式（左侧菜单 + 右侧内容）
    ========================================================================== */
 
 :root {
   --bg: #0f1115;
   --bg-elev: #171a21;
+  --bg-side: #12141a;
   --bg-input: #0c0e12;
   --border: #262b36;
+  --border-soft: #1e232c;
   --border-focus: #ff5a3c;
   --text: #e7eaf0;
   --text-dim: #9aa3b2;
@@ -17,6 +19,7 @@
   --success: #22c55e;
   --warn: #eab308;
   --radius: 12px;
+  --radius-sm: 10px;
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
@@ -30,83 +33,292 @@ html,
 body {
   height: 100%;
 }
-body {
-  /* 卡片一多，内容可能比窗口高；日志卡片会先按 min-height 收缩，收缩到底之后
-     交给这里整页滚动兜底，保证不管窗口多小，日志和其它卡片始终可以滚到看见。 */
-  overflow-y: auto;
-}
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
-  background: radial-gradient(1200px 600px at 50% -10%, #1a1d26 0%, var(--bg) 55%);
+  background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   user-select: none;
+  overflow: hidden;
 }
 
-.app {
-  max-width: 780px;
-  margin: 0 auto;
-  padding: 22px 20px 28px;
+/* ==========================================================================
+   骨架：侧栏 + 内容
+   ========================================================================== */
+.shell {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
   height: 100vh;
 }
 
-/* ---------- 顶部 ---------- */
-.header {
-  padding: 4px 2px;
+/* ---------- 侧栏 ---------- */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--bg-side);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 14px;
 }
+
 .brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
+  padding: 6px 8px 18px;
 }
 .logo {
-  font-size: 34px;
+  font-size: 30px;
   filter: drop-shadow(0 4px 10px rgba(255, 90, 60, 0.4));
 }
-h1 {
-  font-size: 20px;
+.brand-text h1 {
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: 0.3px;
+  line-height: 1.15;
 }
-.subtitle {
-  font-size: 13px;
+.brand-text p {
+  font-size: 12px;
   color: var(--text-dim);
-  margin-top: 3px;
+  margin-top: 2px;
 }
 
-/* ---------- 卡片 ---------- */
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+}
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(255, 90, 60, 0.16), rgba(255, 138, 60, 0.1));
+  border-color: rgba(255, 90, 60, 0.35);
+  color: #fff;
+}
+.nav-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.nav-label {
+  flex: 1;
+}
+.nav-badge {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.nav-item.active .nav-badge {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  padding: 12px 10px 2px;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sidebar-foot .version {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.sidebar-foot .foot-note {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* ---------- 内容 ---------- */
+.content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(1000px 500px at 70% -20%, #1a1d26 0%, var(--bg) 60%);
+}
+
+/* 常驻状态条 */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 24px 10px;
+}
+.statusbar-spacer {
+  flex: 1;
+}
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex-shrink: 0;
+}
+.status-dot.running {
+  background: var(--warn);
+  box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.15);
+  animation: pulse 1.2s infinite;
+}
+.status-dot.done {
+  background: var(--success);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
+}
+.status-dot.error {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.status-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+.episode-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-2);
+  background: rgba(255, 138, 60, 0.12);
+  border: 1px solid rgba(255, 138, 60, 0.3);
+  border-radius: 999px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+.episode-badge:empty {
+  display: none;
+}
+.stat-speed,
+.stat-time {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.progress-text {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+  text-align: right;
+}
+.progress-track {
+  height: 6px;
+  margin: 0 24px;
+  background: var(--bg-input);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
+/* 页面容器：只显示当前激活的视图 */
+.content-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.view {
+  flex: 1;
+  min-height: 0;
+  display: none;
+}
+.view.active {
+  display: block;
+  overflow-y: auto;
+  padding: 20px 24px 24px;
+}
+/* 日志页要让日志框自身撑满并内部滚动，而不是整页滚动 */
+.view-log.active {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   卡片与表单
+   ========================================================================== */
 .card {
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px 18px;
+  padding: 18px 20px;
   box-shadow: var(--shadow);
+}
+.card + .card {
+  margin-top: 16px;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .field-label {
   display: block;
   font-size: 12px;
   color: var(--text-dim);
-  margin: 4px 2px 6px;
+  margin: 4px 2px 7px;
   letter-spacing: 0.4px;
+}
+.field-label:not(:first-child) {
+  margin-top: 16px;
+}
+.field-hint {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.6;
+  margin-top: 8px;
 }
 
 .input-row {
   display: flex;
   gap: 10px;
-  margin-bottom: 12px;
 }
 
 input[type="text"] {
   flex: 1;
+  min-width: 0;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   color: var(--text);
   padding: 11px 13px;
   font-size: 14px;
@@ -125,28 +337,80 @@ input[readonly] {
   color: var(--text-dim);
 }
 
-/* ---------- 抓取方式 / 勾选行 ---------- */
+/* ---------- 抓取方式（卡片式单选） ---------- */
 .mode-group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-bottom: 8px;
+  gap: 8px;
 }
+.mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.mode-option:hover {
+  border-color: #3a4150;
+}
+.mode-option:has(input:checked) {
+  border-color: var(--border-focus);
+  background: rgba(255, 90, 60, 0.07);
+}
+.mode-option input[type="radio"] {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--border-focus);
+  cursor: pointer;
+  flex: none;
+}
+.mode-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.mode-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mode-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.tag-recommend {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--success);
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+/* ---------- 普通勾选行 ---------- */
 .checkbox-row {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  margin: 2px 2px 10px;
+  gap: 9px;
+  margin-top: 16px;
   font-size: 13px;
   color: var(--text-dim);
   cursor: pointer;
   user-select: none;
 }
-.mode-group .checkbox-row {
-  margin-bottom: 4px;
-}
-.checkbox-row input[type="checkbox"],
-.checkbox-row input[type="radio"] {
+.checkbox-row input[type="checkbox"] {
   margin-top: 2px;
   width: 15px;
   height: 15px;
@@ -158,21 +422,23 @@ input[readonly] {
   line-height: 1.5;
 }
 
-/* ---------- 按钮 ---------- */
+/* ==========================================================================
+   按钮
+   ========================================================================== */
 .actions {
   display: flex;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: 16px;
 }
 .btn {
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   padding: 10px 18px;
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
   cursor: pointer;
-  transition: transform 0.05s, background 0.15s, opacity 0.15s;
+  transition: transform 0.05s, background 0.15s, opacity 0.15s, filter 0.15s;
 }
 .btn:active {
   transform: translateY(1px);
@@ -208,102 +474,47 @@ input[readonly] {
   border-color: #3a4150;
 }
 .btn-mini {
-  padding: 4px 10px;
+  padding: 5px 11px;
   font-size: 12px;
   background: transparent;
   border-color: var(--border);
   color: var(--text-dim);
 }
-.btn-mini:hover {
+.btn-mini:not(:disabled):hover {
   color: var(--text);
+  border-color: #3a4150;
 }
 
-/* ---------- 可折叠面板（环境检查 / 链接与下载设置共用） ---------- */
-.pane-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  color: var(--text-dim);
-}
-.pane-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0; /* 收起后摘要可以省略号，不把标题挤走 */
-  background: transparent;
-  border: none;
-  color: var(--text-dim);
-  font-size: 13px;
-  font-family: inherit;
-  padding: 4px 2px;
-  margin: -4px -2px;
-  cursor: pointer;
-}
-.pane-toggle:hover {
-  color: var(--text);
-}
-.pane-chevron {
-  display: inline-block;
-  transition: transform 0.15s ease;
-  color: var(--text-faint);
-}
-.pane.collapsed .pane-chevron {
-  transform: rotate(-90deg);
-}
-.pane-summary {
-  display: none;
-  color: var(--text-faint);
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.pane.collapsed .pane-summary {
-  display: inline;
-}
-.pane.collapsed .pane-body {
-  display: none;
-}
-
-/* ---------- 环境检查 ---------- */
-.env-card {
-  padding: 14px 18px;
-}
+/* ==========================================================================
+   环境检查
+   ========================================================================== */
 .env-actions {
   display: flex;
   gap: 8px;
 }
-.env-card .pane-body {
-  margin-top: 10px;
-}
-
-/* ---------- 链接与下载设置 ---------- */
-.input-card .pane-head {
-  margin-bottom: 4px;
-}
-/* 收起后只剩标题和操作按钮，别再留展开时的那段留白 */
-.input-card.collapsed .actions {
-  margin-top: 12px;
+.env-list {
+  display: flex;
+  flex-direction: column;
 }
 .env-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 0;
+  gap: 11px;
+  padding: 11px 2px;
   font-size: 13px;
 }
 .env-row + .env-row {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-soft);
 }
 .env-label {
   color: var(--text);
   flex: none;
-  width: 150px;
+  width: 160px;
 }
 .env-msg {
   color: var(--text-dim);
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -336,106 +547,23 @@ input[readonly] {
   background: var(--text-faint);
 }
 
-/* ---------- 状态 & 进度 ---------- */
-.status-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.status-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--text-faint);
-  flex-shrink: 0;
-}
-.status-dot.running {
-  background: var(--warn);
-  box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.15);
-  animation: pulse 1.2s infinite;
-}
-.status-dot.done {
-  background: var(--success);
-  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
-}
-.status-dot.error {
-  background: var(--danger);
-  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
-}
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-.status-text {
-  font-size: 14px;
-  flex: 1;
-}
-.episode-badge {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent-2);
-  background: rgba(255, 138, 60, 0.12);
-  border: 1px solid rgba(255, 138, 60, 0.3);
-  border-radius: 999px;
-  padding: 2px 10px;
-  white-space: nowrap;
-}
-.episode-badge:empty {
-  display: none;
-}
-.progress-text {
-  font-size: 13px;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-.progress-track {
-  height: 10px;
-  background: var(--bg-input);
-  border-radius: 999px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-.progress-bar {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  border-radius: 999px;
-  transition: width 0.25s ease;
-}
-.meta-row {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ---------- 日志 ---------- */
+/* ==========================================================================
+   日志
+   ========================================================================== */
 .log-card {
   flex: 1;
   display: flex;
   flex-direction: column;
   position: relative; /* 供「N 条新日志」浮标定位 */
-  /* 卡片一多，窗口装不下时这里先按 flex:1 收缩，但绝不小于这个高度——低于此高度改由
-     body 的 overflow-y:auto 整页滚动兜底(见上)，而不是把日志挤成看不见的一条缝。 */
-  min-height: 160px;
-}
-.log-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  color: var(--text-dim);
-  margin-bottom: 10px;
+  min-height: 0;
 }
 .log {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   padding: 10px 12px;
   font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
   font-size: 12px;
@@ -479,8 +607,11 @@ input[readonly] {
   display: none;
 }
 
-.log::-webkit-scrollbar { width: 8px; }
-.log::-webkit-scrollbar-thumb {
+/* ---------- 滚动条 ---------- */
+.log::-webkit-scrollbar,
+.view.active::-webkit-scrollbar { width: 8px; }
+.log::-webkit-scrollbar-thumb,
+.view.active::-webkit-scrollbar-thumb {
   background: #2b313d;
   border-radius: 8px;
 }

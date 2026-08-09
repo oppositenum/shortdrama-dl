@@ -28,12 +28,9 @@ const openDirBtn = $('openDir');
 const clearLogBtn = $('clearLog');
 const envRecheckBtn = $('envRecheck');
 const envFixBtn = $('envFix');
-const envCard = $('envCard');
-const envToggle = $('envToggle');
 const envSummary = $('envSummary');
-const inputCard = $('inputCard');
-const inputToggle = $('inputToggle');
-const inputSummary = $('inputSummary');
+const navEl = $('nav');
+const appVersionEl = $('appVersion');
 const logJumpBtn = $('logJump');
 
 const statusText = $('status');
@@ -154,41 +151,32 @@ function resetEnvRows() {
 function updateEnvSummary() {
   const okCount = ENV_IDS.filter((id) => envItemState[id] === 'ok').length;
   const anyChecking = ENV_IDS.some((id) => envItemState[id] === 'checking');
-  envSummary.textContent = anyChecking ? '检查中…' : `${okCount}/${ENV_IDS.length} 就绪`;
+  envSummary.textContent = anyChecking ? '检查中…' : `${okCount}/${ENV_IDS.length}`;
 }
-
-function setEnvCollapsed(collapsed) {
-  envCard.classList.toggle('collapsed', collapsed);
-  envToggle.setAttribute('aria-expanded', String(!collapsed));
-  window.api.saveSettings({ envCollapsed: collapsed });
-}
-
-envToggle.addEventListener('click', () => {
-  setEnvCollapsed(!envCard.classList.contains('collapsed'));
-});
 
 // ==========================================================================
-// 链接与下载设置：和环境检查一样可收起。收起的只有表单，操作按钮留在外面，
-// 所以收起状态下照样能开始/停止，腾出来的高度全给日志。
+// 侧栏导航：点菜单切右侧内容，记住上次停在哪一页。
+// 状态条和进度条在内容顶部常驻，切到任何页都看得到下载进度。
 // ==========================================================================
-function updateInputSummary() {
-  const url = urlInput.value.trim();
-  const label = GRAB_MODE_LABEL[getGrabMode()] || '';
-  const shortUrl = url.length > 46 ? `${url.slice(0, 44)}…` : url;
-  inputSummary.textContent = url ? `${shortUrl} · ${label}` : `未填链接 · ${label}`;
+const VIEWS = ['download', 'settings', 'env', 'log'];
+
+function showView(view) {
+  const target = VIEWS.includes(view) ? view : 'download';
+  for (const item of navEl.querySelectorAll('.nav-item')) {
+    item.classList.toggle('active', item.dataset.view === target);
+  }
+  for (const panel of document.querySelectorAll('.view')) {
+    panel.classList.toggle('active', panel.dataset.view === target);
+  }
+  // 切到日志页时，若视线本就在底部则跟到最新（新日志可能是切走时攒下的）
+  if (target === 'log' && logPinnedToBottom) scrollLogToBottom();
+  window.api.saveSettings({ activeView: target });
 }
 
-function setInputCollapsed(collapsed) {
-  inputCard.classList.toggle('collapsed', collapsed);
-  inputToggle.setAttribute('aria-expanded', String(!collapsed));
-  updateInputSummary();
-  window.api.saveSettings({ inputCollapsed: collapsed });
-}
-
-inputToggle.addEventListener('click', () => {
-  setInputCollapsed(!inputCard.classList.contains('collapsed'));
+navEl.addEventListener('click', (e) => {
+  const item = e.target.closest('.nav-item');
+  if (item) showView(item.dataset.view);
 });
-urlInput.addEventListener('input', updateInputSummary);
 
 window.api.onEnvBegin(() => {
   envRecheckBtn.disabled = true;
@@ -389,7 +377,6 @@ for (const el of [modeApp, modeApi, modeOffline, modeNone]) {
   if (!el) continue;
   el.addEventListener('change', () => {
     syncGrabDirRow();
-    updateInputSummary();
     saveFormState();
     // 切换抓取方式后重跑环境检查（纯协议/本机签名不查安卓/Frida）
     if (!downloading) runEnvCheck();
@@ -533,8 +520,11 @@ async function initSettings() {
     }
   }
 
-  setEnvCollapsed(saved.envCollapsed === true);
-  setInputCollapsed(saved.inputCollapsed === true);
+  showView(saved.activeView);
   runEnvCheck();
+
+  window.api.getAppVersion().then((v) => {
+    if (v) appVersionEl.textContent = `v${v}`;
+  }).catch(() => {});
 }
 initSettings();
