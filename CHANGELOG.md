@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.5.1...v1.6.0) (2026-08-09)
+
+
+### Features
+
+* support actor/character pages as multi-series lists ([#19](https://github.com/oppositenum/shortdrama-dl/issues/19)) ([22451bd](https://github.com/oppositenum/shortdrama-dl/commit/22451bda04874f1cb5d5adfccf59822ab161df83))
+
 ## [1.5.1](https://github.com/oppositenum/shortdrama-dl/compare/v1.5.0...v1.5.1) (2026-08-04)
 
 
