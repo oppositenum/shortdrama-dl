@@ -16,6 +16,8 @@ const {
   formatElapsed,
   getSeriesIdFromUrl,
   isCategoryUrl,
+  isCharacterUrl,
+  isSeriesListUrl,
   isSeriesUrl,
   isValidUrl,
   refererOf,
@@ -42,6 +44,24 @@ test('分类页要排除带 series_id 的那种', () => {
   assert.equal(isCategoryUrl('https://hongguoduanju.com/category?sort_type=1'), true);
   assert.equal(isCategoryUrl('https://hongguoduanju.com/category?series_id=1'), false);
   assert.equal(isCategoryUrl('https://hongguoduanju.com/detail?series_id=1'), false);
+});
+
+// 角色/演员聚合页也是一页多部剧，结构与分类页一致，要走同一套批量流程。
+test('角色聚合页当列表页处理，且不被误判成详情页', () => {
+  const characterUrl = 'https://hongguoduanju.com/character/7429227723668591897';
+  assert.equal(isCharacterUrl(characterUrl), true);
+  assert.equal(isCharacterUrl('https://hongguoduanju.com/character/1?series_id=1'), false, '带 series_id 的不算');
+  assert.equal(isCharacterUrl('https://hongguoduanju.com/category?sort_type=1'), false);
+  // 关键：不能掉进详情页/单集分支，否则会被当成单个视频去抓、静默失败
+  assert.equal(isSeriesUrl(characterUrl), false);
+  assert.equal(isCategoryUrl(characterUrl), false);
+});
+
+test('列表页判别覆盖分类页和角色页两种', () => {
+  assert.equal(isSeriesListUrl('https://hongguoduanju.com/category?sort_type=1'), true);
+  assert.equal(isSeriesListUrl('https://hongguoduanju.com/character/7429227723668591897'), true);
+  assert.equal(isSeriesListUrl('https://hongguoduanju.com/detail?series_id=1'), false);
+  assert.equal(isSeriesListUrl('https://hongguoduanju.com/player/abc'), false);
 });
 
 test('从链接里取 series_id，取不到给 null 而不是抛', () => {

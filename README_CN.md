@@ -137,7 +137,8 @@ powershell -File .\python\start_avd.ps1 -Ensure -InstallMissing
 
 - **开发启动**：`npm start`（`npm run dev` 额外开启 Electron 调试日志）。
 - **单播放页**：粘贴 `/player/...` 链接，选择保存目录，点「开始下载」。
-- **整剧**：粘贴 `/detail?series_id=...` 或 `/category?...` 链接，然后选抓取方式；网页只解析剧名/总集数/封面，分集由所选方式负责。已存在的分集会跳过，所以中断后直接重跑就是续传。
+- **整剧**：粘贴 `/detail?series_id=...` 链接，然后选抓取方式；网页只解析剧名/总集数/封面，分集由所选方式负责。已存在的分集会跳过，所以中断后直接重跑就是续传。
+- **一页多部剧**：粘贴 `/category?...`（分类/榜单页）或 `/character/...`（演员/角色聚合页）链接，会解析出页面里的全部剧目并逐部下载，同一套跳过/补漏逻辑。
 - **通知**（可选）：填 Bark 地址（形如 `https://api.day.app/你的Key`），点「试发一条」验证。照官方示例把标题和内容一起粘进来也行，只会保留 key。
 - 已有分集跳过和 `.complete` 完成标记见 [架构文档](docs/ARCHITECTURE.md)。
 
