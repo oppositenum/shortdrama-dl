@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.7.0...v1.8.0) (2026-08-10)
+
+
+### Features
+
+* **ui:** polish into a restrained macOS-style dark desktop tool ([#23](https://github.com/oppositenum/shortdrama-dl/issues/23)) ([7ac5ef8](https://github.com/oppositenum/shortdrama-dl/commit/7ac5ef8db13f06d84b0d090670759e61fe13c46a))
+
 ## [1.7.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.6.0...v1.7.0) (2026-08-09)
 
 
