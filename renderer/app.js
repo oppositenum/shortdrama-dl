@@ -32,6 +32,10 @@ const envSummary = $('envSummary');
 const navEl = $('nav');
 const appVersionEl = $('appVersion');
 const logJumpBtn = $('logJump');
+const taskbarEl = $('taskbar');
+const pageTitleEl = $('pageTitle');
+const pageSubEl = $('pageSub');
+const actionsEl = $('actions');
 
 const statusText = $('status');
 const statusDot = $('statusDot');
@@ -136,7 +140,11 @@ function setEnvRow(id, state, message) {
   if (!row) return;
   envItemState[id] = state;
   const dot = row.querySelector('.env-dot');
-  dot.className = 'env-dot ' + state;
+  // 纯展示映射：主进程对「当前模式无需」的项发的是 ok + 说明文字，
+  // 界面上把它画成灰色 "—" 而不是绿色 ✓，正常与无需一眼可分。
+  const displayState =
+    state === 'ok' && /不需要|无需/.test(message || '') ? 'blocked' : state;
+  dot.className = 'env-dot ' + displayState;
   row.querySelector('.env-msg').textContent = message || '';
   updateEnvSummary();
 }
@@ -149,9 +157,13 @@ function resetEnvRows() {
 }
 
 function updateEnvSummary() {
-  const okCount = ENV_IDS.filter((id) => envItemState[id] === 'ok').length;
+  // 侧栏只给一个克制的信号：全部就绪 ✓ / 有待处理项给数字 / 检查中 …
   const anyChecking = ENV_IDS.some((id) => envItemState[id] === 'checking');
-  envSummary.textContent = anyChecking ? '检查中…' : `${okCount}/${ENV_IDS.length}`;
+  const troubleCount = ENV_IDS.filter((id) =>
+    ['missing', 'warn', 'error'].includes(envItemState[id])
+  ).length;
+  envSummary.textContent = anyChecking ? '…' : troubleCount ? String(troubleCount) : '✓';
+  envSummary.classList.toggle('attention', !anyChecking && troubleCount > 0);
 }
 
 // ==========================================================================
@@ -159,6 +171,12 @@ function updateEnvSummary() {
 // 状态条和进度条在内容顶部常驻，切到任何页都看得到下载进度。
 // ==========================================================================
 const VIEWS = ['download', 'settings', 'env', 'log'];
+const VIEW_META = {
+  download: ['下载', '输入短剧链接，选择下载方式后开始任务'],
+  settings: ['设置', '管理下载目录、组件路径和通知'],
+  env: ['环境检查', '检查当前下载方式所需的组件'],
+  log: ['运行日志', '任务运行过程的实时输出'],
+};
 
 function showView(view) {
   const target = VIEWS.includes(view) ? view : 'download';
@@ -168,6 +186,9 @@ function showView(view) {
   for (const panel of document.querySelectorAll('.view')) {
     panel.classList.toggle('active', panel.dataset.view === target);
   }
+  const [title, sub] = VIEW_META[target];
+  pageTitleEl.textContent = title;
+  pageSubEl.textContent = sub;
   // 切到日志页时，若视线本就在底部则跟到最新（新日志可能是切走时攒下的）
   if (target === 'log' && logPinnedToBottom) scrollLogToBottom();
   window.api.saveSettings({ activeView: target });
@@ -181,6 +202,7 @@ navEl.addEventListener('click', (e) => {
 window.api.onEnvBegin(() => {
   envRecheckBtn.disabled = true;
   envFixBtn.disabled = true;
+  envFixBtn.hidden = true;
   resetEnvRows();
 });
 
@@ -191,6 +213,8 @@ window.api.onEnvDone(() => {
   envFixBtn.disabled = !FIXABLE_ENV_IDS.some(
     (id) => envItemState[id] === 'missing' || envItemState[id] === 'warn'
   );
+  // 没有可修复项时不显示一个永远禁用的按钮
+  envFixBtn.hidden = envFixBtn.disabled;
 });
 
 function runEnvCheck() {
@@ -250,6 +274,8 @@ logEl.addEventListener('scroll', () => {
 
 logJumpBtn.addEventListener('click', scrollLogToBottom);
 
+const LOG_LEVEL_LABEL = { info: 'INFO', success: 'OK', warn: 'WARN', error: 'ERROR' };
+
 function appendLog({ time, level, message }) {
   // 追加发生在可视区下方，浏览器不会改 scrollTop，所以停在半路的视线自然不受影响。
   const wasPinned = logPinnedToBottom;
@@ -257,7 +283,9 @@ function appendLog({ time, level, message }) {
   line.className = `log-line ${level || 'info'}`;
   line.innerHTML =
     `<span class="log-time">${time || ''}</span>` +
+    `<span class="log-level"></span>` +
     `<span class="log-msg"></span>`;
+  line.querySelector('.log-level').textContent = LOG_LEVEL_LABEL[level] || 'INFO';
   line.querySelector('.log-msg').textContent = message;
   logEl.appendChild(line);
   if (wasPinned) {
@@ -280,6 +308,9 @@ function setProgress(percent) {
 
 function setDownloadingUI(on) {
   downloading = on;
+  // 按钮按状态显隐（CSS 依据 .running 切换）：空闲只留「开始下载」，
+  // 下载中换成「打开文件夹 / 抓完本部再停 / 取消任务」。
+  actionsEl.classList.toggle('running', on);
   startBtn.disabled = on;
   cancelBtn.disabled = !on;
   stopAfterSeriesBtn.disabled = !on;
@@ -304,6 +335,7 @@ function setDownloadingUI(on) {
 window.api.onLog((d) => appendLog(d));
 
 window.api.onStatus((text) => {
+  taskbarEl.hidden = false;
   statusText.textContent = text;
   setDot('running');
 });
@@ -339,9 +371,11 @@ window.api.onDone((d) => {
   setProgress(100);
   setDownloadingUI(false);
   openDirBtn.disabled = false;
+  openDirBtn.hidden = false;
 });
 
 window.api.onError((msg) => {
+  taskbarEl.hidden = false;
   statusText.textContent = '出错：' + msg;
   setDot('error');
   setDownloadingUI(false);
@@ -352,6 +386,8 @@ window.api.onCanceled(() => {
   setDot('');
   setProgress(0);
   setDownloadingUI(false);
+  // 用户主动取消：回到空闲态，不留一条 0% 的空进度条
+  taskbarEl.hidden = true;
 });
 
 // ==========================================================================
@@ -427,10 +463,12 @@ startBtn.addEventListener('click', async () => {
   }
 
   setProgress(0);
-  timemarkEl.textContent = '--:--:--';
+  timemarkEl.textContent = '';
   speedEl.textContent = '';
   episodeEl.textContent = '';
   openDirBtn.disabled = true;
+  openDirBtn.hidden = true;
+  taskbarEl.hidden = false;
   setDownloadingUI(true);
   setDot('running');
   statusText.textContent = '准备中…';
