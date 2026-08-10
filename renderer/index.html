@@ -15,72 +15,107 @@
       <!-- ===================== 左侧：菜单 ===================== -->
       <aside class="sidebar">
         <div class="brand">
-          <span class="logo">🎬</span>
+          <span class="logo" aria-hidden="true">
+            <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="28" height="28" rx="7" fill="#FF6845" />
+              <path d="M11 9.2v9.6l7.5-4.8L11 9.2Z" fill="#fff" />
+            </svg>
+          </span>
           <div class="brand-text">
             <h1>红果短剧</h1>
-            <p>下载器</p>
+            <p>本地下载工具</p>
           </div>
         </div>
 
         <nav class="nav" id="nav">
           <button class="nav-item active" type="button" data-view="download">
-            <span class="nav-icon">⬇️</span>
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 4v10" /><path d="m8 11 4 4 4-4" /><path d="M5 20h14" />
+              </svg>
+            </span>
             <span class="nav-label">下载</span>
           </button>
           <button class="nav-item" type="button" data-view="settings">
-            <span class="nav-icon">⚙️</span>
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 8h10" /><path d="M18 8h2" /><path d="M4 16h4" /><path d="M12 16h8" />
+                <circle cx="16" cy="8" r="2.2" /><circle cx="9" cy="16" r="2.2" />
+              </svg>
+            </span>
             <span class="nav-label">设置</span>
           </button>
           <button class="nav-item" type="button" data-view="env">
-            <span class="nav-icon">🧩</span>
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="7" y="7" width="10" height="10" rx="2" />
+                <path d="M10 3v2M14 3v2M10 19v2M14 19v2M3 10h2M3 14h2M19 10h2M19 14h2" />
+              </svg>
+            </span>
             <span class="nav-label">环境检查</span>
             <span id="envSummary" class="nav-badge"></span>
           </button>
           <button class="nav-item" type="button" data-view="log">
-            <span class="nav-icon">📜</span>
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 7h14" /><path d="M5 12h14" /><path d="M5 17h9" />
+              </svg>
+            </span>
             <span class="nav-label">运行日志</span>
           </button>
         </nav>
 
         <div class="sidebar-foot">
           <span id="appVersion" class="version">—</span>
-          <span class="foot-note">本地下载 · 开源</span>
+          <span class="foot-note">本地运行</span>
         </div>
       </aside>
 
       <!-- ===================== 右侧：内容 ===================== -->
       <main class="content">
-        <!-- 常驻状态条：无论在哪个页面都能看到下载状态与进度 -->
-        <div class="statusbar">
-          <span class="status-dot" id="statusDot"></span>
-          <span id="status" class="status-text">就绪</span>
-          <span id="episode" class="episode-badge"></span>
-          <span class="statusbar-spacer"></span>
-          <span id="speed" class="stat-speed"></span>
-          <span id="timemark" class="stat-time">--:--:--</span>
-          <span id="progressText" class="progress-text">0%</span>
-        </div>
-        <div class="progress-track">
-          <div id="progressBar" class="progress-bar"></div>
+        <!-- 页头：标题随当前页切换 -->
+        <header class="page-head">
+          <div class="page-head-text">
+            <h2 id="pageTitle" class="page-title">下载</h2>
+            <p id="pageSub" class="page-sub">输入短剧链接，选择下载方式后开始任务</p>
+          </div>
+        </header>
+
+        <!-- 任务条：只在有任务（下载中 / 完成 / 出错）时显示；
+             空闲时整体隐藏，不出现 0% 和空进度条。
+             常驻于页面容器之外，切到任何页都看得到下载进度。 -->
+        <div class="taskbar" id="taskbar" hidden>
+          <div class="statusbar">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="status" class="status-text">就绪</span>
+            <span id="episode" class="episode-badge"></span>
+            <span class="statusbar-spacer"></span>
+            <span id="speed" class="stat-speed"></span>
+            <span id="timemark" class="stat-time"></span>
+            <span id="progressText" class="progress-text"></span>
+          </div>
+          <div class="progress-track">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
         </div>
 
         <div class="content-body">
           <!-- ---------- 页：下载 ---------- -->
           <section class="view view-download active" data-view="download">
-            <div class="card">
-              <label class="field-label" for="url">播放页 / 详情页 / 列表页链接</label>
-              <div class="input-row">
-                <input
-                  id="url"
-                  type="text"
-                  placeholder="播放页 /player/… 下单集；详情/分类/角色页选抓取方式后下全集"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-              </div>
+            <div class="field">
+              <label class="field-label" for="url">短剧链接</label>
+              <input
+                id="url"
+                type="text"
+                placeholder="播放页 /player/… 下单集；详情 / 分类 / 角色页下全部剧集"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
 
-              <div class="field-label">整剧抓取方式</div>
-              <div class="mode-group" id="grabModeGroup" role="radiogroup" aria-label="整剧抓取方式">
+            <div class="field">
+              <div class="field-label" id="grabModeLabel">下载方式</div>
+              <div class="mode-group" id="grabModeGroup" role="radiogroup" aria-labelledby="grabModeLabel">
                 <label class="mode-option">
                   <input type="radio" name="grabMode" id="modeOffline" value="offline" checked />
                   <span class="mode-text">
@@ -92,7 +127,7 @@
                   <input type="radio" name="grabMode" id="modeApi" value="api" />
                   <span class="mode-text">
                     <span class="mode-title">纯协议下载</span>
-                    <span class="mode-desc">网络 + Python + ffmpeg；遇 110001 时若本机已有模拟器在跑，可借 App 签名回退</span>
+                    <span class="mode-desc">网络 + Python + ffmpeg；遇风控可借模拟器签名回退</span>
                   </span>
                 </label>
                 <label class="mode-option">
@@ -112,69 +147,91 @@
               </div>
             </div>
 
-            <div class="actions">
+            <div class="actions" id="actions">
               <button id="start" class="btn btn-primary">
+                <span class="btn-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 5v10" /><path d="m8 12 4 4 4-4" /><path d="M6 20h12" />
+                  </svg>
+                </span>
                 <span class="btn-text">开始下载</span>
               </button>
-              <button id="stopAfterSeries" class="btn btn-ghost" disabled title="不再从清单开新的剧；当前这一部抓完、并把前面攒下的缺集补完之后才结束。要立刻中断请按「取消」">
+              <button id="openDir" class="btn btn-secondary" disabled hidden>打开文件夹</button>
+              <button id="stopAfterSeries" class="btn btn-secondary" disabled title="不再从清单开新的剧；当前这一部抓完、并把前面攒下的缺集补完之后才结束。要立刻中断请按「取消任务」">
                 抓完本部再停
               </button>
-              <button id="cancel" class="btn btn-danger" disabled title="立即打断，正在抓的这一部会中断">取消</button>
-              <button id="openDir" class="btn btn-ghost" disabled>打开文件夹</button>
+              <button id="cancel" class="btn btn-danger" disabled title="立即打断，正在抓的这一部会中断">取消任务</button>
             </div>
           </section>
 
           <!-- ---------- 页：设置 ---------- -->
           <section class="view view-settings" data-view="settings">
-            <div class="card">
-              <label class="field-label" for="dir">保存目录</label>
-              <div class="input-row">
-                <input id="dir" type="text" placeholder="默认下载文件夹" readonly />
-                <button id="chooseDir" class="btn btn-ghost">选择文件夹</button>
-              </div>
+            <div class="section">
+              <h3 class="section-title">文件与下载</h3>
 
-              <label class="field-label" for="grabDir">Python 组件目录</label>
-              <div class="input-row" id="grabDirRow">
-                <input
-                  id="grabDir"
-                  type="text"
-                  placeholder="留空使用内置 python/（HONGGUO_GRAB_DIR 可覆盖）"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-                <button id="chooseGrabDir" class="btn btn-ghost">选择目录</button>
+              <div class="field">
+                <label class="field-label" for="dir">保存位置</label>
+                <div class="input-row">
+                  <input id="dir" type="text" placeholder="默认下载文件夹" readonly />
+                  <button id="chooseDir" class="btn btn-secondary">选择文件夹</button>
+                </div>
               </div>
 
               <label class="checkbox-row">
                 <input id="introDetailed" type="checkbox" />
-                <span>简介.txt 写详细信息（默认只写剧名和剧情简介；勾选后另附集数、标签、来源和演职人员）</span>
+                <span>简介.txt 写详细信息<span class="checkbox-hint">默认只写剧名和剧情简介；勾选后另附集数、标签、来源和演职人员</span></span>
               </label>
             </div>
 
-            <div class="card">
-              <label class="field-label" for="barkUrl">Bark 通知（可选）</label>
-              <div class="input-row">
-                <input
-                  id="barkUrl"
-                  type="text"
-                  placeholder="https://api.day.app/你的Key（留空不通知；每抓完一整部剧、以及出错时推送）"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-                <button id="testNotify" class="btn btn-ghost">试发一条</button>
+            <div class="section">
+              <h3 class="section-title">高级设置</h3>
+
+              <div class="field">
+                <label class="field-label" for="grabDir">Python 组件目录</label>
+                <div class="input-row" id="grabDirRow">
+                  <input
+                    id="grabDir"
+                    type="text"
+                    class="input-dim"
+                    placeholder="留空自动使用内置 python/（HONGGUO_GRAB_DIR 可覆盖）"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button id="chooseGrabDir" class="btn btn-secondary">修改</button>
+                </div>
+                <p class="field-hint">一般无需改动；留空即使用应用内置的 Python 组件。</p>
               </div>
-              <p class="field-hint">填好地址后点「试发一条」可立即确认地址是否正确，不必等一部剧抓完。</p>
+            </div>
+
+            <div class="section">
+              <h3 class="section-title">通知</h3>
+
+              <div class="field">
+                <label class="field-label" for="barkUrl">Bark 通知<span class="label-optional">可选</span></label>
+                <div class="input-row">
+                  <input
+                    id="barkUrl"
+                    type="text"
+                    class="input-dim"
+                    placeholder="https://api.day.app/你的Key（留空不通知）"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button id="testNotify" class="btn btn-secondary">测试通知</button>
+                </div>
+                <p class="field-hint">每抓完一整部剧、以及出错时推送；填好后点「测试通知」立即验证地址。</p>
+              </div>
             </div>
           </section>
 
           <!-- ---------- 页：环境检查 ---------- -->
           <section class="view view-env" data-view="env">
-            <div class="card">
-              <div class="card-head">
-                <span class="card-title">环境检查</span>
+            <div class="section">
+              <div class="section-head">
+                <h3 class="section-title">组件状态</h3>
                 <div class="env-actions">
-                  <button id="envRecheck" class="btn btn-mini">重新检查</button>
-                  <button id="envFix" class="btn btn-mini" disabled>修复缺失项</button>
+                  <button id="envRecheck" class="btn btn-secondary btn-mini">重新检查</button>
+                  <button id="envFix" class="btn btn-secondary btn-mini" disabled hidden>修复缺失项</button>
                 </div>
               </div>
               <div class="env-list">
@@ -185,12 +242,12 @@
                 </div>
                 <div class="env-row" data-env="ffmpeg">
                   <span class="env-dot checking"></span>
-                  <span class="env-label">ffmpeg/ffprobe</span>
+                  <span class="env-label">ffmpeg / ffprobe</span>
                   <span class="env-msg">检查中…</span>
                 </div>
                 <div class="env-row" data-env="android">
                   <span class="env-dot checking"></span>
-                  <span class="env-label">Android 模拟器/设备</span>
+                  <span class="env-label">Android 模拟器 / 设备</span>
                   <span class="env-msg">检查中…</span>
                 </div>
                 <div class="env-row" data-env="hongguo_app">
@@ -209,10 +266,10 @@
 
           <!-- ---------- 页：运行日志 ---------- -->
           <section class="view view-log" data-view="log">
-            <div class="card log-card">
-              <div class="card-head">
-                <span class="card-title">运行日志</span>
-                <button id="clearLog" class="btn btn-mini">清空</button>
+            <div class="log-card">
+              <div class="log-head">
+                <span class="log-live"><span class="log-live-dot"></span>实时输出</span>
+                <button id="clearLog" class="btn btn-ghost btn-mini">清空</button>
               </div>
               <div id="log" class="log"></div>
               <!-- 往上翻看历史时不打断视线：新日志照常写入，只在这里提示有多少条 -->
