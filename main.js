@@ -1707,6 +1707,7 @@ function grabWithApi({
     expectedEpisodes: endEp - startEp + 1,
     explainExit: (code) => {
       if (code === 3) return `${modeTag}环境或参数不可用，本次只保存封面`;
+      if (code === 5) return '视频详情 API 请求或响应异常，未能获取分集列表；具体原因见上方 API 日志，本次只保存封面和简介';
       if (code === 4) {
         return offlineOnly
           ? '本机签名仍被业务 API 拒绝（110001）。可稍后重试，或改用「纯协议下载 / App 抓取」'

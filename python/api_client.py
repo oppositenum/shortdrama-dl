@@ -156,7 +156,44 @@ class HongguoApiClient:
             and not hasattr(self.signer, "ensure_frida_server")
         )
 
+    @staticmethod
+    def _read_json_response(resp: Any) -> Dict[str, Any]:
+        raw = resp.read()
+        headers = getattr(resp, "headers", {})
+        status = getattr(resp, "status", "unknown")
+        content_type = headers.get("Content-Type", "unknown")
+        # Only log response metadata, never bodies, signed URLs or request headers.
+        meta = f"HTTP {status}, Content-Type={content_type}, 响应长度={len(raw)} 字节"
+        if not raw.strip():
+            raise ApiError(f"接口返回空正文（{meta}）")
+        try:
+            data = json.loads(raw.decode("utf-8"))
+        except (ValueError, UnicodeError) as e:
+            raise ApiError(f"接口返回非 JSON 内容（{meta}）") from e
+        if not isinstance(data, dict):
+            raise ApiError(f"接口返回的 JSON 不是对象（{meta}）")
+        return data
+
+    @staticmethod
+    def _record_failure(failures: Dict[str, List[str]], host: str, error: Exception) -> None:
+        if isinstance(error, urllib.error.HTTPError):
+            reason = f"HTTP {error.code}"
+        elif isinstance(error, ApiError):
+            reason = str(error)
+        else:
+            # Transport exceptions may contain a full signed URL; omit their text.
+            reason = f"请求失败（{type(error).__name__}）"
+        failures.setdefault(host, []).append(reason)
+
+    @staticmethod
+    def _failure_summary(failures: Dict[str, List[str]]) -> str:
+        return "; ".join(
+            f"{host}（失败 {len(reasons)} 次）: " + " / ".join(dict.fromkeys(reasons))
+            for host, reasons in failures.items()
+        )
+
     def post_json(self, path: str, payload: Dict[str, Any], *, retries: int = 3) -> Dict[str, Any]:
+        failures: Dict[str, List[str]] = {}
         # 1) Signed path: OfflineSigner（纯 Python）或 TtnetDeviceSigner（Frida）
         if self.signer is not None:
             last_err: Optional[Exception] = None
@@ -184,9 +221,7 @@ class HongguoApiClient:
                                     url, data=body, method="POST", headers=headers
                                 )
                                 with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                                    data = json.loads(
-                                        resp.read().decode("utf-8", "replace")
-                                    )
+                                    data = self._read_json_response(resp)
                             else:
                                 raise ApiError("offline signer missing sign_headers")
                         else:
@@ -197,6 +232,7 @@ class HongguoApiClient:
                                     self.signer.ensure_alive()
                                 except Exception as e:
                                     last_err = e
+                                    self._record_failure(failures, host, e)
                                     time.sleep(0.5 * (rnd + 1))
                                     continue
                             data = self.signer.post_json(base, payload)
@@ -207,11 +243,13 @@ class HongguoApiClient:
                                 code=code,
                                 body=data,
                             )
+                            self._record_failure(failures, host, last_err)
                             time.sleep(0.4 * (rnd + 1))
                             continue
                         return data
                     except Exception as e:
                         last_err = e
+                        self._record_failure(failures, host, e)
                         # script destroyed / session dead：清掉再让 ensure_alive 重建
                         msg = str(e).lower()
                         if any(
@@ -233,7 +271,7 @@ class HongguoApiClient:
                             time.sleep(0.3 * (rnd + 1))
                         continue
             raise ApiError(
-                f"{path} signed post failed: {last_err}",
+                f"{path} signed post failed: {self._failure_summary(failures)}",
                 code=getattr(last_err, "code", None),
                 body=getattr(last_err, "body", None),
             )
@@ -262,8 +300,7 @@ class HongguoApiClient:
                 )
                 try:
                     with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                        raw = resp.read()
-                    data = json.loads(raw.decode("utf-8", "replace"))
+                        data = self._read_json_response(resp)
                     ok, code, msg = self._response_ok(data)
                     if not ok:
                         last_err = ApiError(
@@ -271,6 +308,7 @@ class HongguoApiClient:
                             code=code,
                             body=data,
                         )
+                        self._record_failure(failures, host, last_err)
                         if code in (110001, "110001", 101001, "101001"):
                             # 110001 是冲着这套身份来的业务风控，不是这台 host 的毛病。
                             # 换 host 或原地重试只会用同一身份再挨几次拒绝，把风控拖得更久。
@@ -281,9 +319,11 @@ class HongguoApiClient:
                     return data
                 except ApiError as e:
                     last_err = e
+                    self._record_failure(failures, host, e)
                     continue
                 except Exception as e:
                     last_err = e
+                    self._record_failure(failures, host, e)
                     continue
             if saw_risk:
                 break  # 风控不重试：本轮就到此为止，别再跑第二、三轮
@@ -298,7 +338,7 @@ class HongguoApiClient:
                 "仍失败可加 --interval，或 --device-sign 挂模拟器 App 签名。）"
             )
         raise ApiError(
-            f"{path} failed on all hosts: {last_err}{hint}",
+            f"{path} failed on all hosts: {self._failure_summary(failures)}{hint}",
             code=code,
             body=getattr(last_err, "body", None),
         )

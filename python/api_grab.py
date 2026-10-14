@@ -10,7 +10,7 @@
 协议:
   stdout 仅 JSON Lines（与 hongguo_grab.py 相同的 event 协议子集）
   stderr 调试日志
-  退出码: 0 全成功 / 2 部分失败 / 3 环境或参数错误
+  退出码: 0 全成功 / 2 部分失败 / 3 环境或参数错误 / 4 业务风控 / 5 API 详情失败
 
 密钥:
   video_model 返回 spade_a，由 spade_keys.unwrap_spade 离线解成 16 字节 AES key。
@@ -435,7 +435,7 @@ def main() -> int:
                         signer.detach()
                     except Exception:
                         pass
-                return 4 if _is_risk_err(e2) else 3
+                return 4 if _is_risk_err(e2) else (5 if isinstance(e2, ApiError) else 3)
         else:
             logev("error", f"拉取剧详情失败: {msg}")
             if signer is not None:
@@ -450,13 +450,13 @@ def main() -> int:
                     "或保证模拟器红果+frida-server 后使用 --device-sign。",
                 )
                 return 4
-            return 3
+            return 5 if isinstance(e, ApiError) else 3
 
     title = detail.get("series_title") or args.series_name or args.series_id
     episodes = client.episode_list(detail)
     if not episodes:
         logev("error", "剧详情里没有分集列表")
-        return 3
+        return 5
 
     total = max(ep["ep"] for ep in episodes)
     end = args.end_ep if args.end_ep > 0 else total
