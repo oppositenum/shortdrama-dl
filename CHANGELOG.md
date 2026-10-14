@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/oppositenum/shortdrama-dl/compare/v1.8.0...v1.8.1) (2026-10-14)
+
+
+### Bug Fixes
+
+* **api:** diagnose empty responses and distinguish API failures ([7b89037](https://github.com/oppositenum/shortdrama-dl/commit/7b89037d1d80803cbb6a83043563eaea1d5405f3))
+
 ## [1.8.0](https://github.com/oppositenum/shortdrama-dl/compare/v1.7.0...v1.8.0) (2026-08-10)
 
 
